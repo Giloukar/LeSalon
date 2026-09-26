@@ -3148,8 +3148,8 @@ if(window.SalonTableView){
    spectator:!!net.spectator,
    gated:!!gate,
    privateIndex:S?privateIndex():0,
-   canInteract:!!(S&&S.id==='huit'&&canPlay()),
-   viewData:{playableIds:S&&S.id==='huit'&&canPlay()?mine.filter(c=>eightLegal(S,c)).map(c=>c.id):[]},
+   canInteract:!!(S&&S.id==='huit'&&canPlay()&&!showSuit),
+   viewData:{playableIds:S&&S.id==='huit'&&canPlay()&&!showSuit?mine.filter(c=>eightLegal(S,c)).map(c=>c.id):[]},
    interactions:{
     playCard(id){if(!S||S.id!=='huit'||!canPlay())return false;const c=player(S).hand.find(c=>c.id===id);if(!c)return false;eightPlayCardUI(c);return true},
     draw(){if(!S||S.id!=='huit'||!canPlay())return false;dispatch({type:'draw'});return true}
