@@ -21,8 +21,8 @@ Le harness fige l’horloge et le hasard dans le navigateur de test, enregistre 
 - l’absence de paquets et de tirages RNG ajoutés par un refresh ;
 - la projection online et les surcharges finales réellement chargées ;
 - la reproduction de la pendule modifiée par le rendu ;
-- la reproduction de l’index de siège perdu par la dernière surcharge invitée.
+- le contrat d’identité du siège invité, y compris le jet rapide Cactus hors tour.
 
-Les deux derniers scénarios sont des diagnostics du comportement actuel. Leur résultat est volontairement décrit et ne constitue pas encore un contrat de neutralité. Les tests ne valident pas exhaustivement les règles, le drag, WebRTC réel, l’audio, le puff ou la qualité visuelle.
+Le scénario de pendule reste un diagnostic du comportement actuel. Les scénarios d’identité de siège sont désormais des contrats de régression. Les tests ne valident pas exhaustivement les règles, le drag, WebRTC réel, l’audio, le puff ou la qualité visuelle.
 
 Voir le diagnostic d’architecture dans docs/table-2d-readiness.md.
