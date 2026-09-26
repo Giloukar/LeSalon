@@ -612,7 +612,7 @@ function createGame(id,config,old=null){
  if(ARCADE_IDS.includes(id))return createArcade(s);
  if(id==='rummikub'){let t=[];for(let d=0;d<2;d++)for(let color=0;color<4;color++)for(let num=1;num<=13;num++)t.push({id:'t'+d+'-'+color+'-'+num,tile:true,color,num});t.push({id:'j0',tile:true,joker:true},{id:'j1',tile:true,joker:true});s.deck=shuffle(t);for(const p of s.players){p.hand=s.deck.splice(-14);p.opened=false;}s.table=[];rummiSnapshot(s);}
  else if(id==='oie'){for(const p of s.players){p.pos=0;p.wait=0;p.trapped=false;p.rolled=false;}s.dice=[1,1];s.path=[];}
- else if(id==='cactus'){s.deck=deck(s.players.length>4?2:1);for(const p of s.players){p.hand=s.deck.splice(-4);p.known={2:clone(p.hand[2]),3:clone(p.hand[3])};}s.discard=[s.deck.pop()];s.peekers=s.players.map((p,i)=>i).filter(i=>!s.players[i].bot);s.turn=s.peekers[0]??0;s.phase=s.peekers.length?'peek':'draw';s.caller=null;s.left=0;}
+ else if(id==='cactus'){s.deck=deck(1);for(const p of s.players){p.hand=s.deck.splice(-4);p.known={2:clone(p.hand[2]),3:clone(p.hand[3])};}s.discard=[s.deck.pop()];s.peekers=s.players.map((p,i)=>i).filter(i=>!s.players[i].bot);s.turn=s.peekers[0]??0;s.phase=s.peekers.length?'peek':'draw';s.caller=null;s.left=0;}
  else if(id==='vingtetun'){for(const p of s.players){p.chips=1000;p.bet=0;p.status='';}s.round=1;blackjackStart(s);}
  else {s.deck=deck(id==='huit'&&s.players.length>6?2:1);if(id==='huit'){for(const p of s.players)p.hand=s.deck.splice(-7);let k=s.deck.findIndex(c=>![1,7,8,11].includes(c.rank));s.discard=[s.deck.splice(k,1)[0]];s.suit=s.discard[0].suit;s.dir=1;s.announced=false;s.drawnId=null;s.stalls=0;}
  else {if(id==='pouilleux')s.deck=s.deck.filter(c=>c.rank!==12||c.suit==='S');let i=0;while(s.deck.length)s.players[i++%s.players.length].hand.push(s.deck.pop());
@@ -2588,6 +2588,7 @@ document.addEventListener('pointercancel',e=>{if(eightDragState?.id===e.pointerI
    ========================================================================= */
 const LEGACY3_CREATE=createGame,LEGACY3_ACT=act,LEGACY3_AI=ai,LEGACY3_BOARD=boardHTML,LEGACY3_ACTIONS=actionsHTML,LEGACY3_TURN=turnText,LEGACY3_STATUS=playerStatus,LEGACY3_SANITIZE=sanitizeOnlineAction,LEGACY3_PROJECT=projectGame,LEGACY3_VALIDATE=validateSaved,LEGACY3_SCENE=playSceneAction;
 const LEGACY3_ONLINE_ACT=onlineAct,LEGACY3_APPLY_ONLINE=applyOnlineAction,LEGACY3_GUEST_ACTION=handleGuestAction;
+const LEGACY3_ANIMATE_PAWN=animatePawn;
 const LEGACY_CACTUS_VERSION=1,LEGACY_GOOSE_VERSION=1;
 const LEGACY_CACTUS_LIMIT=6,LEGACY_CACTUS_PENALTY=10,LEGACY_CACTUS_ROYAL=-5,LEGACY_CACTUS_OBJECTIVE=100;
 const LEGACY_GOOSE_TRAPS=[6,19,31,42,52,58,63];
@@ -2620,7 +2621,8 @@ function legacyCactusInit(s,old){
  }
  s.discard=[s.deck.pop()];
  s.peekers=s.players.map(function(p,i){return p.bot?-1:i}).filter(function(i){return i>=0});
- s.turn=s.peekers[0]!==undefined?s.peekers[0]:0;
+ s.cactusStart=Math.floor(Math.random()*s.players.length);
+ s.turn=s.peekers[0]!==undefined?s.peekers[0]:s.cactusStart;
  s.phase=s.peekers.length?'peek':'draw';
  s.caller=null;s.left=0;s.drawn=null;s.source=null;s.power=null;s.reveal=null;s.swapFirst=null;
  s.cactusMatchOver=false;s.cactusGains=null;s.totals=null;s.lastQuick=null;
@@ -2692,7 +2694,7 @@ function legacyCactusAct(s,a){
   if(a.type!=='ready')return false;
   const at=s.peekers.indexOf(i);
   if(at>=0&&at<s.peekers.length-1){s.turn=s.peekers[at+1];return true}
-  s.turn=0;s.phase='draw';return true;
+  s.turn=s.cactusStart||0;s.phase='draw';return true;
  }
  if(s.phase==='reveal'){
   if(a.type!=='ready')return false;
@@ -2804,8 +2806,8 @@ function legacyGooseEffects(s,i,steps,path,event,depth,depart){
  if(pos===63){event.arrive=true;finish(s,i,p.name+' atteint exactement la case 63 !');return}
  if(GEESE.includes(pos)&&depth<24){
   event.geese=(event.geese||0)+1;
-  p.pos=legacyGooseWalk(p.pos,steps,path);p.best=Math.max(p.best,p.pos);
-  return legacyGooseEffects(s,i,steps,path,event,depth+1,pos);
+  const gooseDepart=pos;p.pos=legacyGooseWalk(p.pos,steps,path);p.best=Math.max(p.best,p.pos);
+  return legacyGooseEffects(s,i,steps,path,event,depth+1,gooseDepart);
  }
  if(pos===6){p.pos=12;path.push(12);event.trap='pont';legacyGooseCross(s,i,depart,path,event);return}
  if(pos===42){p.backtrack+=12;p.pos=30;path.push(30);event.trap='labyrinthe';legacyGooseCross(s,i,depart,path,event);return}
@@ -2925,7 +2927,7 @@ function legacyCactusBoard(){
 }
 function legacyGooseBoard(){
  const pending=S.goosePending,dests=new Set(pending?[pending.dice[0],pending.dice[1],pending.dice[0]+pending.dice[1]].map(function(n){return legacyGooseTarget(player(S).pos,n)}):[]);
- const pos=player(S).pos,coord=pos>0&&CELL_COORDS[pos-1]?CELL_COORDS[pos-1]:[4,3],camX=((4-coord[0])*1.8).toFixed(1)+'%',camY=((3-coord[1])*1.8).toFixed(1)+'%';
+ const camPlayer=S.path&&S.path.length&&S.players[S.movedPlayer]?S.players[S.movedPlayer]:player(S),pos=camPlayer.pos,coord=pos>0&&CELL_COORDS[pos-1]?CELL_COORDS[pos-1]:[4,3],camX=((4-coord[0])*1.8).toFixed(1)+'%',camY=((3-coord[1])*1.8).toFixed(1)+'%';
  const board=CELL_COORDS.map(function(pair,k){
   const x=pair[0],y=pair[1],n=k+1,symbol=GEESE.includes(n)?'♧':({6:'⌒',19:'☕',31:'◉',42:'⤴',52:'▥',58:'↶',63:'♛'}[n]||''),grain=S.gooseGrains.includes(n)?'<span class="goose-grain" aria-label="Grain doré">✦</span>':'';
   return '<div class="goose-cell '+(GEESE.includes(n)?'goose ':'')+([6,19,31,42,52].includes(n)?'trap ':'')+(n===58?'danger ':'')+(n===63?'goal ':'')+(dests.has(n)?'goose-possible ':'')+'" data-cell="'+n+'" style="grid-column:'+(x+1)+';grid-row:'+(y+1)+'" title="Case '+n+(GEESE.includes(n)?' · Oie':SPECIAL[n]?' · '+SPECIAL[n]:'')+'"><span class="number">'+n+'</span><span class="cell-symbol" aria-hidden="true">'+symbol+'</span>'+grain+'<div class="tokens">'+S.players.map(function(p,i){return p.pos===n?pawnHTML(i):''}).join('')+'</div></div>';
@@ -3060,9 +3062,23 @@ handleGuestAction=function(packet){
  return LEGACY3_GUEST_ACTION(packet);
 };
 
+
+animatePawn=function(path,old){
+ LEGACY3_ANIMATE_PAWN(path,old);
+ if(!S||S.id!=='oie'||!path||path.length<2||!motions())return;
+ const board=document.querySelector('.legacy-goose .goose-board');if(!board)return;
+ const frames=path.map(function(n,i){
+  const coord=n>0&&CELL_COORDS[n-1]?CELL_COORDS[n-1]:[4,3],x=((4-coord[0])*1.8).toFixed(1),y=((3-coord[1])*1.8).toFixed(1);
+  return{transform:'translate('+x+'%,'+y+'%) scale('+(i===path.length-1?'1.055':'1.09')+')',offset:path.length===1?1:i/(path.length-1)};
+ });
+ const delay=immersive()?motionDuration(180):0,duration=motionDuration(Math.min(1750,Math.max(560,path.length*92)));
+ try{board.animate(frames,{duration:duration,delay:delay,easing:'linear',fill:'none'})}catch(e){}
+}
+
 playSceneAction=function(ctx){
  LEGACY3_SCENE(ctx);
  if(!ctx||!S)return;
+ if(S.id==='cactus'&&ctx.type==='quick'){const q=S.lastQuick;if(q&&q.good){scenePulse('[data-cactus-discard="1"]',SCENES.cactus.accent,true);sceneBadge('Jet rapide !',ctx,'✳')}else if(q){sceneBadge('Raté · +1',ctx,'!')}}
  if(S.id==='oie'&&ctx.type==='gooseReroll'){sceneDice(ctx);sceneBadge('Une plume !',ctx,'🪶')}
  if(S.id==='oie'&&ctx.type==='gooseChoose'&&S.gooseLastEvent){
   const ev=S.gooseLastEvent;
