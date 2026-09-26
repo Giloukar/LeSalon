@@ -1,6 +1,6 @@
 (function(){
 'use strict';
-const view=window.SalonTableView;
+const view=window.SalonTableView,SRC=document.currentScript?.src||location.href;
 if(!view)return;
 let modulePromise=null,renderer=null;
 function webglAvailable(){
@@ -16,7 +16,7 @@ view.register('3d',{
   available(){return webglAvailable()&&supportedHere()},
   async prepare(){
     if(!webglAvailable())throw new Error('WebGL indisponible');
-    modulePromise??=import('./table-3d.js?v=1');
+    modulePromise??=import(new URL('./table-3d.js?v=1',SRC).href);
     const mod=await modulePromise;
     renderer??=mod.createTable3DRenderer({
       onFatal(error){view.fallback('webgl-failed',error)}
