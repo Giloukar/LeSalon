@@ -373,7 +373,10 @@ html[data-motion="off"] .catalog-star{transition:none}html[data-motion="off"] .c
 @media(max-width:360px){.auction-bids{grid-template-columns:repeat(2,minmax(0,1fr))}.box-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
 html[data-motion="off"] .auction-number,html[data-motion="off"] .box-tile{transition:none}@media(prefers-reduced-motion:reduce){.auction-number,.box-tile{transition:none}}
 
-.salon-switch{position:fixed;left:16px;top:16px;z-index:100040;display:flex;gap:6px;padding:5px;border:1px solid #ffffff22;border-radius:14px;background:#10151ee8;box-shadow:0 8px 28px #0006;backdrop-filter:blur(12px)}.salon-switch a{padding:8px 11px;border-radius:9px;font-size:12px;color:var(--muted);transition:.18s}.salon-switch a:hover{background:var(--panel2);color:var(--ink);transform:translateY(-1px)}@media(max-width:600px){.salon-switch{left:8px;top:8px}.salon-switch a{padding:7px 9px;font-size:11px}}</style><link rel="stylesheet" href="./shared/puff-widget.css?v=18"><link rel="stylesheet" href="./shared/global-nav.css?v=2"></head><body><nav class="salon-switch" aria-label="Navigation Le Salon"><a href="./index.html">⌂ Le Salon</a><a href="./leximind.html">LexiMind →</a></nav><a class="skip" href="#main">Aller au contenu</a><div id="app"></div><dialog id="dialog" aria-label="Options de la table"></dialog><div id="toasts"></div><div id="announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div><noscript><main style="max-width:600px;margin:10vh auto;padding:30px;font-family:system-ui"><h1>La table de jeux</h1><p>Pour distribuer les cartes et lancer les dés, activez JavaScript dans votre navigateur. Le solo et le jeu sur le même écran fonctionnent hors connexion ; les salons à distance nécessitent Internet.</p></main></noscript><!-- PeerJS 1.5.5 — MIT License
+.salon-switch{position:fixed;left:16px;top:16px;z-index:100040;display:flex;gap:6px;padding:5px;border:1px solid #ffffff22;border-radius:14px;background:#10151ee8;box-shadow:0 8px 28px #0006;backdrop-filter:blur(12px)}.salon-switch a{padding:8px 11px;border-radius:9px;font-size:12px;color:var(--muted);transition:.18s}.salon-switch a:hover{background:var(--panel2);color:var(--ink);transform:translateY(-1px)}@media(max-width:600px){.salon-switch{left:8px;top:8px}.salon-switch a{padding:7px 9px;font-size:11px}}</style><link rel="stylesheet" href="./shared/puff-widget.css?v=18"><link rel="stylesheet" href="./shared/global-nav.css?v=2"><style id="eight-house-rules-v2">
+.playing-card.joker-card{color:#7d2037;background:linear-gradient(145deg,#fffdf5,#f5e8dc);border-color:#9e6a76}.playing-card.joker-card .pip{font-size:clamp(24px,4vw,42px);display:flex;flex-direction:column;gap:2px}.playing-card.joker-card .pip small{font:800 8px/1 system-ui;letter-spacing:1.6px}.playing-card[data-eight-card="1"]{touch-action:none;cursor:grab}.playing-card[data-eight-card="1"]:active{cursor:grabbing}.eight-drag-source{opacity:.38!important}.eight-drag-ghost{position:fixed!important;z-index:100500!important;margin:0!important;pointer-events:none!important;transition:none!important;transform-origin:center;filter:drop-shadow(0 18px 28px #0009);will-change:left,top,transform}.eight-discard{position:relative;border-radius:18px;padding:8px;transition:transform .16s ease,background .16s ease,box-shadow .16s ease}.eight-discard.eight-drop-hot{transform:scale(1.055);background:#dbea9e18;box-shadow:0 0 0 2px #dbea9eaa,0 0 34px #dbea9e35}.eight-discard.eight-drop-hot:after{content:"LÂCHEZ ICI";position:absolute;left:50%;bottom:-25px;transform:translateX(-50%);font:800 9px/1 system-ui;letter-spacing:1.5px;color:#dbea9e;white-space:nowrap}.eight-attack{display:inline-flex;align-items:center;gap:6px;margin-left:10px;padding:5px 9px;border-radius:99px;background:#a53f4c;color:#fff;font:900 11px/1 system-ui;box-shadow:0 5px 16px #0005}.eight-lock{opacity:.7;font-size:10px;margin-left:8px}.eight-counter{box-shadow:0 0 0 1px #ff8f9d55}.eight-house-note{margin-top:9px;font-size:10px;color:#aebbaa;letter-spacing:.04em}.eight-playable{box-shadow:0 0 0 1px #dbea9e35}.eight-playable:hover{box-shadow:0 12px 30px #0006,0 0 0 2px #dbea9e88}
+@media(max-width:700px){.eight-discard{padding:4px}.eight-discard.eight-drop-hot:after{bottom:-19px}.eight-house-note{font-size:9px}}
+</style></head><body><nav class="salon-switch" aria-label="Navigation Le Salon"><a href="./index.html">⌂ Le Salon</a><a href="./leximind.html">LexiMind →</a></nav><a class="skip" href="#main">Aller au contenu</a><div id="app"></div><dialog id="dialog" aria-label="Options de la table"></dialog><div id="toasts"></div><div id="announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div><noscript><main style="max-width:600px;margin:10vh auto;padding:30px;font-family:system-ui"><h1>La table de jeux</h1><p>Pour distribuer les cartes et lancer les dés, activez JavaScript dans votre navigateur. Le solo et le jeu sur le même écran fonctionnent hors connexion ; les salons à distance nécessitent Internet.</p></main></noscript><!-- PeerJS 1.5.5 — MIT License
 Copyright (c) 2015 Michelle Bu and Eric Zhang, http://peerjs.com
 
 (The MIT License)
@@ -411,7 +414,7 @@ const SUIT_NAMES={S:'pique',H:'cœur',D:'carreau',C:'trèfle'};
 const RANKS={1:'A',11:'V',12:'D',13:'R'};
 const TILE_COLORS=['rouge','bleu','ambre','noir'];
 const GAMES={
- huit:{name:'8 américain',short:'8 américain',tag:'Un classique qui a du répondant.',desc:'Changez la couleur, renversez le jeu et videz votre main.',category:'cartes',kind:'Dynamique',time:'10–15 min',min:2,max:6,accent:'#b0c9a0',bg:'#395a43',symbol:'8',rules:['But : être le premier à poser toutes ses cartes. Chacun reçoit 7 cartes.','Posez une carte de la même couleur (pique, cœur, carreau ou trèfle) ou de la même valeur que la défausse. Le 8 se pose sur tout et permet de choisir la couleur.','Un as fait piocher 2 cartes au suivant et saute son tour, le 7 saute un tour, le valet inverse le sens (à deux, il saute un tour). Les pénalités ne se cumulent pas.','Vous pouvez piocher une carte. Si elle est jouable, posez-la ou passez ; les autres cartes attendent votre prochain tour.','Avant de passer de 2 cartes à 1, appuyez sur « Carte ! ». Un oubli ajoute 2 cartes. Une main vide gagne immédiatement.']},
+ huit:{name:'8 américain',short:'8 américain',tag:'Les règles de la maison sont de retour.',desc:'Attaques cumulées, 8 magique, jokers et coups de vice.',category:'cartes',kind:'Dynamique',time:'10–20 min',min:2,max:6,accent:'#b0c9a0',bg:'#395a43',symbol:'8',rules:['But : se débarrasser de sa main. Donne : 8 cartes à 2 joueurs, 7 à 3 joueurs, 6 à partir de 4 joueurs. À 5 joueurs et plus, deux jeux sont mélangés.','Entame : la dame de cœur est prioritaire, puis dame de carreau, pique et trèfle ; à défaut on cherche les rois, puis les valets. Cette carte d’entame ne déclenche pas son effet.','Le 8 se pose sur n’importe quoi, permet de choisir la couleur et annule une attaque. On ne peut pas poser immédiatement un 8 sur un 8 ; une pioche ou une autre carte lève ce verrou.','As : +2 cumulable avec un autre As. Joker : +4, choisit la couleur et peut couvrir une attaque d’As ; un As ne peut pas répondre à un Joker. Les attaques s’additionnent jusqu’à ce qu’un joueur ramasse tout le cumul.','Valet : inverse le sens. 10 : rejouez. 7 : saute le joueur suivant. À deux joueurs, valet, 10 et 7 rendent donc la main au même joueur.','Vous pouvez toujours choisir de piocher, même si vous avez une carte jouable. La carte piochée ne se joue pas immédiatement : le tour passe.','À deux joueurs, on ne peut pas finir sur un 7, un valet ou un 10 : on repioche une carte. À trois joueurs ou plus, seul le 10 empêche de sortir. Une dernière attaque peut encore être renvoyée par le dernier adversaire.','Avant de passer de 2 cartes à 1, annoncez « Carte ! ». Si vous oubliez, le joueur suivant peut utiliser « Contre-carte ! » avant son coup : vous piochez 2 cartes.']},
  oie:{name:"Jeu de l’oie",short:"Jeu de l’oie",tag:'Le hasard fait bien les choses. Parfois.',desc:'Deux dés, 63 cases et quelques détours inattendus.',category:'plateau',kind:'Chance',time:'10–20 min',min:2,max:6,accent:'#dfc296',bg:'#725439',symbol:'⚄',rules:['Atteignez exactement la case 63. Lancez deux dés à chaque tour. Un dépassement vous fait reculer du nombre de cases en trop.','Sur une oie (5, 9, 14, 18, 23, 27, 32, 36, 41, 45, 50, 54, 59), avancez à nouveau du total des dés ; après un rebond, reculez.','Pont (6) : allez en 12. Auberge (19) : passez 2 tours. Labyrinthe (42) : retour en 30. Tête de mort (58) : retour au départ.','Puits (31) et prison (52) : attendez qu’un autre joueur vous remplace, au maximum 3 tours dans cette variante.','Au premier lancer, un 9 obtenu avec 3 + 6 mène en 26 ; avec 4 + 5, en 53. Plusieurs pions peuvent partager une case ordinaire.']},
  cactus:{name:'Le Cactus',short:'Cactus',tag:'Gardez les bonnes cartes en tête.',desc:'Quatre cartes cachées. Votre mémoire fait la différence.',category:'cartes',kind:'Mémoire',time:'10–15 min',min:2,max:6,accent:'#d1d19d',bg:'#666b3d',symbol:'✳',rules:['But : terminer à 6 points maximum. Pour gagner son annonce, il faut aussi être strictement sous chaque adversaire. Chacun a 4 cartes cachées ; regardez vos 2 cartes du bas au départ.','À votre tour, piochez une carte du paquet ou prenez celle de la défausse. Échangez-la avec une de vos cartes, ou jetez-la si elle vient du paquet.','Variante de cette table : quatre cartes conservées, sans défausse éclair. Une carte piochée au paquet puis jetée donne un pouvoir : 7 ou 8, regardez une carte à vous ; 9 ou 10, regardez une carte adverse ; valet ou dame, échangez à l’aveugle une de vos cartes avec une carte adverse. Vous pouvez ignorer le pouvoir.','As = 1 ; de 2 à 10 = valeur de la carte ; valet et dame = 10 ; tous les rois = 0.','Au début de votre tour, annoncez « Cactus ! » si vous pensez avoir 6 points ou moins. Chaque adversaire joue encore un tour. Au décompte final, l’annonceur perd en cas de dépassement ou si un adversaire a autant ou moins. Parmi les autres, le minimum à 6 ou moins gagne (ex æquo possibles). Si aucun score n’est admissible, personne ne gagne.']},
  president:{name:'Le Président',short:'Président',tag:'Une main pour changer la hiérarchie.',desc:'Montez les enchères et prenez la tête de la table.',category:'cartes',kind:'Stratégie',time:'10–20 min',min:2,max:6,accent:'#c5b7dc',bg:'#534766',symbol:'♛',rules:['Débarrassez-vous de toutes vos cartes. L’ordre croissant est 3, 4, …, 10, valet, dame, roi, as, 2.','Le premier pose une carte ou plusieurs cartes de même valeur. Il faut répondre avec le même nombre de cartes, d’une valeur supérieure, ou passer. Une nouvelle pose réautorise tous les joueurs à répondre.','Lorsque tous les autres joueurs encore en jeu passent, le dernier à avoir posé ouvre un nouveau pli. S’il a terminé, le suivant encore en jeu ouvre.','Variante révolution : un carré peut être posé sur tout. Il vide le pli et inverse entièrement l’ordre des valeurs, jusqu’au prochain carré.','Le premier est Président. À la manche suivante, le dernier lui donne ses 2 meilleures cartes et reçoit ses 2 moins bonnes. À 4 joueurs ou plus, les deux rangs intermédiaires échangent aussi 1 carte (sauf s’ils font partie du premier échange). Les échanges sont automatiques.']},
@@ -721,7 +724,7 @@ function projectGame(source,viewer){
 }
 function sanitizeOnlineAction(gameId,raw){
  if(!raw||typeof raw!=='object'||typeof raw.type!=='string')return null;
- const allowed={huit:['card','draw','pass','announce'],oie:['roll'],cactus:['ready','draw','take','swap','discard','target','skip','call'],president:['play','pass'],menteur:['play','trust','challenge'],vingtetun:['bet','hit','stand','double','nextRound'],pouilleux:['pick'],rummikub:['move','undo','undoStep','commit','draw'],echo:['memorized','pad','continue'],anagrammes:['word','giveup','continue'],ballon:['pump','bank','continue'],golf:['shoot','continue'],code:['codeGuess','continue'],intrus:['spot','continue']};
+ const allowed={huit:['card','draw','pass','announce','counter'],oie:['roll'],cactus:['ready','draw','take','swap','discard','target','skip','call'],president:['play','pass'],menteur:['play','trust','challenge'],vingtetun:['bet','hit','stand','double','nextRound'],pouilleux:['pick'],rummikub:['move','undo','undoStep','commit','draw'],echo:['memorized','pad','continue'],anagrammes:['word','giveup','continue'],ballon:['pump','bank','continue'],golf:['shoot','continue'],code:['codeGuess','continue'],intrus:['spot','continue']};
  if(!allowed[gameId]?.includes(raw.type))return null;
  if(raw.type==='pad'&&(!Number.isInteger(raw.index)||raw.index<0||raw.index>3))return null;
  if(raw.type==='word'&&(typeof raw.word!=='string'||raw.word.length>40||!normalizeWord(raw.word)))return null;
@@ -1301,8 +1304,8 @@ function actionsHTML(){if(isOnline()&&net.spectator)return '<p class="spectator-
  const d=rummiDiagnostic(S);return rummiToolbar()+`<div class="rummi-status ${d.ok?'valid':''}" role="status">${esc(d.text)}</div><div class="action-zone"><button class="btn secondary" data-action="rummi-place" data-dest="new" ${!selection.size?'disabled':''}>Nouveau groupe +</button>${button('Valider le tour','commit',{},!d.ok)}${button(S.deck.length?((S.rummiHistory?.length||S.rummiUndoCount)?'Annuler et piocher':'Piocher et finir'):'Passer','draw',{},false,'secondary')}${button('Annuler le déplacement','undoStep',{},!(S.rummiHistory?.length||S.rummiUndoCount),'ghost small')}${button('Recommencer le tour','undo',{},false,'ghost small')}<button class="btn ghost small" data-action="rummi-place" data-dest="hand" ${!selection.size||[...selection].some(id=>S.refTable.flat().some(t=>t.id===id))?'disabled':''}>Au chevalet</button></div>`;
 }
 function handHTML(){if(isOnline()&&net.spectator)return '<p class="spectator-note">◉ Vous observez la partie. Les chevalets et les cartes restent privés.</p>';if(ARCADE_IDS.includes(S.id))return '';if(['oie','cactus','yam','boite'].includes(S.id))return '';if(S.id==='vingtetun'&&S.phase==='bet')return '';const i=privateIndex(),p=S.players[i],mine=canPlay()&&S.turn===i;let cards=[...p.hand];if(S.id==='rummikub')cards.sort((a,b)=>(!!a.joker)-(!!b.joker)||(sortByColor?(a.color??5)-(b.color??5)||(a.num||0)-(b.num||0):(a.num||99)-(b.num||99)||(a.color||0)-(b.color||0)));else cards.sort((a,b)=>sortByColor?SUITS.indexOf(a.suit)-SUITS.indexOf(b.suit)||a.rank-b.rank:presRank(a.rank)-presRank(b.rank)||SUITS.indexOf(a.suit)-SUITS.indexOf(b.suit));
- const helper=S.id==='huit'?'Touchez la carte que vous souhaitez jouer.':S.id==='rummikub'?'Sélectionnez des tuiles du chevalet ou de la table, puis leur destination.':S.id==='president'||S.id==='menteur'?'Sélectionnez vos cartes, puis confirmez votre coup.':S.id==='vingtetun'?'As : 1 ou 11 · Figures : 10':'Vos paires sont retirées automatiquement.';
- return `<section data-motion-key="hand" class="hand-panel" aria-label="Main de ${esc(p.name)}"><div class="hand-top"><div class="hand-title">${esc(S.mode==='solo'||S.mode==='online'?'Votre '+(S.id==='rummikub'?'chevalet':'main'):p.name)} <span>${cards.length} ${S.id==='rummikub'?'tuiles':'cartes'}</span></div>${S.id==='vingtetun'?`<div class="hand-total">${bjValue(cards)} points ${natural(cards)?'· Blackjack':''}${p.bet?' · Mise '+p.bet:''}</div>`:`<button class="btn ghost small" data-action="sort">Trier par ${sortByColor?'valeur':'couleur'}</button>`}</div>${S.id==='rummikub'?`<div class="rummi-rack">${cards.map(t=>tileHTML(t,{button:mine,selected:selection.has(t.id),classes:selection.has(t.id)?'selected':'',attr:`data-action="select-tile" data-id="${t.id}"`,key:'t-'+t.id})).join('')||'<span class="empty-hand">Chevalet vide. Bien joué !</span>'}</div>`:`<div class="hand ${cards.length>12?'compact':''}">${cards.map(c=>{const legal=S.id==='huit'&&mine,selectable=mine&&['president','menteur'].includes(S.id)&&(S.id!=='menteur'||S.phase==='play'),isButton=legal||selectable;return cardHTML(c,{button:isButton,classes:(legal?'pickable ':selectable?'pickable ':'')+(selection.has(c.id)?'selected ':'')+'',selected:selectable?selection.has(c.id):undefined,attr:`data-action="hand-card" data-id="${c.id}"`,key:'c-'+c.id});}).join('')||'<span class="empty-hand">Plus une carte. Profitez du spectacle.</span>'}</div>`}<p class="hand-help">${helper}${cards.length>12?' Faites défiler votre main si nécessaire.':''}</p>${sceneRestHTML()}</section>`;
+ const helper=S.id==='huit'?'Cliquez une carte jouable ou glissez-la directement sur la défausse.':S.id==='rummikub'?'Sélectionnez des tuiles du chevalet ou de la table, puis leur destination.':S.id==='president'||S.id==='menteur'?'Sélectionnez vos cartes, puis confirmez votre coup.':S.id==='vingtetun'?'As : 1 ou 11 · Figures : 10':'Vos paires sont retirées automatiquement.';
+ return `<section data-motion-key="hand" class="hand-panel" aria-label="Main de ${esc(p.name)}"><div class="hand-top"><div class="hand-title">${esc(S.mode==='solo'||S.mode==='online'?'Votre '+(S.id==='rummikub'?'chevalet':'main'):p.name)} <span>${cards.length} ${S.id==='rummikub'?'tuiles':'cartes'}</span></div>${S.id==='vingtetun'?`<div class="hand-total">${bjValue(cards)} points ${natural(cards)?'· Blackjack':''}${p.bet?' · Mise '+p.bet:''}</div>`:`<button class="btn ghost small" data-action="sort">Trier par ${sortByColor?'valeur':'couleur'}</button>`}</div>${S.id==='rummikub'?`<div class="rummi-rack">${cards.map(t=>tileHTML(t,{button:mine,selected:selection.has(t.id),classes:selection.has(t.id)?'selected':'',attr:`data-action="select-tile" data-id="${t.id}"`,key:'t-'+t.id})).join('')||'<span class="empty-hand">Chevalet vide. Bien joué !</span>'}</div>`:`<div class="hand ${cards.length>12?'compact':''}">${cards.map(c=>{const legal=S.id==='huit'&&mine&&eightLegal(S,c),selectable=mine&&['president','menteur'].includes(S.id)&&(S.id!=='menteur'||S.phase==='play'),isButton=legal||selectable;return cardHTML(c,{button:isButton,classes:(legal?'pickable eight-playable ':selectable?'pickable ':'')+(selection.has(c.id)?'selected ':'')+'',selected:selectable?selection.has(c.id):undefined,attr:`data-action="hand-card" data-id="${c.id}"${S.id==='huit'&&legal?' data-eight-card="1"':''}`,key:'c-'+c.id});}).join('')||'<span class="empty-hand">Plus une carte. Profitez du spectacle.</span>'}</div>`}<p class="hand-help">${helper}${cards.length>12?' Faites défiler votre main si nécessaire.':''}</p>${sceneRestHTML()}</section>`;
 }
 function collectRects(){return motionRects();}
 function renderGame(animate=true,path=null){
@@ -1891,7 +1894,7 @@ handHTML=function(){let html=cardsHandHTML();if(!S||!['huit','president','menteu
 refreshSelection=function(){cardsRefresh();if(!S||!['huit','president','menteur'].includes(S.id))return;document.querySelectorAll('.hand-panel [data-action="hand-card"]').forEach(b=>{const selected=selection.has(b.dataset.id);b.classList.toggle('selected',selected);b.setAttribute('aria-pressed',String(selected));});const actions=$('game-actions');if(actions)patchMarkup(actions,actionsHTML());};
 turnText=function(){const result=cardsTurnText();if(S?.id==='huit'&&canPlay()&&!showSuit&&S.phase!=='afterdraw')return [result[0],'Sélectionnez une carte, puis confirmez pour la poser.'];return result;};
 function cardConfirm(){if(!canPlay()||S.id!=='huit'||selection.size!==1)return;const c=player(S).hand.find(c=>selection.has(c.id));if(!c)return;if(c.rank===8){showSuit=c.id;renderGame(false);}else dispatch({type:'card',id:c.id});}
-document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const action=b.dataset.action;if(action==='card-layout'){prefs.cardLayout=prefs.cardLayout==='grid'?'fan':'grid';storage.set('prefs',prefs);renderGame(false);return;}if(action==='card-confirm'){cardConfirm();return;}if(action==='hand-card'&&S?.id==='huit'){e.preventDefault();e.stopImmediatePropagation();if(!canPlay())return;const id=b.dataset.id,was=selection.has(id);selection.clear();if(!was)selection.add(id);showSuit=null;refreshSelection();}},true);
+document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const action=b.dataset.action;if(action==='card-layout'){prefs.cardLayout=prefs.cardLayout==='grid'?'fan':'grid';storage.set('prefs',prefs);renderGame(false);return;}if(action==='card-confirm'){cardConfirm();return;}if(action==='hand-card'&&S?.id==='huit'){e.preventDefault();e.stopImmediatePropagation();if(performance.now()<eightDragSuppressClickUntil||!canPlay())return;const c=player(S).hand.find(c=>c.id===b.dataset.id);if(!c||!eightLegal(S,c)){sound('error');toast('Cette carte ne peut pas être posée maintenant.');return;}selection.clear();eightPlayCardUI(c);}},true);
 document.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select')||$('dialog').open||!S||!canPlay())return;const hand=e.target.closest('.hand-panel');if(!hand)return;const cards=[...hand.querySelectorAll('button[data-action="hand-card"]')];if(!cards.length)return;let i=cards.indexOf(e.target.closest('button'));if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();const target=e.key==='Home'?0:e.key==='End'?cards.length-1:(i+(e.key==='ArrowLeft'?-1:1)+cards.length)%cards.length;cards[target].focus();cards[target].scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'});}if(e.key==='Escape'){selection.clear();showSuit=null;refreshSelection();e.preventDefault();e.stopImmediatePropagation();}if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();if(S.id==='huit')cardConfirm();else if(['president','menteur'].includes(S.id)&&selection.size)dispatch({type:'play',ids:[...selection]});}},true);
 // Les images de cartes cachées ont toujours un dos, même en cas d'affichage futur.
 const secureCardHTML=cardHTML;
@@ -2234,6 +2237,313 @@ refreshSelection=function(){if(!V16_IDS.includes(S?.id))return V16_REFRESH();doc
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled||!canPlay())return;if(b.dataset.action==='bid-select'&&S.id==='encheres'){const selected=selection.has(b.dataset.id);selection.clear();if(!selected)selection.add(b.dataset.id);refreshSelection();}if(b.dataset.action==='box-select'&&S.id==='boite'){const n=b.dataset.number;if(selection.has(n))selection.delete(n);else selection.add(n);refreshSelection();}});
 document.addEventListener('keydown',e=>{if(!V16_IDS.includes(S?.id)||!canPlay()||$('dialog').open||!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;const selector=S.id==='encheres'?'[data-action="bid-select"]':'[data-action="box-select"]:not(:disabled)',cards=[...document.querySelectorAll(selector)],i=cards.indexOf(e.target);if(i<0)return;e.preventDefault();cards[e.key==='Home'?0:e.key==='End'?cards.length-1:(i+(e.key==='ArrowRight'?1:-1)+cards.length)%cards.length]?.focus();});
 playSceneAction=function(ctx){V16_SCENE(ctx);if(!ctx||ctx.id!==S?.id||!motionOn()||gate)return;if(S.id==='encheres'&&ctx.type==='bid'&&S.phase!=='play')document.querySelectorAll('.auction-bids .auction-number').forEach((el,i)=>uiAnimate(el,[{transform:'rotateY(90deg)',opacity:0},{transform:'rotateY(0)',opacity:1}],{duration:motionDuration(500),delay:motionDuration(i*65),easing:MOTION_SOFT},'auction-reveal'));if(S.id==='boite'&&ctx.type==='roll')document.querySelectorAll('.box-dice .die').forEach((el,i)=>uiAnimate(el,[{transform:'translateY(-15px) rotate(-28deg)'},{transform:'translateY(3px) rotate(14deg)',offset:.6},{transform:'none'}],{duration:motionDuration(550),delay:i*65,easing:MOTION_SOFT},'box-roll'));};
+
+
+/* =========================================================================
+   8 AMÉRICAIN — restauration des règles de la maison (version historique)
+   Source fonctionnelle : ancien moteur du Salon (août 2026), réadapté au
+   moteur multi-jeux moderne sans restaurer l'ancienne page entière.
+   ========================================================================= */
+const HOUSE8_CREATE=createGame,HOUSE8_AI=ai,HOUSE8_ACT=act,HOUSE8_BOARD=boardHTML,HOUSE8_ACTIONS=actionsHTML,HOUSE8_TURN=turnText,HOUSE8_STATUS=playerStatus,HOUSE8_CARDHTML=cardHTML,HOUSE8_CARDLABEL=cardLabel,HOUSE8_ERROR=cardActionError,HOUSE8_SANITIZE=sanitizeOnlineAction,HOUSE8_VALIDATE=validateSaved;
+const HOUSE8_ENTAME_SUITS=['H','D','S','C'];
+let eightDragState=null,eightDragSuppressClickUntil=0;
+
+function eightValue(c){return c?.joker?'JK':c?.rank}
+function eightRequiresSuit(c){return !!c&&(c.joker||c.rank===8)}
+function eightCardName(c){return c?.joker?'Joker':rankName(c.rank)+(SYMBOLS[c.suit]||'')}
+function eightDeck(playerCount){
+ const copies=playerCount>=5?2:1,out=[];
+ for(let d=0;d<copies;d++){
+  for(const suit of SUITS)for(let rank=1;rank<=13;rank++)out.push({id:'h8-'+d+'-'+suit+'-'+rank,suit,rank});
+  out.push({id:'h8-'+d+'-joker-0',suit:'X',rank:0,joker:true},{id:'h8-'+d+'-joker-1',suit:'X',rank:0,joker:true});
+ }
+ return shuffle(out);
+}
+function eightSpecial(c){const v=eightValue(c);return c?.joker||[1,7,8,10,11].includes(v)}
+function eightLive(s){return s.players.map((p,i)=>p.hand.length>0?i:-1).filter(i=>i>=0)}
+function eightEligible(s,i){return !!s.players[i]&&(s.players[i].hand.length>0||s.pendingExit===i)}
+function eightStep(s,from,steps=1){
+ let i=from,count=0,guard=0;
+ while(count<steps&&guard++<s.players.length*5+8){
+  i=(i+s.dir+s.players.length)%s.players.length;
+  if(eightEligible(s,i))count++;
+ }
+ return i;
+}
+function eightCanRetaliate(s,i){
+ return s.players[i]?.hand.some(c=>c.joker||(c.rank===1&&s.attack==='A'))||false;
+}
+function eightHasPlayable(s,i){return s.players[i]?.hand.some(c=>eightLegal(s,c))||false}
+function eightDrawCards(s,i,n){
+ const cards=draw(s,n);s.players[i].hand.push(...cards);
+ if(s.players[i].hand.length!==1)s.announced[i]=false;
+ return cards;
+}
+function eightRecordExit(s,i){
+ if(!s.eightOrder.includes(i)){s.eightOrder.push(i);say(s,s.players[i].name+' se débarrasse de ses cartes · '+s.eightOrder.length+(s.eightOrder.length===1?'er':'e')+'.');}
+ const live=eightLive(s);
+ if(live.length<=1){
+  if(live.length&&!s.eightOrder.includes(live[0]))s.eightOrder.push(live[0]);
+  const winner=s.eightOrder[0]??i,names=s.eightOrder.map((x,k)=>(k+1)+'. '+s.players[x].name).join(' · ');
+  finish(s,winner,s.players[winner].name+' remporte la manche. Classement : '+names);
+  return true;
+ }
+ return false;
+}
+function eightResolvePendingTurn(s,turn){
+ if(s.pendingExit!==turn)return turn;
+ const i=s.pendingExit;
+ if(s.pendingDraw>0){
+  const n=s.pendingDraw;eightDrawCards(s,i,n);s.pendingDraw=0;s.attack=null;s.blockEight=false;s.pendingExit=null;s.announced[i]=false;
+  say(s,'La riposte revient sur '+s.players[i].name+' : +'+n+' cartes.');return eightStep(s,i,1);
+ }
+ s.pendingExit=null;
+ if(eightRecordExit(s,i)||s.phase==='over')return i;
+ return eightStep(s,i,1);
+}
+function eightAdvance(s,from,{skip=0,replay=false}={}){
+ if(s.phase==='over')return;
+ if(replay&&s.players[from].hand.length>0){s.turn=from;s.moves++;return}
+ let t=eightStep(s,from,1+skip);t=eightResolvePendingTurn(s,t);
+ if(s.phase!=='over')s.turn=t;
+ s.moves++;
+}
+function eightSetup(s){
+ s.houseRulesVersion=2;s.dir=1;s.pendingDraw=0;s.attack=null;s.blockEight=false;s.pendingExit=null;s.counterTarget=null;s.eightOrder=[];s.announced=s.players.map(()=>false);s.stalls=0;
+ const n=s.players.length,count=n<=2?8:n===3?7:6;
+ let attempts=0,valid=false;
+ while(!valid&&attempts++<60){
+  s.deck=eightDeck(n);for(const p of s.players)p.hand=[];
+  for(let k=0;k<count;k++)for(const p of s.players){const c=s.deck.pop();if(c)p.hand.push(c)}
+  valid=s.players.every(p=>p.hand.filter(c=>c.rank===8).length<3);
+ }
+ let opener=null;
+ for(const rank of [12,13,11]){
+  for(const suit of HOUSE8_ENTAME_SUITS){
+   for(let i=0;i<s.players.length;i++){
+    const k=s.players[i].hand.findIndex(c=>!c.joker&&c.rank===rank&&c.suit===suit);
+    if(k>=0){opener={i,k,c:s.players[i].hand[k]};break}
+   }
+   if(opener)break;
+  }
+  if(opener)break;
+ }
+ if(opener){
+  s.players[opener.i].hand.splice(opener.k,1);s.discard=[opener.c];s.suit=opener.c.suit;s.turn=eightStep(s,opener.i,1);
+  say(s,s.players[opener.i].name+' entame avec '+eightCardName(opener.c)+' · effet neutralisé.');
+ }else{
+  let k=s.deck.findIndex(c=>!eightSpecial(c));if(k<0)k=s.deck.length-1;
+  const c=s.deck.splice(k,1)[0];s.discard=[c];s.suit=c.suit;s.turn=eightLive(s)[0]??0;
+  say(s,'Aucune figure d’entame : '+eightCardName(c)+' ouvre la table.');
+ }
+ s.phase='play';s.winners=[];s.moves=0;
+ return s;
+}
+createGame=function(id,config,old=null){const s=HOUSE8_CREATE(id,config,old);return id==='huit'?eightSetup(s):s;};
+
+eightLegal=function(s,c){
+ if(!c||c.hidden)return false;
+ const v=eightValue(c),top=s.discard?.at(-1);
+ if(s.pendingDraw>0){
+  if(c.joker)return true;
+  if(v===1)return s.attack==='A';
+  if(v===8)return !s.blockEight;
+  return false;
+ }
+ if(c.joker)return true;
+ if(v===8)return !s.blockEight;
+ if(!top)return true;
+ return c.suit===s.suit||(!top.joker&&c.rank===top.rank);
+};
+
+function houseEightAct(s,a){
+ if(s.phase==='over'||s.id!=='huit'||!a)return false;
+ const i=s.turn,p=s.players[i];
+ if(a.type==='announce'){
+  if(p.hand.length!==2||s.announced[i])return false;
+  s.announced[i]=true;say(s,p.name+' annonce « Carte ! »');return true;
+ }
+ if(a.type==='counter'){
+  const t=s.counterTarget;
+  if(!Number.isInteger(t)||t===i||!s.players[t]||s.players[t].hand.length!==1||s.announced[t])return false;
+  eightDrawCards(s,t,2);s.announced[t]=false;s.counterTarget=null;
+  say(s,'Contre-carte ! '+s.players[t].name+' avait oublié son annonce et pioche 2 cartes.');return true;
+ }
+ if(a.type==='draw'){
+  s.counterTarget=null;s.announced[i]=false;
+  if(s.pendingDraw>0){
+   const n=s.pendingDraw,cards=eightDrawCards(s,i,n);s.pendingDraw=0;s.attack=null;s.blockEight=false;
+   say(s,p.name+' ramasse le cumul : +'+cards.length+' carte'+(cards.length>1?'s':'')+'.');
+  }else{
+   const cards=eightDrawCards(s,i,1);s.blockEight=false;
+   say(s,p.name+(cards.length?' pioche une carte. Le tour passe.':' ne trouve plus de carte à piocher.'));
+  }
+  if(s.pendingExit!==null){
+   const out=s.pendingExit;s.pendingExit=null;
+   if(eightRecordExit(s,out)||s.phase==='over')return true;
+  }
+  eightAdvance(s,i);return true;
+ }
+ if(a.type!=='card')return false;
+ const k=p.hand.findIndex(c=>c.id===a.id),c=p.hand[k];
+ if(k<0||!c||!eightLegal(s,c)||eightRequiresSuit(c)&&!SUITS.includes(a.suit))return false;
+ s.counterTarget=null;
+ const liveBefore=eightLive(s).length;
+ p.hand.splice(k,1);s.discard.push(c);
+ const v=eightValue(c);s.suit=eightRequiresSuit(c)?a.suit:c.suit;s.blockEight=v===8;
+ let replay=false,skip=0;
+ if(v===8){
+  if(s.pendingDraw>0)say(s,p.name+' coupe l’attaque avec un 8 · '+SUIT_NAMES[s.suit]+' demandé.');
+  else say(s,p.name+' pose un 8 · '+SUIT_NAMES[s.suit]+' demandé.');
+  s.pendingDraw=0;s.attack=null;
+ }else if(c.joker){
+  s.pendingDraw+=4;s.attack='JK';
+  say(s,p.name+' pose un Joker : +4 (cumul +'+s.pendingDraw+') · '+SUIT_NAMES[s.suit]+' demandé.');
+ }else if(v===1){
+  s.pendingDraw+=2;s.attack='A';say(s,p.name+' pose un As : +2 (cumul +'+s.pendingDraw+').');
+ }else if(v===11){
+  s.dir*=-1;replay=liveBefore<=2;say(s,p.name+' pose un Valet : '+(replay?'il rejoue.':'le sens s’inverse.'));
+ }else if(v===10){
+  replay=true;say(s,p.name+' pose un 10 et rejoue.');
+ }else if(v===7){
+  skip=1;say(s,p.name+' pose un 7 : le joueur suivant saute son tour.');
+ }else say(s,p.name+' pose '+eightCardName(c)+'.');
+
+ if(p.hand.length===1){
+  if(!s.announced[i])s.counterTarget=i;
+ }else if(p.hand.length!==1)s.announced[i]=false;
+
+ if(!p.hand.length){
+  s.announced[i]=false;s.counterTarget=null;
+  const duo=liveBefore<=2,forbidden=duo?[7,10,11].includes(v):v===10;
+  if(forbidden){
+   const got=eightDrawCards(s,i,1);skip=0;
+   if(!got.length){if(eightRecordExit(s,i)||s.phase==='over')return true;replay=false}
+   else{
+    replay=eightHasPlayable(s,i);
+    say(s,p.name+' ne peut pas finir sur cette carte : il repioche'+(replay?' et peut rejouer.':'.'));
+   }
+  }else if(s.pendingDraw>0){
+   const others=eightLive(s).filter(x=>x!==i);
+   if(others.length===1&&eightCanRetaliate(s,others[0])){
+    s.pendingExit=i;say(s,p.name+' a posé sa dernière carte, mais la riposte reste possible.');
+   }else if(eightRecordExit(s,i)||s.phase==='over')return true;
+  }else if(eightRecordExit(s,i)||s.phase==='over')return true;
+ }
+ eightAdvance(s,i,{skip,replay});return true;
+}
+act=function(s,a){return s?.id==='huit'?houseEightAct(s,a):HOUSE8_ACT(s,a);};
+
+function houseEightAI(s){
+ const p=player(s),i=s.turn;
+ if(Number.isInteger(s.counterTarget)&&s.counterTarget!==i&&s.players[s.counterTarget]?.hand.length===1&&!s.announced[s.counterTarget])return{type:'counter'};
+ if(p.hand.length===2&&!s.announced[i])return{type:'announce'};
+ const legal=p.hand.filter(c=>eightLegal(s,c));
+ if(legal.length){
+  legal.sort((a,b)=>{
+   const score=c=>c.joker?9:c.rank===1?8:c.rank===8?7:c.rank===10?6:c.rank===7?5:c.rank===11?4:0;
+   return score(b)-score(a);
+  });
+  const c=legal[0],suit=SUITS.slice().sort((a,b)=>p.hand.filter(x=>!x.joker&&x.rank!==8&&x.suit===b).length-p.hand.filter(x=>!x.joker&&x.rank!==8&&x.suit===a).length)[0]||'S';
+  return{type:'card',id:c.id,...(eightRequiresSuit(c)?{suit}:{})};
+ }
+ return{type:'draw'};
+}
+ai=function(s){return s?.id==='huit'?houseEightAI(s):HOUSE8_AI(s);};
+
+cardLabel=function(c){return c?.joker?'Joker':HOUSE8_CARDLABEL(c);};
+cardHTML=function(c,o={}){
+ if(!c?.joker)return HOUSE8_CARDHTML(c,o);
+ const tag=o.button?'button':'div',label=o.label||'Joker';
+ return `<${tag} class="playing-card joker-card ${o.classes||''}" ${o.button?'type="button"':''} ${o.attr||''} ${o.key?`data-flip="${esc(o.key)}"`:''} ${o.button?`aria-label="${esc(label)}"`:`role="img" aria-label="${esc(label)}"`} ${o.selected!==undefined?`aria-pressed="${o.selected}"`:''} ${o.disabled?'disabled':''}><span class="corner">JK<i>★</i></span><span class="inner-border"></span><span class="pip face">★<small>JOKER</small></span><span class="corner bottom">JK<i>★</i></span></${tag}>`;
+};
+
+boardHTML=function(){
+ if(S?.id!=='huit')return HOUSE8_BOARD();
+ const top=S.discard.at(-1),attack=S.pendingDraw>0?`<span class="eight-attack">ATTAQUE +${S.pendingDraw}</span>`:'';
+ return `<section data-motion-key="felt" class="felt" aria-label="Table du 8 américain"><div class="center-piles"><div class="pile"><div class="stack">${cardHTML(null,{button:canPlay(),attr:attrs({type:'draw'}),label:S.pendingDraw?'Ramasser '+S.pendingDraw+' cartes':'Piocher une carte'})}</div><div class="pile-label">PIOCHE · ${S.deck.length}</div></div><div class="pile eight-discard" data-eight-drop="1">${cardHTML(top,{key:'c-'+top.id})}<div class="pile-label">DÉFAUSSE</div></div></div><div class="suit-chip"><b class="${['H','D'].includes(S.suit)?'red-suit':''}">${SYMBOLS[S.suit]}</b> ${SUIT_NAMES[S.suit]} demandé <span style="margin-left:9px">${S.dir===1?'↻':'↺'}</span>${attack}${S.blockEight?'<span class="eight-lock">8 verrouillé</span>':''}</div><div class="eight-house-note">Cliquez ou glissez une carte sur la défausse · une pioche termine toujours le tour.</div><span class="felt-mark">LA TABLE DE JEUX</span></section>`;
+};
+
+actionsHTML=function(){
+ if(S?.id!=='huit')return HOUSE8_ACTIONS();
+ if(!canPlay())return HOUSE8_ACTIONS();
+ if(showSuit)return `<div class="action-note">${player(S).hand.find(c=>c.id===showSuit)?.joker?'Joker':'8'} : quelle couleur demandez-vous ?</div><div class="suit-chooser">${SUITS.map(x=>`<button class="${['H','D'].includes(x)?'red-suit':''}" data-action="choose-suit" data-suit="${x}" aria-label="Choisir ${SUIT_NAMES[x]}">${SYMBOLS[x]}</button>`).join('')}</div><div class="action-zone"><button class="btn ghost small" data-action="cancel-suit">Annuler</button></div>`;
+ const i=S.turn,p=player(S),counter=Number.isInteger(S.counterTarget)&&S.counterTarget!==i&&S.players[S.counterTarget]?.hand.length===1&&!S.announced[S.counterTarget];
+ return `<div class="action-zone">${button(S.pendingDraw?'Ramasser +'+S.pendingDraw:'Piocher une carte','draw',{},false,'secondary')}${button(S.announced[i]?'Carte annoncée ✓':'Carte !','announce',{},p.hand.length!==2||S.announced[i],S.announced[i]?'ghost':'')}${counter?button('Contre-carte !','counter',{},false,'danger eight-counter'):''}</div>`;
+};
+
+turnText=function(){
+ if(S?.id==='huit'&&canPlay()){
+  if(S.pendingDraw)return ['À vous de répondre','Cumul +'+S.pendingDraw+' : As sur As, Joker, 8 pour couper… ou ramassez tout.'];
+  if(Number.isInteger(S.counterTarget)&&S.counterTarget!==S.turn)return ['À vous de jouer','Contre-carte est disponible avant votre coup.'];
+  return ['À vous de jouer','Cliquez une carte ou glissez-la sur la défausse. Vous pouvez aussi choisir de piocher.'];
+ }
+ return HOUSE8_TURN();
+};
+playerStatus=function(i){
+ if(S?.id==='huit'){
+  const rank=S.eightOrder?.indexOf(i)??-1;
+  if(rank>=0)return 'Sorti · '+(rank+1)+(rank===0?'er':'e');
+  return S.players[i].hand.length+' carte'+(S.players[i].hand.length>1?'s':'')+(S.announced?.[i]?' · Carte !':'');
+ }
+ return HOUSE8_STATUS(i);
+};
+cardActionError=function(s,a){
+ if(s?.id==='huit'&&a.type==='card'){
+  const c=player(s).hand.find(c=>c.id===a.id);
+  if(c&&!eightLegal(s,c)){
+   if(s.pendingDraw)return 'Vous êtes sous attaque : répondez avec la bonne attaque, un Joker ou un 8, sinon ramassez le cumul.';
+   if(c.rank===8&&s.blockEight)return 'Un 8 vient d’être posé : il faut une autre carte ou une pioche avant de rejouer un 8.';
+   return 'Il faut suivre la couleur demandée ('+SUIT_NAMES[s.suit]+'), la valeur de la défausse, jouer un 8 ou un Joker.';
+  }
+ }
+ return HOUSE8_ERROR(s,a);
+};
+sanitizeOnlineAction=function(id,raw){if(id==='huit'&&raw?.type==='counter')return{type:'counter'};return HOUSE8_SANITIZE(id,raw);};
+validateSaved=function(){HOUSE8_VALIDATE();if(saved?.id==='huit'&&saved.houseRulesVersion!==2)saved=null;};
+
+function eightPlayCardUI(c){
+ if(!c||!eightLegal(S,c))return;
+ selection.clear();
+ if(eightRequiresSuit(c)){showSuit=c.id;renderGame(false)}
+ else dispatch({type:'card',id:c.id});
+}
+function eightDropTarget(){return document.querySelector('[data-eight-drop="1"]')}
+function eightInsideDrop(x,y){
+ const el=eightDropTarget();if(!el)return false;const r=el.getBoundingClientRect(),m=Math.min(100,Math.max(55,r.width*.7));
+ return x>r.left-m&&x<r.right+m&&y>r.top-m&&y<r.bottom+m;
+}
+function eightDragCleanup(){
+ const d=eightDragState;if(!d)return;
+ d.source.classList.remove('eight-drag-source');d.ghost?.remove();eightDropTarget()?.classList.remove('eight-drop-hot');eightDragState=null;
+}
+document.addEventListener('pointerdown',e=>{
+ if(S?.id!=='huit'||!canPlay()||e.button&&e.button!==0)return;
+ const el=e.target.closest('[data-eight-card="1"]');if(!el)return;
+ const c=player(S).hand.find(c=>c.id===el.dataset.id);if(!c||!eightLegal(S,c))return;
+ const r=el.getBoundingClientRect();eightDragState={id:e.pointerId,source:el,card:c,x:e.clientX,y:e.clientY,moved:false,rect:r,ghost:null};
+ try{el.setPointerCapture(e.pointerId)}catch{}
+},{capture:true});
+document.addEventListener('pointermove',e=>{
+ const d=eightDragState;if(!d||d.id!==e.pointerId)return;
+ const dx=e.clientX-d.x,dy=e.clientY-d.y;
+ if(!d.moved&&Math.hypot(dx,dy)<8)return;
+ if(!d.moved){
+  d.moved=true;d.source.classList.add('eight-drag-source');d.ghost=d.source.cloneNode(true);d.ghost.removeAttribute('id');d.ghost.removeAttribute('data-action');d.ghost.classList.add('eight-drag-ghost');d.ghost.style.width=d.rect.width+'px';d.ghost.style.height=d.rect.height+'px';document.body.appendChild(d.ghost);
+ }
+ e.preventDefault();
+ d.ghost.style.left=(e.clientX-d.rect.width/2)+'px';d.ghost.style.top=(e.clientY-d.rect.height/2)+'px';d.ghost.style.transform='rotate('+(dx*.035).toFixed(1)+'deg) scale(1.07)';
+ eightDropTarget()?.classList.toggle('eight-drop-hot',eightInsideDrop(e.clientX,e.clientY));
+},{capture:true,passive:false});
+function eightDragEnd(e){
+ const d=eightDragState;if(!d||d.id!==e.pointerId)return;
+ const drop=d.moved&&eightInsideDrop(e.clientX,e.clientY),card=d.card,moved=d.moved;
+ eightDragCleanup();
+ if(moved)eightDragSuppressClickUntil=performance.now()+450;
+ if(drop)eightPlayCardUI(card);
+}
+document.addEventListener('pointerup',eightDragEnd,{capture:true});
+document.addEventListener('pointercancel',e=>{if(eightDragState?.id===e.pointerId)eightDragCleanup()},{capture:true});
 
 validateSaved();applyPrefs();showHome();bootOnlineInvite();musicMount();
 </script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="./shared/config.js"></script><script src="./shared/account.js?v=3"></script><script src="./shared/account-ui.js?v=4"></script><script src="./shared/profile.js"></script><script src="./shared/profile-ui.js?v=3"></script><script src="./shared/usage-tracker.js"></script><script src="./shared/user-stats.js"></script><script src="./shared/game-results.js"></script><script src="./shared/table-tools.js?v=2"></script><script src="./shared/game-history.js"></script><script src="./shared/puff-widget.js?v=18"></script><script src="./shared/global-nav.js?v=2"></script></body></html>
