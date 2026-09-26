@@ -3,10 +3,13 @@
   "private": true,
   "version": "0.0.0",
   "packageManager": "pnpm@11.19.0",
-  "engines": { "node": ">=22" },
-  "scripts": {
-    "test": "node --test --test-concurrency=1 characterization.test.mjs",
-    "test:contracts": "node --test --test-concurrency=1 contracts.test.mjs"
+  "engines": {
+    "node": ">=22"
   },
-  "devDependencies": { "playwright": "1.62.1" }
+  "scripts": {
+    "test": "node --test --test-concurrency=1 characterization.test.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
 }
