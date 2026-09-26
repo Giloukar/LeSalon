@@ -1,0 +1,28 @@
+# Caractérisation 2D
+
+Ces tests chargent le vrai jeux.html dans Chromium avec ses surcharges finales. Ils n’ajoutent aucun état au jeu et ne modifient aucune règle.
+
+## Exécuter
+
+Depuis ce dossier :
+
+    pnpm install
+    pnpm exec playwright install chromium
+    pnpm test
+
+La CI installe Chromium avec ses dépendances système. La variable TABLE_BROWSER_EXECUTABLE permet d’utiliser un Chrome local.
+
+Le harness fige l’horloge et le hasard dans le navigateur de test, enregistre les timers, intercepte les ressources externes et remplace le transport par un espion. Aucun salon PeerJS, compte, appel Supabase ou stockage utilisateur réel n’est utilisé.
+
+## Ce qui est vérifié
+
+- les 22 définitions de jeu et plusieurs rendus successifs ;
+- une trace IA identique avec ou sans rendus supplémentaires ;
+- l’absence de paquets et de tirages RNG ajoutés par un refresh ;
+- la projection online et les surcharges finales réellement chargées ;
+- la reproduction de la pendule modifiée par le rendu ;
+- la reproduction de l’index de siège perdu par la dernière surcharge invitée.
+
+Les deux derniers scénarios sont des diagnostics du comportement actuel. Leur résultat est volontairement décrit et ne constitue pas encore un contrat de neutralité. Les tests ne valident pas exhaustivement les règles, le drag, WebRTC réel, l’audio, le puff ou la qualité visuelle.
+
+Voir le diagnostic d’architecture dans docs/table-2d-readiness.md.
