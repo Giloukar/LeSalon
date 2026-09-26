@@ -21,7 +21,169 @@ function drawTiming(stage){stage.querySelector(".puffTrack").innerHTML=T.z.map(z
 function rate(stage,g,t){let r=stage.querySelector(".puffRating");r.className="puffRating";void r.offsetWidth;r.textContent=LABEL[g]+(g==="bad"?(t<1?" · trop court":" · trop long"):"");r.className="puffRating show r-"+g}
 function pickTrick(t){if(!TRICKS.some(x=>x[0]===t))return;trick=t;localStorage.setItem(TK,t);document.querySelectorAll(".puffTricks button").forEach(b=>b.setAttribute("aria-checked",b.dataset.trick===t))}
 function pickSkin(k){if(!SKINS.some(x=>x[0]===k))return;skin=k;localStorage.setItem(SK,k);p3?.setSkin(k);document.querySelectorAll(".puffSkins button").forEach(b=>b.setAttribute("aria-checked",b.dataset.skin===k))}
-function show(){if(!document.querySelector("#puffOrb"))boot();let p=document.querySelector("#puffPanel");if(!p)return;p.hidden=false;if(!au)import(new URL("./puff-audio.js?v=2",SRC).href).then(m=>{au=m;m.setMuted(muted)}).catch(()=>{});load3d(p.querySelector(".puffStage"));p3?.show()}function hide(){clearEffects();p3?.hide();let p=document.querySelector("#puffPanel");if(p)p.hidden=true}
-function boot(){localStorage.removeItem("salon_fun_puff_hidden");if(document.querySelector("#puffOrb"))return;let fog=document.createElement("div");fog.id="puffScreenVapor";fog.className="puffScreenVapor";let rings=document.createElement("div");rings.id="puffRingLayer";rings.className="puffRingLayer";document.body.append(fog,rings);document.addEventListener("pointerdown",e=>{if(!smokeLocked)return;if(e.target.closest("#puffHide,#puffMute,.puffTricks,.puffSkins"))return;ring(e.clientX,e.clientY);e.preventDefault();e.stopPropagation()},{capture:true,passive:false});let b=document.createElement("button");b.id="puffOrb";b.title="Pause Puff";b.textContent="☁";let p=document.createElement("aside");p.id="puffPanel";p.hidden=true;p.innerHTML='<div class="puffStageWrap"><button id="puffHide" class="puffClose" title="Fermer" aria-label="Fermer">×</button><button id="puffMute" class="puffMute" aria-pressed="'+muted+'" title="Son">'+(muted?"🔇":"🔊")+'</button><div class="puffStage" role="button" tabindex="0" aria-label="Puff virtuelle JNR — maintiens pour tirer"><div class="puffFallback"></div><div class="puffHoldGlow"></div><div class="puffTiming" aria-hidden="true"><div class="puffTrack"></div><i class="puffNeedle"></i></div><div class="puffRating" aria-live="polite"></div></div></div><div class="puffTricks" role="radiogroup" aria-label="Trick à faire dans la fumée">'+TRICKS.map((t,i)=>'<button type="button" role="radio" data-trick="'+t[0]+'" aria-checked="'+(t[0]===trick)+'" title="Touche '+(i+1)+'">'+t[1]+'</button>').join("")+'</div><div class="puffSkins" role="radiogroup" aria-label="Skin de la JNR">'+SKINS.map(k=>'<button type="button" role="radio" data-skin="'+k[0]+'" aria-checked="'+(k[0]===skin)+'"><i style="background:linear-gradient(135deg,'+k[2]+')"></i>'+k[1]+'</button>').join("")+'</div><div class="puffMeta"><span><b id="puffCount">'+s.puffs+'</b></span><span>× <b id="puffRecord">'+s.best+'</b></span><span>★ <b id="puffPerfect">'+(s.perfects||0)+'</b></span></div>';document.body.append(b,p);let stage=p.querySelector(".puffStage"),v=()=>stage.querySelector(".puffVideo");p.querySelectorAll(".puffTricks button").forEach(x=>x.onclick=()=>pickTrick(x.dataset.trick));p.querySelectorAll(".puffSkins button").forEach(x=>x.onclick=()=>pickSkin(x.dataset.skin));b.onclick=()=>{if(!p.hidden){hide();return}show()};p.querySelector("#puffHide").onclick=hide;document.addEventListener("keydown",e=>{if(p.hidden)return;if(e.key==="Escape"){e.preventDefault();hide()}else if(/^[1-5]$/.test(e.key)&&!e.target.closest?.("input,textarea"))pickTrick(TRICKS[e.key-1][0])});let begin=()=>{if(hold||smokeLocked)return;hold=Date.now();T=newTiming();drawTiming(stage);stage.classList.add("pulling","timing");stage.querySelector(".puffRating").className="puffRating";au?.inhaleStart();approach(v());clearTimeout(coughT);coughT=setTimeout(()=>finish(true),T.cough*1000);let needle=stage.querySelector(".puffNeedle"),loop=()=>{if(!hold)return;let t=(Date.now()-hold)/1000;needle.style.left=Math.min(100,t/T.cough*100)+"%";tick=requestAnimationFrame(loop)};loop()},finish=forced=>{if(!hold)return;let d=Date.now()-hold;hold=0;cancelAnimationFrame(tick);clearTimeout(coughT);au?.inhaleStop();stage.classList.remove("pulling");setTimeout(()=>{if(!hold)stage.classList.remove("timing")},1100);if(d<=220&&!forced){reverse(v(),false);return}let g=forced?"cough":gradeOf(d/1000);rate(stage,g,d/1000);countPuff(d,g);reverse(v(),true)},start=e=>{e.preventDefault();if(smokeLocked){ring(e.clientX,e.clientY);return}stage.setPointerCapture?.(e.pointerId);begin()},end=()=>finish(false);p.querySelector("#puffMute").onclick=e=>{muted=!muted;localStorage.setItem("salon_fun_puff_muted",muted?"1":"0");au?.setMuted(muted);e.currentTarget.textContent=muted?"🔇":"🔊";e.currentTarget.setAttribute("aria-pressed",muted)};stage.addEventListener("pointerdown",start);stage.addEventListener("pointerup",end);stage.addEventListener("pointercancel",end);stage.addEventListener("contextmenu",e=>e.preventDefault());stage.addEventListener("keydown",e=>{if((e.code==="Space"||e.code==="Enter")&&!e.repeat){e.preventDefault();begin()}});stage.addEventListener("keyup",e=>{if(e.code==="Space"||e.code==="Enter")end()});sync()}
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);else boot();window.SalonAccount?.onChange?.(()=>sync());window.SalonPuff={state:()=>s,show,hide,sync,trick:pickTrick,skin:pickSkin};
+const POSK="salon_fun_puff_pos_v1",STOWK="salon_fun_puff_stowed_v1";
+let panelPos=(()=>{try{return JSON.parse(localStorage.getItem(POSK)||"null")}catch(_){return null}})(),pressTimer=0,gesture=null;
+
+function settings(open){
+  const c=document.querySelector("#puffControls");
+  if(!c)return;
+  c.hidden=open==null?!c.hidden:!open;
+  document.querySelector("#puffOrb")?.setAttribute("aria-expanded",String(!c.hidden));
+}
+function panel(){return document.querySelector("#puffPanel")}
+function defaultPos(p){
+  const r=p.getBoundingClientRect(),gap=34;
+  return{x:Math.max(12,innerWidth-r.width-gap),y:Math.max(78,Math.min(innerHeight-r.height-24,(innerHeight-r.height)*.46))};
+}
+function clampPos(p,x,y){
+  const r=p.getBoundingClientRect(),pad=10,top=66;
+  return{x:Math.min(Math.max(pad,x),Math.max(pad,innerWidth-r.width-pad)),y:Math.min(Math.max(top,y),Math.max(top,innerHeight-r.height-pad))};
+}
+function place(p,next,persist=true){
+  if(!p||p.classList.contains("stowed"))return;
+  const q=clampPos(p,Number(next?.x),Number(next?.y));
+  if(!Number.isFinite(q.x)||!Number.isFinite(q.y))return;
+  panelPos=q;p.style.left=q.x+"px";p.style.top=q.y+"px";p.style.right="auto";p.style.bottom="auto";
+  if(persist)localStorage.setItem(POSK,JSON.stringify(q));
+}
+function ensurePos(p){
+  const q=panelPos&&Number.isFinite(panelPos.x)&&Number.isFinite(panelPos.y)?panelPos:defaultPos(p);
+  place(p,q,!panelPos);
+}
+function flip(p,change){
+  if(!p)return;
+  const a=p.getBoundingClientRect();change();const b=p.getBoundingClientRect();
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+  const dx=a.left-b.left,dy=a.top-b.top,sx=a.width/Math.max(1,b.width),sy=a.height/Math.max(1,b.height);
+  p.animate([{transform:"translate("+dx+"px,"+dy+"px) scale("+sx+","+sy+")",opacity:.82},{transform:"translate(0,0) scale(1)",opacity:1}],{duration:420,easing:"cubic-bezier(.2,.9,.2,1)"});
+}
+function show(){
+  if(!document.querySelector("#puffOrb"))boot();
+  const p=panel();if(!p)return;
+  const was=p.classList.contains("stowed");
+  localStorage.setItem(STOWK,"0");
+  if(was)flip(p,()=>{p.classList.remove("stowed");ensurePos(p)});
+  else ensurePos(p);
+  p.hidden=false;settings(false);
+  if(!au)import(new URL("./puff-audio.js?v=2",SRC).href).then(m=>{au=m;m.setMuted(muted)}).catch(()=>{});
+  load3d(p.querySelector(".puffStage"));p3?.show();
+  p.classList.add("respawned");setTimeout(()=>p.classList.remove("respawned"),650);
+}
+function hide(){
+  const p=panel();if(!p||p.classList.contains("stowed"))return;
+  clearEffects();settings(false);localStorage.setItem(STOWK,"1");
+  flip(p,()=>{p.classList.add("stowed");p.style.left="";p.style.top="";p.style.right="";p.style.bottom=""});
+  p3?.show();
+}
+function centerPuff(){
+  const p=panel();if(!p)return;
+  if(p.classList.contains("stowed"))show();
+  panelPos=null;place(p,defaultPos(p),true);settings(false);
+}
+function boot(){
+  localStorage.removeItem("salon_fun_puff_hidden");
+  if(document.querySelector("#puffOrb"))return;
+
+  const fog=document.createElement("div");fog.id="puffScreenVapor";fog.className="puffScreenVapor";
+  const rings=document.createElement("div");rings.id="puffRingLayer";rings.className="puffRingLayer";
+  const b=document.createElement("button");b.id="puffOrb";b.type="button";b.title="Puff — réglages";b.setAttribute("aria-label","Réglages de la puff");b.setAttribute("aria-expanded","false");b.textContent="☁";
+
+  const controls=document.createElement("section");controls.id="puffControls";controls.hidden=true;controls.setAttribute("aria-label","Réglages de la puff");
+  controls.innerHTML='<div class="puffCtlHead"><div><b>Puff JNR</b><small>Objet flottant</small></div><button id="puffCtlClose" type="button" aria-label="Fermer">×</button></div>'+
+  '<div class="puffCtlActions"><button id="puffRespawn" type="button">↗ Réafficher</button><button id="puffStore" type="button">↘ Ranger</button><button id="puffCenter" type="button">◎ Recentrer</button><button id="puffMute" type="button" aria-pressed="'+muted+'">'+(muted?"🔇 Son coupé":"🔊 Son")+'</button></div>'+
+  '<div class="puffCtlLabel">Trick dans la fumée</div><div class="puffTricks" role="radiogroup" aria-label="Trick à faire dans la fumée">'+TRICKS.map((t,i)=>'<button type="button" role="radio" data-trick="'+t[0]+'" aria-checked="'+(t[0]===trick)+'" title="Touche '+(i+1)+'">'+t[1]+'</button>').join("")+'</div>'+
+  '<div class="puffCtlLabel">Style / goût</div><div class="puffSkins" role="radiogroup" aria-label="Skin de la JNR">'+SKINS.map(k=>'<button type="button" role="radio" data-skin="'+k[0]+'" aria-checked="'+(k[0]===skin)+'"><i style="background:linear-gradient(135deg,'+k[2]+')"></i>'+k[1]+'</button>').join("")+'</div>'+
+  '<div class="puffCtlStats"><span><b id="puffCount">'+s.puffs+'</b> taffes</span><span>× <b id="puffRecord">'+s.best+'</b> série</span><span>★ <b id="puffPerfect">'+(s.perfects||0)+'</b> perfect</span></div>';
+
+  const p=document.createElement("aside");p.id="puffPanel";p.setAttribute("aria-label","Puff virtuelle flottante");
+  p.innerHTML='<div class="puffStageWrap"><div class="puffStage" role="button" tabindex="0" aria-label="Puff virtuelle JNR — maintiens pour tirer, fais glisser rapidement pour la déplacer"><div class="puffFallback"></div><div class="puffHoldGlow"></div><div class="puffTiming" aria-hidden="true"><div class="puffTrack"></div><i class="puffNeedle"></i></div><div class="puffRating" aria-live="polite"></div></div></div>';
+
+  document.body.append(fog,rings,p,b,controls);
+  const stage=p.querySelector(".puffStage"),v=()=>stage.querySelector(".puffVideo");
+
+  controls.querySelectorAll(".puffTricks button").forEach(x=>x.onclick=()=>pickTrick(x.dataset.trick));
+  controls.querySelectorAll(".puffSkins button").forEach(x=>x.onclick=()=>pickSkin(x.dataset.skin));
+  controls.querySelector("#puffCtlClose").onclick=()=>settings(false);
+  controls.querySelector("#puffRespawn").onclick=show;
+  controls.querySelector("#puffStore").onclick=hide;
+  controls.querySelector("#puffCenter").onclick=centerPuff;
+  controls.querySelector("#puffMute").onclick=e=>{
+    muted=!muted;localStorage.setItem("salon_fun_puff_muted",muted?"1":"0");au?.setMuted(muted);
+    e.currentTarget.textContent=muted?"🔇 Son coupé":"🔊 Son";e.currentTarget.setAttribute("aria-pressed",String(muted));
+  };
+
+  b.onclick=()=>p.classList.contains("stowed")?show():settings();
+
+  document.addEventListener("pointerdown",e=>{
+    if(!controls.hidden&&!e.target.closest("#puffControls,#puffOrb"))settings(false);
+    if(!smokeLocked||e.target.closest("#puffPanel,#puffControls,#puffOrb"))return;
+    ring(e.clientX,e.clientY);
+  },{capture:true,passive:true});
+
+  document.addEventListener("keydown",e=>{
+    if(e.key==="Escape"&&!controls.hidden){e.preventDefault();settings(false);return}
+    if(/^[1-5]$/.test(e.key)&&!e.target.closest?.("input,textarea")&&!p.classList.contains("stowed"))pickTrick(TRICKS[e.key-1][0]);
+  });
+
+  let begin=()=>{
+    if(hold||smokeLocked||p.classList.contains("stowed"))return;
+    hold=Date.now();T=newTiming();drawTiming(stage);stage.classList.add("pulling","timing");stage.querySelector(".puffRating").className="puffRating";
+    au?.inhaleStart();approach(v());clearTimeout(coughT);coughT=setTimeout(()=>finish(true),T.cough*1000);
+    const needle=stage.querySelector(".puffNeedle");
+    const loop=()=>{if(!hold)return;let t=(Date.now()-hold)/1000;needle.style.left=Math.min(100,t/T.cough*100)+"%";tick=requestAnimationFrame(loop)};loop();
+  };
+  let finish=forced=>{
+    if(!hold)return;
+    let d=Date.now()-hold;hold=0;cancelAnimationFrame(tick);clearTimeout(coughT);au?.inhaleStop();stage.classList.remove("pulling");
+    setTimeout(()=>{if(!hold)stage.classList.remove("timing")},1100);
+    if(d<=220&&!forced){reverse(v(),false);return}
+    let g=forced?"cough":gradeOf(d/1000);rate(stage,g,d/1000);countPuff(d,g);reverse(v(),true);
+  };
+
+  const dragMove=e=>{
+    if(!gesture||e.pointerId!==gesture.id)return;
+    const dx=e.clientX-gesture.x,dy=e.clientY-gesture.y,dist=Math.hypot(dx,dy);
+    if(!gesture.drag&&!gesture.pulling&&dist>9){clearTimeout(pressTimer);gesture.drag=true;p.classList.add("dragging")}
+    if(!gesture.drag)return;
+    e.preventDefault();place(p,{x:gesture.left+dx,y:gesture.top+dy},false);
+  };
+  const start=e=>{
+    if(p.classList.contains("stowed")){e.preventDefault();show();return}
+    if(smokeLocked){ring(e.clientX,e.clientY);return}
+    e.preventDefault();
+    const r=p.getBoundingClientRect();
+    gesture={id:e.pointerId,x:e.clientX,y:e.clientY,left:r.left,top:r.top,drag:false,pulling:false};
+    stage.setPointerCapture?.(e.pointerId);clearTimeout(pressTimer);
+    pressTimer=setTimeout(()=>{if(gesture&&!gesture.drag){gesture.pulling=true;begin()}},125);
+  };
+  const end=e=>{
+    if(!gesture||e.pointerId!==gesture.id)return;
+    clearTimeout(pressTimer);
+    if(gesture.drag){
+      panelPos=clampPos(p,p.getBoundingClientRect().left,p.getBoundingClientRect().top);
+      place(p,panelPos,true);p.classList.remove("dragging");
+    }else if(gesture.pulling)finish(false);
+    else{begin();finish(false)}
+    gesture=null;
+  };
+  stage.addEventListener("pointerdown",start);
+  stage.addEventListener("pointermove",dragMove);
+  stage.addEventListener("pointerup",end);
+  stage.addEventListener("pointercancel",end);
+  stage.addEventListener("contextmenu",e=>e.preventDefault());
+  stage.addEventListener("keydown",e=>{
+    if(p.classList.contains("stowed")){if(e.code==="Space"||e.code==="Enter"){e.preventDefault();show()}return}
+    if((e.code==="Space"||e.code==="Enter")&&!e.repeat){e.preventDefault();begin()}
+  });
+  stage.addEventListener("keyup",e=>{if(e.code==="Space"||e.code==="Enter")finish(false)});
+
+  addEventListener("resize",()=>{if(!p.classList.contains("stowed"))place(p,panelPos||defaultPos(p),false)});
+
+  if(localStorage.getItem(STOWK)==="1")p.classList.add("stowed");else ensurePos(p);
+  if(!au)import(new URL("./puff-audio.js?v=2",SRC).href).then(m=>{au=m;m.setMuted(muted)}).catch(()=>{});
+  load3d(stage);p3?.show();sync();
+}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot);else boot();
+window.SalonAccount?.onChange?.(()=>sync());
+window.SalonPuff={state:()=>s,show,hide,stow:hide,center:centerPuff,sync,trick:pickTrick,skin:pickSkin};
 })();
