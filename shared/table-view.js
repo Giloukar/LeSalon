@@ -64,6 +64,7 @@ function register(mode,adapter){
 }
 async function setMode(mode,{persistPreference=true,reason='user'}={}){
   if(mode!==BASE_MODE&&mode!=='3d'&&!renderers.has(mode))return{ok:false,mode:active,reason:'unknown-mode'};
+  const id=++requestId;
   if(persistPreference&&(mode===BASE_MODE||mode==='3d')){
     preferred=mode;
     persist(mode);
@@ -71,7 +72,7 @@ async function setMode(mode,{persistPreference=true,reason='user'}={}){
   if(mode===active)return{ok:true,mode:active,reason:'unchanged'};
   if(!available(mode))return{ok:false,mode:active,reason:'unavailable'};
 
-  const id=++requestId,r=renderer(mode);
+  const r=renderer(mode);
   try{
     if(typeof r?.prepare==='function')await r.prepare();
   }catch(error){
