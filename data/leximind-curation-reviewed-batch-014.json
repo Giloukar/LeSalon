@@ -1,0 +1,211 @@
+[
+  {
+    "word": "national-socialiste",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "pos_mismatch",
+    "evidence_url": "https://fr.wiktionary.org/wiki/national-socialiste"
+  },
+  {
+    "word": "quatre-vingt",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "pos_mismatch"
+  },
+  {
+    "word": "contre-proposition",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "orthographic_variant",
+    "evidence_url": "https://fr.wiktionary.org/wiki/contre-proposition"
+  },
+  {
+    "word": "appareil-photo",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "orthographic_variant",
+    "evidence_url": "https://fr.wiktionary.org/wiki/appareil_photo"
+  },
+  {
+    "word": "bla-bla-bla",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "orthographic_variant",
+    "evidence_url": "https://fr.wiktionary.org/wiki/bla-bla-bla"
+  },
+  {
+    "word": "cardio-vasculaire",
+    "pos": "ADJ",
+    "decision": "rejected",
+    "reason": "orthographic_variant",
+    "evidence_url": "https://fr.wiktionary.org/wiki/cardio-vasculaire"
+  },
+  {
+    "word": "institutionnalisé",
+    "pos": "ADJ",
+    "decision": "rejected",
+    "reason": "inflected_form"
+  },
+  {
+    "word": "new-yorkaise",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "inflected_form"
+  },
+  {
+    "word": "débarasse",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "inflected_form"
+  },
+  {
+    "word": "entrainements",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "inflected_form"
+  },
+  {
+    "word": "rafraichissant",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "inflected_form"
+  },
+  {
+    "word": "subspatiale",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "inflected_form"
+  },
+  {
+    "word": "téléporte",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "inflected_form"
+  },
+  {
+    "word": "reconnaitrais",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "inflected_form"
+  },
+  {
+    "word": "fraichement",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "inflected_form"
+  },
+  {
+    "word": "field",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "foreign_or_noise"
+  },
+  {
+    "word": "hospital",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "foreign_or_noise"
+  },
+  {
+    "word": "homie",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "foreign_or_noise"
+  },
+  {
+    "word": "eagles",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "foreign_or_noise"
+  },
+  {
+    "word": "awards",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "foreign_or_noise"
+  },
+  {
+    "word": "trade",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "foreign_or_noise"
+  },
+  {
+    "word": "christmas",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "foreign_or_noise"
+  },
+  {
+    "word": "foods",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "foreign_or_noise"
+  },
+  {
+    "word": "chocolate",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "foreign_or_noise"
+  },
+  {
+    "word": "games",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "foreign_or_noise"
+  },
+  {
+    "word": "irish",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "foreign_or_noise"
+  },
+  {
+    "word": "gates",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "portland",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "pepsi",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "skype",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "lucien",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "coca-cola",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "rutherford",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "colisée",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  }
+]
