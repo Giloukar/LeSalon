@@ -143,7 +143,7 @@ export function createTable3DRenderer({onFatal}={}){
     clearObjects();
     const s=payload.state,viewer=Number.isInteger(payload.privateIndex)?payload.privateIndex:0;
     if(!s?.players?.length)return;
-    const own=s.players[viewer]?.hand||[],playable=new Set(payload.viewData?.playableIds||[]);
+    const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),playable=new Set(payload.viewData?.playableIds||[]);
 
     const n=own.length,span=Math.min(7.1,Math.max(1.4,(n-1)*.62));
     own.forEach((card,i)=>{
@@ -181,7 +181,12 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function render(payload){
     current=payload;if(!active)return;
-    init();ensureHost();document.documentElement.dataset.table3dGame=payload.gameId||'';
+    init();
+    if(payload.gated){
+      resizeObserver?.disconnect();resizeObserver=null;host?.remove();host=null;
+      document.documentElement.removeAttribute('data-table-3d-game');return;
+    }
+    ensureHost();document.documentElement.dataset.table3dGame=payload.gameId||'';
     if(payload.gameId==='huit')syncEight(payload);
     draw();
   }
