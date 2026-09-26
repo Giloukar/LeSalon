@@ -89,6 +89,12 @@ function stowGuide(active){
   const g=document.querySelector("#puffStowGuide");if(!g)return;
   g.classList.toggle("active",!!active)
 }
+function unstowPosition(p){
+  if(!p)return;
+  const r=p.getBoundingClientRect(),w=r.width||300,h=r.height||480,anchor=Math.min(innerWidth-18,Math.max(18,stowX*innerWidth));
+  const q=clampPos(p,anchor-w/2,innerHeight-h-24);
+  place(p,q,true,false)
+}
 function scheduleLayout(){
   if(layoutRaf)return;
   layoutRaf=requestAnimationFrame(()=>{layoutRaf=0;layoutHud();const p=panel();if(!p)return;if(p.classList.contains("stowed"))stowPosition(p);else if(!gesture?.drag){const r=p.getBoundingClientRect(),q=panelPos||{x:r.left,y:r.top};place(p,q,false,true)}})
@@ -136,7 +142,7 @@ function show(){
   const p=panel();if(!p)return;
   const was=p.classList.contains("stowed");
   localStorage.setItem(STOWK,"0");
-  if(was){p.classList.remove("stowed","stow-ready");ensurePos(p)}
+  if(was){p.classList.remove("stowed","stow-ready");unstowPosition(p)}
   else ensurePos(p);
   p.hidden=false;settings(false);
   if(!au)import(new URL("./puff-audio.js?v=2",SRC).href).then(m=>{au=m;m.setMuted(muted)}).catch(()=>{});
