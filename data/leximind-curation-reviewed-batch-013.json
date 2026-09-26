@@ -1,0 +1,230 @@
+[
+  {
+    "word": "temporal",
+    "pos": "NOM",
+    "decision": "approved",
+    "definition": "Anatomie. Os pair du crâne situé dans la région de la tempe.",
+    "source_url": "https://fr.wiktionary.org/wiki/temporal"
+  },
+  {
+    "word": "quelques",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "pos_mismatch"
+  },
+  {
+    "word": "sinon",
+    "pos": "ADV",
+    "decision": "rejected",
+    "reason": "pos_mismatch",
+    "evidence_url": "https://fr.wiktionary.org/wiki/sinon"
+  },
+  {
+    "word": "voilà",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "pos_mismatch"
+  },
+  {
+    "word": "rebonjour",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "pos_mismatch",
+    "evidence_url": "https://fr.wiktionary.org/wiki/rebonjour"
+  },
+  {
+    "word": "biométrique",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "pos_mismatch"
+  },
+  {
+    "word": "enclenche",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "inflected_form",
+    "evidence_url": "https://fr.wiktionary.org/wiki/enclencher"
+  },
+  {
+    "word": "téléportez",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "inflected_form"
+  },
+  {
+    "word": "dysfonctionnelle",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "inflected_form"
+  },
+  {
+    "word": "inquièterais",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "inflected_form"
+  },
+  {
+    "word": "show-business",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "orthographic_variant",
+    "evidence_url": "https://fr.wiktionary.org/wiki/show_business"
+  },
+  {
+    "word": "je-ne-sais-quoi",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "orthographic_variant",
+    "evidence_url": "https://fr.wiktionary.org/wiki/je-ne-sais-quoi"
+  },
+  {
+    "word": "center",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "foreign_or_noise"
+  },
+  {
+    "word": "californie",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "william",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "floride",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "allemagne",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "scott",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "parker",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "saint-esprit",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "oliver",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "sammy",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "satan",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "jacob",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "madison",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "stewart",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "chase",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "pierce",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "venise",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "queens",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "lloyd",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "barbie",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "klein",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "belgique",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "reich",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "finch",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  },
+  {
+    "word": "blair",
+    "pos": "NOM",
+    "decision": "rejected",
+    "reason": "named_entity"
+  }
+]
