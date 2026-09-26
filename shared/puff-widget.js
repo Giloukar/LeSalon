@@ -12,7 +12,7 @@ function reverse(v,counted){if(p3){p3.release(counted);return}if(!v)return;retur
 function clearEffects(){effectId++;smokeLocked=false;hold=0;cancelAnimationFrame(tick);clearTimeout(coughT);au?.inhaleStop(true);returning=false;cancelAnimationFrame(raf);p3?.clear();let fog=document.querySelector("#puffScreenVapor"),rings=document.querySelector("#puffRingLayer"),stage=document.querySelector(".puffStage"),v=document.querySelector(".puffVideo");if(fog){fog.className="puffScreenVapor";fog.innerHTML=""}if(rings)rings.innerHTML="";if(stage){stage.classList.remove("smokeLocked","pulling","timing","coughing");stage.setAttribute("aria-disabled","false")}if(v){v.pause();v.currentTime=START}}
 function useVideo(stage){if(stage.querySelector(".puffVideo"))return;let v=document.createElement("video");v.className="puffVideo";v.src=VIDEO;v.preload="auto";v.playsInline=v.muted=true;v.draggable=false;v.disablePictureInPicture=true;v.setAttribute("controlslist","nodownload noplaybackrate nofullscreen");v.setAttribute("disableremoteplayback","");v.addEventListener("loadeddata",()=>{v.currentTime=START;stage.classList.add("videoReady")});v.addEventListener("error",()=>stage.classList.add("videoError"));stage.prepend(v)}
 // Modèle Three.js chargé à la première ouverture ; la vidéo sert de repli (pas de WebGL, CDN bloqué…)
-function load3d(stage){if(loading)return loading;loading=import(new URL("./puff-3d.js?v=6",SRC).href).then(m=>m.create({stage,skin,level:level()})).then(api=>{p3=api;stage.classList.add("videoReady","is3d");if(!document.querySelector("#puffPanel")?.hidden)p3.show()}).catch(e=>{console.warn("Puff 3D indisponible, repli vidéo",e);p3=null;document.querySelectorAll(".puffCanvas,.puffSmokeCanvas").forEach(c=>c.remove());document.querySelectorAll(".puffTricks,.puffSkins").forEach(x=>x.hidden=true);useVideo(stage)});return loading}
+function load3d(stage){if(loading)return loading;loading=import(new URL("./puff-3d.js?v=7",SRC).href).then(m=>m.create({stage,skin,level:level()})).then(api=>{p3=api;stage.classList.add("videoReady","is3d");if(!document.querySelector("#puffPanel")?.hidden)p3.show()}).catch(e=>{console.warn("Puff 3D indisponible, repli vidéo",e);p3=null;document.querySelectorAll(".puffCanvas,.puffSmokeCanvas").forEach(c=>c.remove());document.querySelectorAll(".puffTricks,.puffSkins").forEach(x=>x.hidden=true);useVideo(stage)});return loading}
 // Timing : la zone "perfect" bouge à chaque taffe ; au-delà de la dernière zone, c'est la toux
 const POWER={perfect:2.2,excellent:1.7,good:1.2,bad:.55,cough:1},LABEL={perfect:"PERFECT",excellent:"EXCELLENT",good:"GOOD",bad:"BAD",cough:"*TOUX* 🤧"};
 function newTiming(){let p=1.9+Math.random()*.6;return{z:[[0,.8,"bad"],[.8,1.5,"good"],[1.5,p,"excellent"],[p,p+.45,"perfect"],[p+.45,p+.9,"excellent"],[p+.9,p+1.5,"bad"]],cough:p+1.5}}
@@ -96,10 +96,10 @@ function boot(){
   '<div class="puffCtlStats"><span><b id="puffCount">'+s.puffs+'</b> taffes</span><span>× <b id="puffRecord">'+s.best+'</b> série</span><span>★ <b id="puffPerfect">'+(s.perfects||0)+'</b> perfect</span></div>';
 
   const p=document.createElement("aside");p.id="puffPanel";p.setAttribute("aria-label","Puff virtuelle flottante");
-  p.innerHTML='<div class="puffStageWrap"><div class="puffStage" role="button" tabindex="0" aria-label="Puff virtuelle JNR — maintiens pour tirer, fais glisser rapidement pour la déplacer"><div class="puffFallback"></div><div class="puffHoldGlow"></div><div class="puffTiming" aria-hidden="true"><div class="puffTrack"></div><i class="puffNeedle"></i></div><div class="puffRating" aria-live="polite"></div></div></div>';
+  p.innerHTML='<div class="puffStageWrap"><div class="puffStage"><div class="puffHitZone" role="button" tabindex="0" aria-label="Puff virtuelle JNR — maintiens pour tirer, fais glisser rapidement pour la déplacer"></div><div class="puffFallback"></div><div class="puffHoldGlow"></div><div class="puffTiming" aria-hidden="true"><div class="puffTrack"></div><i class="puffNeedle"></i></div><div class="puffRating" aria-live="polite"></div></div></div>';
 
   document.body.append(fog,rings,p,b,controls);
-  const stage=p.querySelector(".puffStage"),v=()=>stage.querySelector(".puffVideo");
+  const stage=p.querySelector(".puffStage"),hit=stage.querySelector(".puffHitZone"),v=()=>stage.querySelector(".puffVideo");
 
   controls.querySelectorAll(".puffTricks button").forEach(x=>x.onclick=()=>pickTrick(x.dataset.trick));
   controls.querySelectorAll(".puffSkins button").forEach(x=>x.onclick=()=>pickSkin(x.dataset.skin));
@@ -153,7 +153,7 @@ function boot(){
     e.preventDefault();
     const r=p.getBoundingClientRect();
     gesture={id:e.pointerId,x:e.clientX,y:e.clientY,left:r.left,top:r.top,drag:false,pulling:false};
-    stage.setPointerCapture?.(e.pointerId);clearTimeout(pressTimer);
+    hit.setPointerCapture?.(e.pointerId);clearTimeout(pressTimer);
     pressTimer=setTimeout(()=>{if(gesture&&!gesture.drag){gesture.pulling=true;begin()}},125);
   };
   const end=e=>{
@@ -166,16 +166,16 @@ function boot(){
     else{begin();finish(false)}
     gesture=null;
   };
-  stage.addEventListener("pointerdown",start);
-  stage.addEventListener("pointermove",dragMove);
-  stage.addEventListener("pointerup",end);
-  stage.addEventListener("pointercancel",end);
-  stage.addEventListener("contextmenu",e=>e.preventDefault());
-  stage.addEventListener("keydown",e=>{
+  hit.addEventListener("pointerdown",start);
+  hit.addEventListener("pointermove",dragMove);
+  hit.addEventListener("pointerup",end);
+  hit.addEventListener("pointercancel",end);
+  hit.addEventListener("contextmenu",e=>e.preventDefault());
+  hit.addEventListener("keydown",e=>{
     if(p.classList.contains("stowed")){if(e.code==="Space"||e.code==="Enter"){e.preventDefault();show()}return}
     if((e.code==="Space"||e.code==="Enter")&&!e.repeat){e.preventDefault();begin()}
   });
-  stage.addEventListener("keyup",e=>{if(e.code==="Space"||e.code==="Enter")finish(false)});
+  hit.addEventListener("keyup",e=>{if(e.code==="Space"||e.code==="Enter")finish(false)});
 
   addEventListener("resize",()=>{if(!p.classList.contains("stowed"))place(p,panelPos||defaultPos(p),false)});
 

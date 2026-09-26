@@ -333,7 +333,7 @@ export async function create({ stage, skin = "blackberry", level = 100 }) {
   renderer.domElement.className = "puffCanvas";
   stage.prepend(renderer.domElement);
   const scene = new THREE.Scene(); scene.environment = envMap(renderer);
-  const camera = new THREE.PerspectiveCamera(32, 1, .1, 50); camera.position.set(0, 0, 8.4);
+  const camera = new THREE.PerspectiveCamera(36, 1, .1, 50); camera.position.set(0, 0, 9.25);
   const key = new THREE.DirectionalLight("#ffffff", .75); key.position.set(3, 5, 6); scene.add(key);
   scene.add(new THREE.HemisphereLight("#dfe8ff", "#20242c", .9));
   const puff = await loadPuff(); puff.setSkin(skin); puff.setLevel(level); scene.add(puff.group);
@@ -372,11 +372,11 @@ export async function create({ stage, skin = "blackberry", level = 100 }) {
       const g = puff.group, idle = 1 - pull;
       // Au repos : flotte et oscille ; en tirant : l'embout vient vers la caméra
       rot.y = damp(rot.y, idle * (Math.sin(clock * .55) * .55 + pointerX * .45), 4, dt);
-      rot.x = damp(rot.x, pull * 1.18 + idle * (pointerY * .25 + Math.sin(clock * .8) * .05), 6, dt);
+      rot.x = damp(rot.x, pull * .84 + idle * (pointerY * .22 + Math.sin(clock * .8) * .05), 6, dt);
       shake = Math.max(0, shake - dt * .9);
       g.rotation.set(rot.x + Math.sin(clock * 55) * shake * .05, rot.y, idle * Math.sin(clock * .7) * .06 + Math.sin(clock * 47) * shake * .06);
-      g.position.set(0, -.15 + idle * Math.sin(clock * 1.1) * .08 - pull * .9, pull * 3.6);
-      g.scale.setScalar(1 + (pulling ? Math.sin(clock * 38) * .004 * pull : 0));
+      g.position.set(0, -.04 + idle * Math.sin(clock * 1.1) * .08 - pull * .34, pull * 2.15);
+      g.scale.setScalar(1.07 + (pulling ? Math.sin(clock * 38) * .004 * pull : 0));
       // L'écran s'allume pendant la taffe
       const led = pull * (.85 + .15 * Math.sin(clock * 24));
       puff.screenMat.color.setScalar(.9 + led * 1.6);
