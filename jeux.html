@@ -3141,7 +3141,7 @@ if(window.SalonTableView){
   const mine=S&&S.id==='huit'&&!gate&&!net.spectator?player(S).hand:[];
   return window.SalonTableView.render({
    args,
-   state:S,
+   state:gate?null:S,
    screen:view,
    gameId:S?.id||null,
    online:!!isOnline(),
