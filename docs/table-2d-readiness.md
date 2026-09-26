@@ -18,7 +18,7 @@ Le harness charge le vrai document, y compris les surcharges finales, avec une h
 - Le rendu local et hôte débite aujourd’hui une pendule active de 4 000 ms ; un invité n’est pas autorité et ne la débite pas.
 - La dernière surcharge `handleGuestAction(packet,index)` conserve désormais l’index du siège authentifié et délègue les actions normales avec cet index.
 - La branche Cactus online utilise désormais le siège authentifié et `seat.lastSeq` pour son jet rapide hors tour ; un siège 2 ne peut plus être traité comme le siège 1.
-- clockExpire utilise V10_ACT. Sous une attaque de six dans le 8, il ne pioche qu’une carte et conserve l’attaque alors que l’actuelle règle restaurée pioche six et l’efface.
+- `clockExpire` utilise désormais un chemin de règles actif : `houseEightAct` pour le 8, `legacyGooseAct` pour l’oie et le moteur historique approprié pour les autres jeux minutés. Une expiration sous attaque cumulée du 8 applique donc bien toute la pénalité et efface l’attaque.
 
 Les trois derniers points sont des diagnostics séparés des tests requis. Ils ne sont pas corrigés dans cette PR.
 
@@ -34,9 +34,8 @@ Math.random sert aux distributions, décisions IA, dés et règles, mais aussi a
 
 ## Découpage recommandé
 
-1. Isoler l’expiration des pendules de la référence V10_ACT sans modifier bonus, réserve ou rythme.
-2. Déplacer la réconciliation des pendules hors de renderGame après tests de chaque frontière de session.
-3. Séparer la cadence métier, les délais visuels et le hasard visuel.
-4. Unifier Cactus dans un chemin de commande commun en conservant l’exception hors tour.
+1. Déplacer la réconciliation des pendules hors de renderGame après tests de chaque frontière de session.
+2. Séparer la cadence métier, les délais visuels et le hasard visuel.
+3. Unifier Cactus dans un chemin de commande commun en conservant l’exception hors tour.
 
 Le ViewController et le Renderer3D restent bloqués jusqu’à ce que renderGame soit une lecture de S et que ces invariants soient testés. La vue 2D reste la référence fonctionnelle et le fallback permanent.
