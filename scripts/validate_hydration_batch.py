@@ -20,6 +20,8 @@ ALLOWED_REASONS = {
     "inflected_form",
     "no_stable_lexical_entry",
     "regional_low_value",
+    "named_entity",
+    "foreign_or_noise",
 }
 WORD_RE = re.compile(r"^[A-Za-zÀ-ÖØ-öø-ÿŒœÆæ'’\- ]{2,64}$")
 REDIRECT_RE = re.compile(
