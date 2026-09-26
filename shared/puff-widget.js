@@ -242,7 +242,7 @@ function boot(){
 
   addEventListener("resize",scheduleLayout);
   addEventListener("scroll",scheduleLayout,{passive:true});
-  new MutationObserver(m=>{if(m.some(x=>[...x.addedNodes,...x.removedNodes].some(n=>n.nodeType===1)))scheduleLayout()}).observe(document.body,{childList:true,subtree:true});
+  new MutationObserver(m=>{if(m.some(x=>{let el=x.target?.nodeType===1?x.target:null;if(el===document.body)return[...x.addedNodes,...x.removedNodes].some(n=>n.nodeType===1);while(el&&el.parentElement!==document.body)el=el.parentElement;return visible(el)}))scheduleLayout()}).observe(document.body,{childList:true,subtree:true});
 
   if(localStorage.getItem(STOWK)==="1"){p.classList.add("stowed");stowPosition(p)}else ensurePos(p);
   if(!au)import(new URL("./puff-audio.js?v=2",SRC).href).then(m=>{au=m;m.setMuted(muted)}).catch(()=>{});
