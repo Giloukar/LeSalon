@@ -75,7 +75,7 @@ function layoutHud(){
 function stowThreshold(){return Math.min(120,Math.max(76,innerHeight*.11))}
 function stowPosition(p,clientX=null,persist=false){
   if(!p)return;
-  const r=p.getBoundingClientRect(),w=r.width||300,peekH=Math.min(78,Math.max(56,innerHeight*.075));
+  const r=p.getBoundingClientRect(),w=r.width||300,peekH=Math.min(142,Math.max(112,innerHeight*.15));
   if(Number.isFinite(clientX)){
     const edge=18,anchor=Math.min(innerWidth-edge,Math.max(edge,clientX));
     stowX=Math.min(.98,Math.max(.02,anchor/Math.max(1,innerWidth)));
