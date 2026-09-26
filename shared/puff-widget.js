@@ -21,9 +21,11 @@ function drawTiming(stage){stage.querySelector(".puffTrack").innerHTML=T.z.map(z
 function rate(stage,g,t){let r=stage.querySelector(".puffRating");r.className="puffRating";void r.offsetWidth;r.textContent=LABEL[g]+(g==="bad"?(t<1?" · trop court":" · trop long"):"");r.className="puffRating show r-"+g}
 function pickTrick(t){if(!TRICKS.some(x=>x[0]===t))return;trick=t;localStorage.setItem(TK,t);document.querySelectorAll(".puffTricks button").forEach(b=>b.setAttribute("aria-checked",b.dataset.trick===t))}
 function pickSkin(k){if(!SKINS.some(x=>x[0]===k))return;skin=k;localStorage.setItem(SK,k);p3?.setSkin(k);document.querySelectorAll(".puffSkins button").forEach(b=>b.setAttribute("aria-checked",b.dataset.skin===k))}
-const POSK="salon_fun_puff_pos_v1",STOWK="salon_fun_puff_stowed_v1";
-let panelPos=(()=>{try{return JSON.parse(localStorage.getItem(POSK)||"null")}catch(_){return null}})(),pressTimer=0,gesture=null,layoutRaf=0;
-const SAFE_GAP=12,OWN_UI="#puffPanel,#puffOrb,#puffControls,#puffScreenVapor,#puffRingLayer,.puffSmokeCanvas";
+const POSK="salon_fun_puff_pos_v1",STOWK="salon_fun_puff_stowed_v1",STOWXK="salon_fun_puff_stow_x_v1";
+let panelPos=(()=>{try{return JSON.parse(localStorage.getItem(POSK)||"null")}catch(_){return null}})(),
+    stowX=(()=>{const n=Number(localStorage.getItem(STOWXK));return Number.isFinite(n)&&n>=0&&n<=1?n:.82})(),
+    pressTimer=0,gesture=null,layoutRaf=0;
+const SAFE_GAP=12,OWN_UI="#puffPanel,#puffOrb,#puffControls,#puffStowGuide,#puffScreenVapor,#puffRingLayer,.puffSmokeCanvas";
 function box(x,y,w,h){return{left:x,top:y,right:x+w,bottom:y+h,width:w,height:h}}
 function visible(el){
   if(!el||!el.isConnected||el.matches?.(OWN_UI)||el.closest?.(OWN_UI))return false;
@@ -70,12 +72,22 @@ function layoutHud(){
     ctl.style.left=c.x+"px";ctl.style.top=c.y+"px";ctl.style.right="auto"
   }
 }
-function stowPosition(p){
+function stowThreshold(){return Math.min(120,Math.max(76,innerHeight*.11))}
+function stowPosition(p,clientX=null,persist=false){
   if(!p)return;
-  const peekW=Math.min(215,Math.max(150,innerWidth*.16)),peekH=Math.min(150,Math.max(112,innerHeight*.17));
-  p.style.setProperty("--puff-peek-w",peekW+"px");p.style.setProperty("--puff-peek-h",peekH+"px");
-  const spot=safeSpot(peekW,peekH,{x:innerWidth-peekW-12,y:innerHeight-peekH-12},blockers([document.querySelector("#puffOrb"),document.querySelector("#puffControls")].filter(Boolean)));
-  p.style.left=spot.x+"px";p.style.top=spot.y+"px";p.style.right="auto";p.style.bottom="auto"
+  const r=p.getBoundingClientRect(),w=r.width||300,peekH=Math.min(78,Math.max(56,innerHeight*.075));
+  if(Number.isFinite(clientX)){
+    const edge=18,anchor=Math.min(innerWidth-edge,Math.max(edge,clientX));
+    stowX=Math.min(.98,Math.max(.02,anchor/Math.max(1,innerWidth)));
+    if(persist)localStorage.setItem(STOWXK,String(stowX));
+  }
+  const anchor=Math.min(innerWidth-18,Math.max(18,stowX*innerWidth));
+  p.style.setProperty("--puff-peek-h",peekH+"px");
+  p.style.left=(anchor-w/2)+"px";p.style.top=(innerHeight-peekH)+"px";p.style.right="auto";p.style.bottom="auto"
+}
+function stowGuide(active){
+  const g=document.querySelector("#puffStowGuide");if(!g)return;
+  g.classList.toggle("active",!!active)
 }
 function scheduleLayout(){
   if(layoutRaf)return;
@@ -124,7 +136,7 @@ function show(){
   const p=panel();if(!p)return;
   const was=p.classList.contains("stowed");
   localStorage.setItem(STOWK,"0");
-  if(was)flip(p,()=>{p.classList.remove("stowed");ensurePos(p)});
+  if(was){p.classList.remove("stowed","stow-ready");ensurePos(p)}
   else ensurePos(p);
   p.hidden=false;settings(false);
   if(!au)import(new URL("./puff-audio.js?v=2",SRC).href).then(m=>{au=m;m.setMuted(muted)}).catch(()=>{});
@@ -132,11 +144,17 @@ function show(){
   p.classList.add("respawned");setTimeout(()=>p.classList.remove("respawned"),650);
   scheduleLayout();
 }
-function hide(){
-  const p=panel();if(!p||p.classList.contains("stowed"))return;
-  clearEffects();settings(false);localStorage.setItem(STOWK,"1");
-  flip(p,()=>{p.classList.add("stowed");stowPosition(p)});
-  p3?.show();scheduleLayout();
+function hide(clientX=null){
+  const p=panel();if(!p||p.classList.contains("stowed")||smokeLocked)return;
+  hold=0;cancelAnimationFrame(tick);clearTimeout(coughT);au?.inhaleStop(true);returning=false;cancelAnimationFrame(raf);
+  const stage=p.querySelector(".puffStage"),v=stage?.querySelector(".puffVideo");
+  if(stage)stage.classList.remove("pulling","timing","coughing");
+  if(v){v.pause();try{v.currentTime=START}catch(_){}}
+  p3?.release?.(false);
+  settings(false);stowGuide(false);localStorage.setItem(STOWK,"1");
+  p.classList.remove("dragging","stow-ready");p.classList.add("stowed");
+  const r=p.getBoundingClientRect(),anchor=Number.isFinite(clientX)?clientX:r.left+r.width/2;
+  stowPosition(p,anchor,true);p3?.show();scheduleLayout();
 }
 function centerPuff(){
   const p=panel();if(!p)return;
@@ -149,26 +167,27 @@ function boot(){
 
   const fog=document.createElement("div");fog.id="puffScreenVapor";fog.className="puffScreenVapor";
   const rings=document.createElement("div");rings.id="puffRingLayer";rings.className="puffRingLayer";
+  const guide=document.createElement("div");guide.id="puffStowGuide";guide.setAttribute("aria-hidden","true");
   const b=document.createElement("button");b.id="puffOrb";b.type="button";b.title="Puff — réglages";b.setAttribute("aria-label","Réglages de la puff");b.setAttribute("aria-expanded","false");b.textContent="☁";
 
   const controls=document.createElement("section");controls.id="puffControls";controls.hidden=true;controls.setAttribute("aria-label","Réglages de la puff");
   controls.innerHTML='<div class="puffCtlHead"><div><b>Puff JNR</b><small>Objet flottant</small></div><button id="puffCtlClose" type="button" aria-label="Fermer">×</button></div>'+
-  '<div class="puffCtlActions"><button id="puffRespawn" type="button">↗ Réafficher</button><button id="puffStore" type="button">↘ Ranger</button><button id="puffCenter" type="button">◎ Recentrer</button><button id="puffMute" type="button" aria-pressed="'+muted+'">'+(muted?"🔇 Son coupé":"🔊 Son")+'</button></div>'+
+  '<div class="puffCtlActions"><button id="puffRespawn" type="button">↗ Réafficher</button><button id="puffCenter" type="button">◎ Recentrer</button><button id="puffMute" type="button" aria-pressed="'+muted+'">'+(muted?"🔇 Son coupé":"🔊 Son")+'</button></div>'+
+  '<p class="puffCtlHint">Pour ranger la puff, fais-la simplement glisser vers le bas de l’écran. Elle restera accessible là où tu la déposes.</p>'+
   '<div class="puffCtlLabel">Trick dans la fumée</div><div class="puffTricks" role="radiogroup" aria-label="Trick à faire dans la fumée">'+TRICKS.map((t,i)=>'<button type="button" role="radio" data-trick="'+t[0]+'" aria-checked="'+(t[0]===trick)+'" title="Touche '+(i+1)+'">'+t[1]+'</button>').join("")+'</div>'+
   '<div class="puffCtlLabel">Style / goût</div><div class="puffSkins" role="radiogroup" aria-label="Skin de la JNR">'+SKINS.map(k=>'<button type="button" role="radio" data-skin="'+k[0]+'" aria-checked="'+(k[0]===skin)+'"><i style="background:linear-gradient(135deg,'+k[2]+')"></i>'+k[1]+'</button>').join("")+'</div>'+
   '<div class="puffCtlStats"><span><b id="puffCount">'+s.puffs+'</b> taffes</span><span>× <b id="puffRecord">'+s.best+'</b> série</span><span>★ <b id="puffPerfect">'+(s.perfects||0)+'</b> perfect</span></div>';
 
   const p=document.createElement("aside");p.id="puffPanel";p.setAttribute("aria-label","Puff virtuelle flottante");
-  p.innerHTML='<div class="puffStageWrap"><div class="puffStage"><div class="puffHitZone" role="button" tabindex="0" aria-label="Puff virtuelle JNR — maintiens pour tirer, fais glisser rapidement pour la déplacer"></div><div class="puffFallback"></div><div class="puffHoldGlow"></div><div class="puffTiming" aria-hidden="true"><div class="puffTrack"></div><i class="puffNeedle"></i></div><div class="puffRating" aria-live="polite"></div></div></div>';
+  p.innerHTML='<div class="puffStageWrap"><div class="puffStage"><div class="puffHitZone" role="button" tabindex="0" aria-label="Puff virtuelle JNR — maintiens pour tirer, fais glisser pour la déplacer, ou vers le bas pour la ranger"></div><div class="puffFallback"></div><div class="puffHoldGlow"></div><div class="puffTiming" aria-hidden="true"><div class="puffTrack"></div><i class="puffNeedle"></i></div><div class="puffRating" aria-live="polite"></div></div></div>';
 
-  document.body.append(fog,rings,p,b,controls);
+  document.body.append(fog,rings,guide,p,b,controls);
   const stage=p.querySelector(".puffStage"),hit=stage.querySelector(".puffHitZone"),v=()=>stage.querySelector(".puffVideo");
 
   controls.querySelectorAll(".puffTricks button").forEach(x=>x.onclick=()=>pickTrick(x.dataset.trick));
   controls.querySelectorAll(".puffSkins button").forEach(x=>x.onclick=()=>pickSkin(x.dataset.skin));
   controls.querySelector("#puffCtlClose").onclick=()=>settings(false);
   controls.querySelector("#puffRespawn").onclick=show;
-  controls.querySelector("#puffStore").onclick=hide;
   controls.querySelector("#puffCenter").onclick=centerPuff;
   controls.querySelector("#puffMute").onclick=e=>{
     muted=!muted;localStorage.setItem("salon_fun_puff_muted",muted?"1":"0");au?.setMuted(muted);
@@ -208,6 +227,8 @@ function boot(){
     const dx=e.clientX-gesture.x,dy=e.clientY-gesture.y,dist=Math.hypot(dx,dy);
     if(!gesture.drag&&!gesture.pulling&&dist>9){clearTimeout(pressTimer);gesture.drag=true;p.classList.add("dragging")}
     if(!gesture.drag)return;
+    gesture.stow=e.clientY>=innerHeight-stowThreshold();
+    p.classList.toggle("stow-ready",gesture.stow);stowGuide(gesture.stow);
     e.preventDefault();place(p,{x:gesture.left+dx,y:gesture.top+dy},false,false);
   };
   const start=e=>{
@@ -215,24 +236,25 @@ function boot(){
     if(smokeLocked){ring(e.clientX,e.clientY);return}
     e.preventDefault();
     const r=p.getBoundingClientRect();
-    gesture={id:e.pointerId,x:e.clientX,y:e.clientY,left:r.left,top:r.top,drag:false,pulling:false};
+    gesture={id:e.pointerId,x:e.clientX,y:e.clientY,left:r.left,top:r.top,drag:false,pulling:false,stow:false};
     hit.setPointerCapture?.(e.pointerId);clearTimeout(pressTimer);
     pressTimer=setTimeout(()=>{if(gesture&&!gesture.drag){gesture.pulling=true;begin()}},125);
   };
-  const end=e=>{
+  const end=(e,cancelled=false)=>{
     if(!gesture||e.pointerId!==gesture.id)return;
-    clearTimeout(pressTimer);
-    if(gesture.drag){
+    clearTimeout(pressTimer);const g=gesture;gesture=null;stowGuide(false);p.classList.remove("stow-ready");
+    if(g.drag){
+      p.classList.remove("dragging");
+      if(g.stow&&!cancelled){hide(e.clientX);return}
       panelPos=clampPos(p,p.getBoundingClientRect().left,p.getBoundingClientRect().top);
-      place(p,panelPos,true,true);p.classList.remove("dragging");scheduleLayout();
-    }else if(gesture.pulling)finish(false);
+      place(p,panelPos,true,true);scheduleLayout();
+    }else if(g.pulling)finish(false);
     else{begin();finish(false)}
-    gesture=null;
   };
   hit.addEventListener("pointerdown",start);
   hit.addEventListener("pointermove",dragMove);
-  hit.addEventListener("pointerup",end);
-  hit.addEventListener("pointercancel",end);
+  hit.addEventListener("pointerup",e=>end(e,false));
+  hit.addEventListener("pointercancel",e=>end(e,true));
   hit.addEventListener("contextmenu",e=>e.preventDefault());
   hit.addEventListener("keydown",e=>{
     if(p.classList.contains("stowed")){if(e.code==="Space"||e.code==="Enter"){e.preventDefault();show()}return}
