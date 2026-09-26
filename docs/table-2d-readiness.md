@@ -1,10 +1,10 @@
 # Préparation de la neutralité du rendu
 
-Base contrôlée le 27 septembre 2026 : main à c60116b5392119aa733519b6816a7d4b380c2055, aucune PR ouverte au contrôle initial. Cette PR ne modifie pas jeux.html et reste 100 % 2D.
+Base de travail au 27 septembre 2026 : les contrats de caractérisation, l’identité des sièges invités, l’expiration des pendules et la neutralité temporelle de `renderGame()` sont fusionnés. Le contrôleur de vue est introduit sans activer encore de renderer 3D.
 
 ## Architecture constatée
 
-Tout le moteur et le rendu sont dans jeux.html. Les dernières affectations sont déterminantes : createGame est surchargé pour les pendules, le 8 américain est restauré après l’implémentation initiale, puis Cactus et Oie remplacent encore createGame, act et ai. renderGame construit le DOM mais ses wrappers finaux appellent clockInit et reconcileTiming. dispatch reste le chemin des actions ordinaires ; la branche Oie différée met busy à true et consomme les dés dans un timeout.
+Le moteur historique reste principalement dans `jeux.html` et les dernières affectations restent déterminantes : le 8 américain, Cactus et l’Oie possèdent leurs moteurs restaurés finaux. `dispatch()` reste le chemin des actions ordinaires. `renderGame()` est maintenant neutre vis-à-vis des pendules et sa fonction 2D finale est enregistrée comme renderer de base dans `SalonTableView`.
 
 En ligne, l’hôte possède net.state. Chaque client affiche S, une projection privée produite par projectGame. Les cartes adverses et la pioche sont masquées dans cette projection. PeerJS/WebRTC transporte les commandes ; le choix d’affichage ne doit jamais entrer dans ce protocole, dans net.state ou dans Supabase.
 
@@ -20,7 +20,7 @@ Le harness charge le vrai document, y compris les surcharges finales, avec une h
 - La branche Cactus online utilise désormais le siège authentifié et `seat.lastSeq` pour son jet rapide hors tour ; un siège 2 ne peut plus être traité comme le siège 1.
 - `clockExpire` utilise désormais un chemin de règles actif : `houseEightAct` pour le 8, `legacyGooseAct` pour l’oie et le moteur historique approprié pour les autres jeux minutés. Une expiration sous attaque cumulée du 8 applique donc bien toute la pénalité et efface l’attaque.
 
-Les trois derniers points sont des diagnostics séparés des tests requis. Ils ne sont pas corrigés dans cette PR.
+Ces comportements sont désormais couverts par les contrats Playwright. Le contrôleur de vue ajoute en plus des contrats de bascule locale : aucun changement de renderer ne doit modifier l’état, le RNG ou les paquets réseau.
 
 ## Frontières à préserver
 
@@ -32,10 +32,21 @@ Cactus possède un chemin UI direct parce que le jet rapide est autorisé hors t
 
 Math.random sert aux distributions, décisions IA, dés et règles, mais aussi aux confettis, particules, puff, catalogue et temporisations de reconnexion. Cette PR ne remplace aucun appel. Une future séparation devra introduire un visualRandom privé, sans consommer le RNG métier, puis migrer uniquement les effets prouvés visuels.
 
+## Contrôleur de vue local
+
+`shared/table-view.js` possède la préférence locale de présentation et le registre des renderers. Le renderer `2d` est la couche de base permanente : il continue d’être synchronisé même lorsqu’un futur renderer 3D sera actif. Cette stratégie garde le DOM 2D prêt comme fallback instantané et préserve les contrôles existants.
+
+Le contrôleur ne lit ni `net.state` ni Supabase et n’écrit aucun champ dans `S`. Il reçoit uniquement la projection courante déjà autorisée dans `S`. Un changement de vue est annulable : une préparation 3D asynchrone terminée après un retour en 2D ne peut pas réactiver tardivement la 3D.
+
+La préférence est stockée sous `salon_table_view_v1`. Elle n’appartient ni à la sauvegarde de partie, ni aux messages PeerJS/WebRTC, ni au profil cloud. Le mode 3D n’est pas encore enregistré dans l’interface utilisateur tant qu’un renderer 3D fonctionnel n’existe pas.
+
 ## Découpage recommandé
 
-1. Séparer la cadence métier, les délais visuels et le hasard visuel.
-2. Unifier Cactus dans un chemin de commande commun en conservant l’exception hors tour.
-3. Introduire ensuite le View Controller local et extraire explicitement le renderer 2D.
+1. Valider et fusionner le View Controller local avec la 2D comme renderer de base permanent.
+2. Séparer la cadence métier des délais purement visuels, notamment le lancer différé de l’Oie.
+3. Introduire un hasard visuel indépendant pour les effets et les futurs placements 3D.
+4. Construire le renderer Three.js générique avec des meshes procéduraux de remplacement et un fallback automatique 2D.
+5. Brancher le 8 américain comme premier jeu 3D sans modifier son moteur ni son protocole d’action.
+6. Généraliser ensuite cartes, dés, pions et tuiles aux autres jeux.
 
-Le ViewController et le Renderer3D restent bloqués jusqu’à ce que renderGame soit une lecture de S et que ces invariants soient testés. La vue 2D reste la référence fonctionnelle et le fallback permanent.
+La vue 2D reste la référence fonctionnelle, la couche sémantique et le fallback permanent. Les modèles 3D externes ne sont pas encore requis : des géométries procédurales suffiront jusqu’à la phase de finition visuelle.
