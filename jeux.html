@@ -3069,16 +3069,17 @@ onlineAct=function(raw){
  }
  return LEGACY3_ONLINE_ACT(raw);
 };
-handleGuestAction=function(packet){
+handleGuestAction=function(packet,index){
  if(net&&net.state&&net.state.id==='cactus'&&packet&&packet.action&&packet.action.type==='quick'){
-  if(!net.connected||!Number.isSafeInteger(packet.seq)||packet.seq<1)return;
-  if(packet.seq<=net.lastSeq){publishOnline();return}
-  net.lastSeq=packet.seq;
+  const seat=net.seats[index];
+  if(!net.connected||!seat?.conn?.open||!Number.isSafeInteger(packet.seq)||packet.seq<1)return;
+  if(packet.seq<=seat.lastSeq){publishOnline();return}
+  seat.lastSeq=packet.seq;
   if(packet.matchId!==net.matchId||packet.revision!==net.revision){publishOnline();return}
   const a=sanitizeOnlineAction('cactus',packet.action);if(!a||netPaused()){publishOnline();return}
-  applyOnlineAction(a,1);return;
+  applyOnlineAction(a,index);return;
  }
- return LEGACY3_GUEST_ACTION(packet);
+ return LEGACY3_GUEST_ACTION(packet,index);
 };
 
 
