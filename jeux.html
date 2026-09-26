@@ -376,6 +376,42 @@ html[data-motion="off"] .auction-number,html[data-motion="off"] .box-tile{transi
 .salon-switch{position:fixed;left:16px;top:16px;z-index:100040;display:flex;gap:6px;padding:5px;border:1px solid #ffffff22;border-radius:14px;background:#10151ee8;box-shadow:0 8px 28px #0006;backdrop-filter:blur(12px)}.salon-switch a{padding:8px 11px;border-radius:9px;font-size:12px;color:var(--muted);transition:.18s}.salon-switch a:hover{background:var(--panel2);color:var(--ink);transform:translateY(-1px)}@media(max-width:600px){.salon-switch{left:8px;top:8px}.salon-switch a{padding:7px 9px;font-size:11px}}</style><link rel="stylesheet" href="./shared/puff-widget.css?v=18"><link rel="stylesheet" href="./shared/global-nav.css?v=2"><style id="eight-house-rules-v2">
 .playing-card.joker-card{color:#7d2037;background:linear-gradient(145deg,#fffdf5,#f5e8dc);border-color:#9e6a76}.playing-card.joker-card .pip{font-size:clamp(24px,4vw,42px);display:flex;flex-direction:column;gap:2px}.playing-card.joker-card .pip small{font:800 8px/1 system-ui;letter-spacing:1.6px}.playing-card[data-eight-card="1"]{touch-action:none;cursor:grab}.playing-card[data-eight-card="1"]:active{cursor:grabbing}.eight-drag-source{opacity:.38!important}.eight-drag-ghost{position:fixed!important;z-index:100500!important;margin:0!important;pointer-events:none!important;transition:none!important;transform-origin:center;filter:drop-shadow(0 18px 28px #0009);will-change:left,top,transform}.eight-discard{position:relative;border-radius:18px;padding:8px;transition:transform .16s ease,background .16s ease,box-shadow .16s ease}.eight-discard.eight-drop-hot{transform:scale(1.055);background:#dbea9e18;box-shadow:0 0 0 2px #dbea9eaa,0 0 34px #dbea9e35}.eight-discard.eight-drop-hot:after{content:"LÂCHEZ ICI";position:absolute;left:50%;bottom:-25px;transform:translateX(-50%);font:800 9px/1 system-ui;letter-spacing:1.5px;color:#dbea9e;white-space:nowrap}.eight-attack{display:inline-flex;align-items:center;gap:6px;margin-left:10px;padding:5px 9px;border-radius:99px;background:#a53f4c;color:#fff;font:900 11px/1 system-ui;box-shadow:0 5px 16px #0005}.eight-lock{opacity:.7;font-size:10px;margin-left:8px}.eight-counter{box-shadow:0 0 0 1px #ff8f9d55}.eight-house-note{margin-top:9px;font-size:10px;color:#aebbaa;letter-spacing:.04em}.eight-playable{box-shadow:0 0 0 1px #dbea9e35}.eight-playable:hover{box-shadow:0 12px 30px #0006,0 0 0 2px #dbea9e88}
 @media(max-width:700px){.eight-discard{padding:4px}.eight-discard.eight-drop-hot:after{bottom:-19px}.eight-house-note{font-size:9px}}
+</style><style id="legacy-three-games-restore">
+/* Cactus : retrouver le carré vivant, le jet rapide et les réactions visuelles. */
+.cactus-felt.legacy-cactus{overflow:visible}
+.legacy-cactus .cactus-player{position:relative}
+.legacy-cactus .cactus-player:after{content:"🌵";position:absolute;right:7px;bottom:3px;font-size:18px;opacity:.26;filter:saturate(.8);animation:legacyCactusSway 3.4s ease-in-out infinite}
+.legacy-cactus .cactus-player:nth-child(2n):after{animation-delay:-1.3s}
+@keyframes legacyCactusSway{0%,100%{transform:rotate(-4deg) translateY(0)}50%{transform:rotate(5deg) translateY(-3px)}}
+.cactus-quick-card{touch-action:manipulation;cursor:pointer;position:relative}
+.cactus-quick-card:after{content:"JET";position:absolute;right:3px;bottom:3px;padding:2px 4px;border-radius:4px;background:#171b16cc;color:#dfe8aa;font:900 7px/1 system-ui;letter-spacing:.7px;opacity:0;transition:opacity .15s}
+.cactus-quick-card:hover:after,.cactus-quick-card:focus-visible:after{opacity:1}
+.cactus-empty-slot{width:var(--card-w,72px);aspect-ratio:5/7;border:1px dashed #cfcba447;border-radius:10px;background:#ffffff08;display:grid;place-items:center;color:#d6d2b467;font-size:18px}
+.legacy-cactus .cactus-score{font:800 10px/1.2 system-ui;letter-spacing:.04em;color:#dfe8aa;margin-top:4px}
+.legacy-cactus .quick-hint{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);font:800 8px/1 system-ui;letter-spacing:1.4px;color:#e4dcae99;white-space:nowrap}
+.legacy-cactus-jet-good{animation:legacyCactusGood .55s ease-out}
+.legacy-cactus-jet-bad{animation:legacyCactusBad .58s ease-out}
+@keyframes legacyCactusGood{0%{filter:drop-shadow(0 0 0 #b9dc8c);transform:scale(1)}45%{filter:drop-shadow(0 0 18px #b9dc8c);transform:scale(1.08)}100%{filter:none;transform:scale(1)}}
+@keyframes legacyCactusBad{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px) rotate(-1deg)}40%{transform:translateX(7px) rotate(1deg)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+.legacy-cactus-spines{position:fixed;z-index:100600;pointer-events:none;font-size:18px;animation:legacySpines .75s ease-out forwards}
+@keyframes legacySpines{0%{opacity:1;transform:translate(0,0) scale(.6) rotate(0)}100%{opacity:0;transform:translate(var(--sx),var(--sy)) scale(1.35) rotate(150deg)}}
+
+/* Oie : restaurer le plateau "aventure", les destinations, grains et effet caméra. */
+.goose-felt.legacy-goose{overflow:hidden}
+.legacy-goose .goose-board{transform:translate(var(--goose-cam-x,0),var(--goose-cam-y,0)) scale(1.055);transform-origin:center;transition:transform .8s cubic-bezier(.24,.78,.28,1);will-change:transform}
+.legacy-goose .goose-cell.goose-possible{box-shadow:inset 0 0 0 2px #f5dfa7,0 0 16px #f5dfa744;transform:scale(1.045);z-index:2}
+.legacy-goose .goose-cell.goose-possible .number{font-weight:900}
+.legacy-goose .goose-grain{position:absolute;right:4px;bottom:3px;font-size:11px;filter:drop-shadow(0 0 5px #ffda65);animation:legacyGrain 1.7s ease-in-out infinite}
+@keyframes legacyGrain{0%,100%{transform:translateY(0) scale(.9);opacity:.75}50%{transform:translateY(-3px) scale(1.15);opacity:1}}
+.legacy-goose .goose-adventure-bar{position:absolute;left:10px;right:10px;bottom:8px;display:flex;gap:8px;justify-content:space-between;align-items:center;pointer-events:none}
+.legacy-goose .goose-adventure-chip{padding:5px 8px;border-radius:999px;background:#172419d9;border:1px solid #dfc29655;color:#ead8b8;font:800 9px/1 system-ui;letter-spacing:.08em}
+.goose-choice-grid{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.goose-choice{min-width:106px;text-align:left}
+.goose-choice strong{display:block;font-size:18px}.goose-choice small{display:block;opacity:.66;margin-top:2px}
+.goose-feather{display:inline-flex;align-items:center;gap:5px;padding:7px 10px;border-radius:999px;background:#ffffff0b;border:1px solid #dfc29644;font-size:11px}
+.goose-duel-flash{animation:gooseDuelFlash .72s ease-out}
+@keyframes gooseDuelFlash{0%{filter:drop-shadow(0 0 0 #fff)}45%{filter:drop-shadow(0 0 22px #f0c977)}100%{filter:none}}
+@media(max-width:700px){.legacy-goose .goose-board{transform:none}.legacy-goose .goose-adventure-bar{position:static;margin-top:8px}.cactus-quick-card:after{opacity:.68}}
 </style></head><body><nav class="salon-switch" aria-label="Navigation Le Salon"><a href="./index.html">⌂ Le Salon</a><a href="./leximind.html">LexiMind →</a></nav><a class="skip" href="#main">Aller au contenu</a><div id="app"></div><dialog id="dialog" aria-label="Options de la table"></dialog><div id="toasts"></div><div id="announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div><noscript><main style="max-width:600px;margin:10vh auto;padding:30px;font-family:system-ui"><h1>La table de jeux</h1><p>Pour distribuer les cartes et lancer les dés, activez JavaScript dans votre navigateur. Le solo et le jeu sur le même écran fonctionnent hors connexion ; les salons à distance nécessitent Internet.</p></main></noscript><!-- PeerJS 1.5.5 — MIT License
 Copyright (c) 2015 Michelle Bu and Eric Zhang, http://peerjs.com
 
@@ -415,8 +451,8 @@ const RANKS={1:'A',11:'V',12:'D',13:'R'};
 const TILE_COLORS=['rouge','bleu','ambre','noir'];
 const GAMES={
  huit:{name:'8 américain',short:'8 américain',tag:'Les règles de la maison sont de retour.',desc:'Attaques cumulées, 8 magique, jokers et coups de vice.',category:'cartes',kind:'Dynamique',time:'10–20 min',min:2,max:6,accent:'#b0c9a0',bg:'#395a43',symbol:'8',rules:['But : se débarrasser de sa main. Donne : 8 cartes à 2 joueurs, 7 à 3 joueurs, 6 à partir de 4 joueurs. À 5 joueurs et plus, deux jeux sont mélangés.','Entame : la dame de cœur est prioritaire, puis dame de carreau, pique et trèfle ; à défaut on cherche les rois, puis les valets. Cette carte d’entame ne déclenche pas son effet.','Le 8 se pose sur n’importe quoi, permet de choisir la couleur et annule une attaque. On ne peut pas poser immédiatement un 8 sur un 8 ; une pioche ou une autre carte lève ce verrou.','As : +2 cumulable avec un autre As. Joker : +4, choisit la couleur et peut couvrir une attaque d’As ; un As ne peut pas répondre à un Joker. Les attaques s’additionnent jusqu’à ce qu’un joueur ramasse tout le cumul.','Valet : inverse le sens. 10 : rejouez. 7 : saute le joueur suivant. À deux joueurs, valet, 10 et 7 rendent donc la main au même joueur.','Vous pouvez toujours choisir de piocher, même si vous avez une carte jouable. La carte piochée ne se joue pas immédiatement : le tour passe.','À deux joueurs, on ne peut pas finir sur un 7, un valet ou un 10 : on repioche une carte. À trois joueurs ou plus, seul le 10 empêche de sortir. Une dernière attaque peut encore être renvoyée par le dernier adversaire.','Avant de passer de 2 cartes à 1, annoncez « Carte ! ». Si vous oubliez, le joueur suivant peut utiliser « Contre-carte ! » avant son coup : vous piochez 2 cartes.']},
- oie:{name:"Jeu de l’oie",short:"Jeu de l’oie",tag:'Le hasard fait bien les choses. Parfois.',desc:'Deux dés, 63 cases et quelques détours inattendus.',category:'plateau',kind:'Chance',time:'10–20 min',min:2,max:6,accent:'#dfc296',bg:'#725439',symbol:'⚄',rules:['Atteignez exactement la case 63. Lancez deux dés à chaque tour. Un dépassement vous fait reculer du nombre de cases en trop.','Sur une oie (5, 9, 14, 18, 23, 27, 32, 36, 41, 45, 50, 54, 59), avancez à nouveau du total des dés ; après un rebond, reculez.','Pont (6) : allez en 12. Auberge (19) : passez 2 tours. Labyrinthe (42) : retour en 30. Tête de mort (58) : retour au départ.','Puits (31) et prison (52) : attendez qu’un autre joueur vous remplace, au maximum 3 tours dans cette variante.','Au premier lancer, un 9 obtenu avec 3 + 6 mène en 26 ; avec 4 + 5, en 53. Plusieurs pions peuvent partager une case ordinaire.']},
- cactus:{name:'Le Cactus',short:'Cactus',tag:'Gardez les bonnes cartes en tête.',desc:'Quatre cartes cachées. Votre mémoire fait la différence.',category:'cartes',kind:'Mémoire',time:'10–15 min',min:2,max:6,accent:'#d1d19d',bg:'#666b3d',symbol:'✳',rules:['But : terminer à 6 points maximum. Pour gagner son annonce, il faut aussi être strictement sous chaque adversaire. Chacun a 4 cartes cachées ; regardez vos 2 cartes du bas au départ.','À votre tour, piochez une carte du paquet ou prenez celle de la défausse. Échangez-la avec une de vos cartes, ou jetez-la si elle vient du paquet.','Variante de cette table : quatre cartes conservées, sans défausse éclair. Une carte piochée au paquet puis jetée donne un pouvoir : 7 ou 8, regardez une carte à vous ; 9 ou 10, regardez une carte adverse ; valet ou dame, échangez à l’aveugle une de vos cartes avec une carte adverse. Vous pouvez ignorer le pouvoir.','As = 1 ; de 2 à 10 = valeur de la carte ; valet et dame = 10 ; tous les rois = 0.','Au début de votre tour, annoncez « Cactus ! » si vous pensez avoir 6 points ou moins. Chaque adversaire joue encore un tour. Au décompte final, l’annonceur perd en cas de dépassement ou si un adversaire a autant ou moins. Parmi les autres, le minimum à 6 ou moins gagne (ex æquo possibles). Si aucun score n’est admissible, personne ne gagne.']},
+ oie:{name:"Jeu de l’oie",short:"Jeu de l’oie",tag:'Le mode aventure historique est de retour.',desc:'Deux dés, 63 cases, des choix, des plumes et quelques duels.',category:'plateau',kind:'Chance & choix',time:'10–20 min',min:2,max:6,accent:'#dfc296',bg:'#725439',symbol:'⚄',rules:['Atteignez exactement la case 63. Après chaque lancer, choisissez d’avancer de la somme des deux dés ou de la valeur d’un seul dé.','Un 9 au tout premier lancer mène en 26 avec 6 + 3, et en 53 avec 5 + 4. Les oies des cases 5, 9, 14, 18, 23, 27, 32, 36, 41, 45, 50, 54 et 59 font repartir du même nombre de cases.','Pont 6 → 12. Auberge 19 : 2 tours passés. Labyrinthe 42 → 30. Tête de mort 58 → départ. Puits 31 et prison 52 retiennent le pion jusqu’à ce qu’un autre joueur vienne le remplacer.','Chaque joueur démarre avec 2 plumes. Une plume permet de relancer les deux dés. Huit grains dorés sont semés sur le parcours ; en ramasser un rend une plume.','Quand un joueur arrive sur un autre pion hors piège, un duel de dés départage les deux : l’attaquant doit faire strictement plus. Le perdant retourne sur la case quittée par l’attaquant.','Le plateau suit le pion, met en évidence les destinations possibles et anime chaque étape du déplacement, y compris rebonds, oies, duels et pièges.']},
+ cactus:{name:'Le Cactus',short:'Cactus',tag:'Mémoire, réflexe et vieux coups de vice.',desc:'Quatre cartes cachées, jet rapide et cactus royal.',category:'cartes',kind:'Mémoire',time:'10–15 min',min:2,max:6,accent:'#d1d19d',bg:'#666b3d',symbol:'✳',rules:['Quatre cartes chacun, face cachée, en carré. Au début de la manche, regardez une seule fois vos deux cartes du bas puis mémorisez-les.','À votre tour, prenez la défausse et remplacez obligatoirement une de vos cartes, ou piochez à l’aveugle puis échangez la carte ou rejetez-la.','Un 8 pioché puis rejeté permet de regarder une de vos propres cartes. Les 7, 9, 10, valet et dame n’ont pas de pouvoir supplémentaire dans cette version.','Jet rapide : à tout moment, même hors de votre tour, vous pouvez tenter de jeter une de vos cartes si elle a la même valeur que la défausse. Réussite : elle disparaît. Erreur : la carte reste et vous recevez une carte de pénalité à l’aveugle.','Valeurs : roi = 0, as = 1, valet et dame = 10, les autres valent leur nombre. À votre tour, vous pouvez annoncer « Cactus ! » si vous pensez avoir 6 points ou moins ; les autres jouent chacun un dernier tour.','Le plus petit total gagne la manche et marque 0. Une annonce au-dessus de 6 ajoute 10 points de pénalité. Zéro point est un cactus royal : −5 points. Quand un joueur atteint 100 points, la partie s’arrête et le plus petit score cumulé l’emporte.']},
  president:{name:'Le Président',short:'Président',tag:'Une main pour changer la hiérarchie.',desc:'Montez les enchères et prenez la tête de la table.',category:'cartes',kind:'Stratégie',time:'10–20 min',min:2,max:6,accent:'#c5b7dc',bg:'#534766',symbol:'♛',rules:['Débarrassez-vous de toutes vos cartes. L’ordre croissant est 3, 4, …, 10, valet, dame, roi, as, 2.','Le premier pose une carte ou plusieurs cartes de même valeur. Il faut répondre avec le même nombre de cartes, d’une valeur supérieure, ou passer. Une nouvelle pose réautorise tous les joueurs à répondre.','Lorsque tous les autres joueurs encore en jeu passent, le dernier à avoir posé ouvre un nouveau pli. S’il a terminé, le suivant encore en jeu ouvre.','Variante révolution : un carré peut être posé sur tout. Il vide le pli et inverse entièrement l’ordre des valeurs, jusqu’au prochain carré.','Le premier est Président. À la manche suivante, le dernier lui donne ses 2 meilleures cartes et reçoit ses 2 moins bonnes. À 4 joueurs ou plus, les deux rangs intermédiaires échangent aussi 1 carte (sauf s’ils font partie du premier échange). Les échanges sont automatiques.']},
  menteur:{name:'Le Menteur',short:'Menteur',tag:'Un peu de culot, beaucoup de bluff.',desc:'Annoncez, bluffez… et choisissez qui croire.',category:'cartes',kind:'Bluff',time:'10–20 min',min:2,max:6,accent:'#afced1',bg:'#3d6065',symbol:'?',rules:['Videz votre main en posant de 1 à 4 cartes, face cachée. La valeur annoncée suit le cycle as, 2, 3, …, roi, puis as. Vous pouvez dire vrai ou bluffer.','Dans cette variante, le joueur suivant peut contester avec « Menteur ! » avant de jouer, ou accepter l’annonce.','Si une carte du dernier coup a une autre valeur que l’annonce, le menteur ramasse tout le tas. Sinon, celui qui a contesté ramasse. Les cartes contestées sont révélées.','Une fois l’annonce résolue, le joueur suivant joue la valeur suivante, même s’il vient de ramasser.','Une dernière pose ne gagne qu’une fois acceptée, ou après une accusation injustifiée. Un bluff démasqué ne peut pas gagner.']},
  vingtetun:{name:'Le Vingt-et-un',short:'Vingt-et-un',tag:'Savoir quand s’arrêter, tout un art.',desc:'Approchez 21 et défiez la banque, sans le dépasser.',category:'cartes',kind:'Prise de risque',time:'10–15 min',min:1,max:6,accent:'#ddca91',bg:'#3f6154',symbol:'21',rules:['Vous commencez avec 1 000 jetons fictifs. Après 15 mains, le plus de jetons gagne. Aucun argent réel.','Misez de 10 à 200 jetons (ou votre solde restant s’il est inférieur à 10). Vous recevez 2 cartes, la banque aussi, dont une cachée.','Les figures valent 10 ; l’as vaut 1 ou 11. Tirez une carte ou restez. Au-delà de 21, vous perdez la mise. Sur vos 2 premières cartes, « Doubler » double la mise et donne exactement une dernière carte. Pas de séparation de paires.','La banque tire sous 17 et reste à 17, même avec un as compté 11. Un blackjack naturel (as + carte de valeur 10) bat un 21 en 3 cartes ou plus.','Victoire : la mise est rendue avec un gain égal. Blackjack naturel : gain de 1,5 fois la mise. Égalité : mise rendue. Les joueurs sans jetons quittent les mains suivantes.']},
@@ -1348,7 +1384,7 @@ function celebrate(){
 function schedule(){if(isOnline()){scheduleOnline();return;}clearTimeout(timer);timer=null;if(!S||view!=='game'||gate||busy||$('dialog').open||document.hidden||S.phase==='over'||S.phase==='roundEnd')return;if(S.phase==='dealer'||player(S).bot){timer=setTimeout(()=>{if(!S||view!=='game'||$('dialog').open||gate||document.hidden)return;dispatch(ai(S),true);},motionWait(S.id==='oie'&&motions()?Math.max(prefs.fast?260:900,Math.min(1500,(S.path?.length||0)*65+100)):prefs.fast?260:900));}}
 function dispatch(a,automatic=false){if(isOnline()){if(!$('dialog').open)onlineAct(a);return;}if(!S||view!=='game'||gate||busy||$('dialog').open)return;if(!automatic&&!canPlay()&&!(S.phase==='roundEnd'&&a.type==='nextRound'))return;if(S.id==='oie'&&a.type==='roll'&&!a.dice&&!player(S).wait&&motions()){busy=true;renderGame(false);sound('dice');timer=setTimeout(()=>{busy=false;dispatch({...a,dice:[1+Math.floor(Math.random()*6),1+Math.floor(Math.random()*6)]},automatic);},immersive()?motionDuration(140):prefs.fast?300:650);return;}
  const scene=sceneCapture({...a,actor:S.turn});const previous=clone(S),previousTurn=S.turn,previousPhase=S.phase;let ok=false;try{ok=act(S,a);}catch(error){S=previous;toast('Ce coup n’a pas pu être joué. Votre partie est conservée.');console.error(error);renderGame(false);schedule();return;}if(!ok){S=previous;if(a.type==='commit')toast(rummiDiagnostic(S).text);else toast(cardActionError(S,a));sound('error');renderGame(false);schedule();return;}
- selection.clear();showSuit=null;const changed=previousTurn!==S.turn||(S.id==='vingtetun'&&S.phase==='bet'||S.id==='encheres'&&S.phase==='play')&&previousPhase==='roundEnd';if(S.mode==='local'&&!['oie','metropole','bataille','yam','boite'].includes(S.id)&&!ARCADE_IDS.includes(S.id)&&changed&&S.phase!=='over'&&S.phase!=='roundEnd'&&S.phase!=='dealer')gate=true;record();save();renderGame(true,S.id==='oie'&&a.type==='roll'?S.path:null);playSceneAction(scene);$('announcer').textContent=S.message+' '+turnText()[0];if(S.phase==='over'&&previousPhase!=='over'){celebrate();document.querySelector('.win-box')?.scrollIntoView({behavior:motions()?'smooth':'auto',block:'start'});}else sound(a.type==='roll'?'dice':'card');schedule();}
+ selection.clear();showSuit=null;const changed=previousTurn!==S.turn||(S.id==='vingtetun'&&S.phase==='bet'||S.id==='encheres'&&S.phase==='play')&&previousPhase==='roundEnd';if(S.mode==='local'&&!['oie','metropole','bataille','yam','boite'].includes(S.id)&&!ARCADE_IDS.includes(S.id)&&changed&&S.phase!=='over'&&S.phase!=='roundEnd'&&S.phase!=='dealer')gate=true;record();save();renderGame(true,S.id==='oie'&&['roll','gooseChoose'].includes(a.type)?S.path:null);playSceneAction(scene);$('announcer').textContent=S.message+' '+turnText()[0];if(S.phase==='over'&&previousPhase!=='over'){celebrate();document.querySelector('.win-box')?.scrollIntoView({behavior:motions()?'smooth':'auto',block:'start'});}else sound(a.type==='roll'?'dice':'card');schedule();}
 function updateActionZone(){refreshSelection();}
 document.addEventListener('click',e=>{const el=e.target.closest('[data-action]');if(!el||el.disabled)return;const action=el.dataset.action;if(action==='home'){save();showHome();return;}if(action==='setup'){openSetup(el.dataset.id);return;}if(action==='random'){openSetup(Object.keys(GAMES)[Math.floor(Math.random()*Object.keys(GAMES).length)]);return;}if(action==='filter'){filter=el.dataset.filter;document.querySelectorAll('.filter').forEach(b=>{b.classList.toggle('active',b.dataset.filter===filter);b.setAttribute('aria-pressed',b.dataset.filter===filter);});renderCatalog();return;}if(action==='close-modal'){closeModal();return;}if(action==='settings'){openSettings();return;}if(action==='sound'){prefs.sound=!prefs.sound;applyPrefs();sound();document.querySelectorAll('[data-action="sound"]').forEach(b=>{b.innerHTML=icon(prefs.sound?'sound':'mute');b.setAttribute('aria-label',(prefs.sound?'Couper':'Activer')+' le son');b.setAttribute('aria-pressed',prefs.sound);});return;}if(action==='mode'){setupNames();setup.mode=el.dataset.mode;setup.names=[];renderSetup();return;}if(action==='resume'){S=clone(saved);view='game';selection.clear();showSuit=null;busy=false;gate=S.mode==='local'&&!['oie','metropole','bataille','yam','boite'].includes(S.id)&&!ARCADE_IDS.includes(S.id)&&!['over','dealer','roundEnd'].includes(S.phase);renderGame(false);window.scrollTo(0,0);schedule();return;}if(action==='rules'){openRules();return;}if(action==='pause'){save();modal(`<div class="eyebrow">PRENEZ VOTRE TEMPS</div><h2>La table vous attend.</h2><p class="modal-subtitle">La partie est en pause. Vos cartes seront là à votre retour.</p><button class="btn full" data-action="close-modal">Reprendre la partie ${icon('play')}</button><button class="btn ghost full" style="margin-top:12px" data-action="home">Retour aux jeux</button>`,'pause');return;}if(action==='reveal-hand'){gate=false;renderGame(true);playSceneAction(sceneCapture({type:'deal'}));sound();schedule();return;}if(action==='replay'){startGame(S.config,S.id,S);return;}if(action==='sort'){sortByColor=!sortByColor;renderGame(true);return;}if(action==='clear-selection'){selection.clear();updateActionZone();return;}if(action==='cancel-suit'){showSuit=null;renderGame(false);return;}if(action==='choose-suit'){dispatch({type:'card',id:showSuit,suit:el.dataset.suit});return;}if(action==='game'){dispatch(JSON.parse(el.dataset.gameact));return;}
  if(action==='hand-card'){if(!canPlay())return;const c=player(S).hand.find(c=>c.id===el.dataset.id);if(!c)return;if(S.id==='huit'){if(c.rank===8){showSuit=c.id;renderGame(false);}else dispatch({type:'card',id:c.id});}else if(['president','menteur'].includes(S.id)){if(selection.has(c.id))selection.delete(c.id);else if(selection.size<4)selection.add(c.id);else toast('Quatre cartes au maximum.');refreshSelection();}return;}
@@ -2544,6 +2580,498 @@ function eightDragEnd(e){
 }
 document.addEventListener('pointerup',eightDragEnd,{capture:true});
 document.addEventListener('pointercancel',e=>{if(eightDragState?.id===e.pointerId)eightDragCleanup()},{capture:true});
+
+
+/* =========================================================================
+   RESTAURATION DE FIDÉLITÉ — Cactus + Jeu de l'oie
+   Référence : snapshot historique du Salon utilisé pour restaurer le 8.
+   ========================================================================= */
+const LEGACY3_CREATE=createGame,LEGACY3_ACT=act,LEGACY3_AI=ai,LEGACY3_BOARD=boardHTML,LEGACY3_ACTIONS=actionsHTML,LEGACY3_TURN=turnText,LEGACY3_STATUS=playerStatus,LEGACY3_SANITIZE=sanitizeOnlineAction,LEGACY3_PROJECT=projectGame,LEGACY3_VALIDATE=validateSaved,LEGACY3_SCENE=playSceneAction;
+const LEGACY3_ONLINE_ACT=onlineAct,LEGACY3_APPLY_ONLINE=applyOnlineAction,LEGACY3_GUEST_ACTION=handleGuestAction;
+const LEGACY_CACTUS_VERSION=1,LEGACY_GOOSE_VERSION=1;
+const LEGACY_CACTUS_LIMIT=6,LEGACY_CACTUS_PENALTY=10,LEGACY_CACTUS_ROYAL=-5,LEGACY_CACTUS_OBJECTIVE=100;
+const LEGACY_GOOSE_TRAPS=[6,19,31,42,52,58,63];
+
+function legacyCactusPoints(c){if(!c)return 0;if(c.rank===13)return 0;if(c.rank===1)return 1;if(c.rank===11||c.rank===12)return 10;return c.rank;}
+function legacyCactusCount(p){return p.hand.reduce(function(n,c){return n+(c?1:0)},0)}
+function legacyCactusTotal(p){return p.hand.reduce(function(n,c){return n+legacyCactusPoints(c)},0)}
+function legacyCactusDraw(s){
+ const c=draw(s,1)[0]||null;
+ return c;
+}
+function legacyCactusCarryScores(s,old){
+ for(let i=0;i<s.players.length;i++){
+  const previous=old&&old.id==='cactus'&&old.legacyCactusVersion===LEGACY_CACTUS_VERSION&&!old.cactusMatchOver&&old.players[i];
+  s.players[i].cactusScore=previous&&Number.isFinite(previous.cactusScore)?previous.cactusScore:0;
+  s.players[i].cactusWins=previous&&Number.isFinite(previous.cactusWins)?previous.cactusWins:0;
+  s.players[i].cactusCalls=previous&&Number.isFinite(previous.cactusCalls)?previous.cactusCalls:0;
+  s.players[i].cactusMisses=previous&&Number.isFinite(previous.cactusMisses)?previous.cactusMisses:0;
+  s.players[i].quickHits=previous&&Number.isFinite(previous.quickHits)?previous.quickHits:0;
+  s.players[i].quickMisses=previous&&Number.isFinite(previous.quickMisses)?previous.quickMisses:0;
+ }
+}
+function legacyCactusInit(s,old){
+ s.legacyCactusVersion=LEGACY_CACTUS_VERSION;
+ legacyCactusCarryScores(s,old);
+ s.deck=deck(s.players.length>4?2:1);
+ for(const p of s.players){
+  p.hand=s.deck.splice(-4);
+  p.known={2:clone(p.hand[2]),3:clone(p.hand[3])};
+ }
+ s.discard=[s.deck.pop()];
+ s.peekers=s.players.map(function(p,i){return p.bot?-1:i}).filter(function(i){return i>=0});
+ s.turn=s.peekers[0]!==undefined?s.peekers[0]:0;
+ s.phase=s.peekers.length?'peek':'draw';
+ s.caller=null;s.left=0;s.drawn=null;s.source=null;s.power=null;s.reveal=null;s.swapFirst=null;
+ s.cactusMatchOver=false;s.cactusGains=null;s.totals=null;s.lastQuick=null;
+ say(s,'Quatre cartes chacun. Regardez les deux cartes du bas, puis faites confiance à votre mémoire.');
+ return s;
+}
+function legacyCactusNextPlayer(s,from){return next(s,from,function(){return true},1)}
+function legacyCactusRoundEnd(s,trigger,byEmpty){
+ const totals=s.players.map(legacyCactusTotal),mini=Math.min.apply(null,totals),winners=totals.map(function(v,i){return v===mini?i:-1}).filter(function(i){return i>=0});
+ const gains=totals.map(function(total,i){
+  if(s.caller===i&&total>LEGACY_CACTUS_LIMIT){s.players[i].cactusMisses++;return total+LEGACY_CACTUS_PENALTY}
+  if(total===mini){s.players[i].cactusWins++;return total===0?LEGACY_CACTUS_ROYAL:0}
+  return total;
+ });
+ gains.forEach(function(g,i){s.players[i].cactusScore+=g});
+ s.totals=totals;s.cactusGains=gains;
+ const threshold=s.players.some(function(p){return p.cactusScore>=LEGACY_CACTUS_OBJECTIVE});
+ s.cactusMatchOver=threshold;
+ let finalWinners=winners,reason='';
+ if(threshold){
+  const low=Math.min.apply(null,s.players.map(function(p){return p.cactusScore}));
+  finalWinners=s.players.map(function(p,i){return p.cactusScore===low?i:-1}).filter(function(i){return i>=0});
+  reason='Fin de partie : '+finalWinners.map(function(i){return s.players[i].name}).join(' & ')+' · '+low+' points cumulés.';
+ }else{
+  reason=(byEmpty?s.players[trigger].name+' vide son carré. ':'Abattage. ')+winners.map(function(i){return s.players[i].name}).join(' & ')+' gagne'+(winners.length>1?'nt':'')+' avec '+mini+' point'+(mini>1?'s':'')+'.';
+  if(s.caller!==null&&totals[s.caller]>LEGACY_CACTUS_LIMIT)reason+=' Annonce ratée : +'+LEGACY_CACTUS_PENALTY+' de pénalité.';
+  if(mini===0)reason+=' Cactus royal : −5.';
+ }
+ finish(s,finalWinners,reason);
+ return true;
+}
+function legacyCactusEndTurn(s,i){
+ s.drawn=null;s.source=null;s.power=null;s.reveal=null;s.swapFirst=null;
+ if(s.caller!==null){
+  s.left--;
+  if(s.left<=0)return legacyCactusRoundEnd(s,s.caller,false);
+ }
+ s.turn=legacyCactusNextPlayer(s,i);s.phase='draw';s.moves++;
+ return true;
+}
+function legacyCactusQuick(s,owner,index){
+ if(!s||s.id!=='cactus'||s.phase==='over'||!Number.isInteger(owner)||!Number.isInteger(index))return false;
+ const p=s.players[owner],top=s.discard.at(-1),c=p&&p.hand[index];
+ if(!p||!top||!c)return false;
+ const good=c.rank===top.rank;
+ if(good){
+  p.quickHits++;p.hand[index]=null;p.known[index]=null;s.discard.push(c);
+  s.lastQuick={owner,index,good:true,card:clone(c),at:Date.now()};
+  say(s,p.name+' réussit un jet rapide : '+rankName(c.rank)+' rejoint la défausse.');
+  if(legacyCactusCount(p)===0)return legacyCactusRoundEnd(s,owner,true);
+ }else{
+  p.quickMisses++;
+  const penalty=legacyCactusDraw(s);
+  if(penalty){
+   let slot=p.hand.findIndex(function(x){return !x});
+   if(slot<0){p.hand.push(penalty);slot=p.hand.length-1}else p.hand[slot]=penalty;
+   p.known[slot]=null;
+  }
+  s.lastQuick={owner,index,good:false,card:clone(c),at:Date.now()};
+  say(s,p.name+' rate son jet rapide et reçoit une carte de pénalité.');
+ }
+ return true;
+}
+function legacyCactusAct(s,a){
+ if(s.phase==='over'||!a)return false;
+ const i=s.turn,p=s.players[i];
+ if(a.type==='quick')return legacyCactusQuick(s,Number.isInteger(a.owner)?a.owner:i,a.index);
+ if(s.phase==='peek'){
+  if(a.type!=='ready')return false;
+  const at=s.peekers.indexOf(i);
+  if(at>=0&&at<s.peekers.length-1){s.turn=s.peekers[at+1];return true}
+  s.turn=0;s.phase='draw';return true;
+ }
+ if(s.phase==='reveal'){
+  if(a.type!=='ready')return false;
+  return legacyCactusEndTurn(s,i);
+ }
+ if(s.phase==='power'){
+  if(a.type==='skip')return legacyCactusEndTurn(s,i);
+  if(a.type!=='target'||a.owner!==i||!p.hand[a.index])return false;
+  p.known[a.index]=clone(p.hand[a.index]);s.reveal={owner:i,index:a.index};s.phase='reveal';
+  say(s,p.name+' regarde une de ses cartes.');return true;
+ }
+ if(s.phase==='draw'){
+  if(a.type==='call'){
+   if(s.caller!==null)return false;
+   s.caller=i;s.left=Math.max(0,s.players.length-1);p.cactusCalls++;
+   say(s,p.name+' annonce « Cactus ! ». Chacun joue un dernier tour.');
+   if(!s.left)return legacyCactusRoundEnd(s,i,false);
+   s.turn=legacyCactusNextPlayer(s,i);s.phase='draw';s.moves++;return true;
+  }
+  if(a.type==='draw'){
+   const c=legacyCactusDraw(s);if(!c)return legacyCactusRoundEnd(s,i,false);
+   s.drawn=c;s.source='draw';s.phase='swap';say(s,p.name+' pioche une carte.');return true;
+  }
+  if(a.type==='take'){
+   if(!s.discard.length)return false;
+   s.drawn=s.discard.pop();s.source='take';s.phase='swap';say(s,p.name+' prend la défausse.');return true;
+  }
+  return false;
+ }
+ if(s.phase==='swap'){
+  if(a.type==='swap'){
+   if(!Number.isInteger(a.index)||!p.hand[a.index]||!s.drawn)return false;
+   const out=p.hand[a.index],incoming=s.drawn;p.hand[a.index]=incoming;p.known[a.index]=clone(incoming);s.discard.push(out);
+   say(s,p.name+' échange une carte et rejette '+rankName(out.rank)+SYMBOLS[out.suit]+'.');
+   return legacyCactusEndTurn(s,i);
+  }
+  if(a.type==='discard'&&s.source==='draw'&&s.drawn){
+   const c=s.drawn;s.discard.push(c);s.drawn=null;s.source=null;
+   if(c.rank===8){s.power='self';s.phase='power';say(s,p.name+' jette un 8 et peut regarder une de ses cartes.');return true}
+   say(s,p.name+' rejette la carte piochée.');return legacyCactusEndTurn(s,i);
+  }
+ }
+ return false;
+}
+function legacyCactusAI(s){
+ const p=player(s);
+ if(s.phase==='peek'||s.phase==='reveal')return{type:'ready'};
+ if(s.phase==='power'){
+  const unknown=p.hand.map(function(c,i){return c&&!p.known[i]?i:-1}).filter(function(i){return i>=0});
+  return unknown.length?{type:'target',owner:s.turn,index:unknown[0]}:{type:'skip'};
+ }
+ if(s.phase==='draw'){
+  let estimate=0;
+  for(let i=0;i<p.hand.length;i++)if(p.hand[i])estimate+=p.known[i]?legacyCactusPoints(p.known[i]):5.6;
+  if(s.caller===null&&estimate<=LEGACY_CACTUS_LIMIT&&Math.random()<.72)return{type:'call'};
+  const top=s.discard.at(-1),known=p.hand.map(function(c,i){return c&&p.known[i]?legacyCactusPoints(p.known[i]):-1}),worst=Math.max.apply(null,known);
+  if(top&&worst>=0&&legacyCactusPoints(top)<worst-1)return{type:'take'};
+  return{type:'draw'};
+ }
+ if(s.phase==='swap'){
+  let worst=-1,wv=-1,unknown=-1;
+  p.hand.forEach(function(c,i){if(!c)return;if(p.known[i]){const v=legacyCactusPoints(p.known[i]);if(v>wv){wv=v;worst=i}}else if(unknown<0)unknown=i});
+  const val=s.drawn?legacyCactusPoints(s.drawn):99;
+  if(s.source==='take')return{type:'swap',index:worst>=0?worst:unknown};
+  if(worst>=0&&wv>val)return{type:'swap',index:worst};
+  if(unknown>=0&&val<=4)return{type:'swap',index:unknown};
+  return{type:'discard'};
+ }
+ return{type:'ready'};
+}
+
+/* ----- Jeu de l'oie historique ----- */
+function legacyGooseSeed(s){
+ const blocked=new Set(LEGACY_GOOSE_TRAPS.concat(GEESE)),pool=[];
+ for(let n=2;n<63;n++)if(!blocked.has(n))pool.push(n);
+ shuffle(pool);s.gooseGrains=pool.slice(0,8).sort(function(a,b){return a-b});
+}
+function legacyGooseInit(s){
+ s.legacyGooseVersion=LEGACY_GOOSE_VERSION;s.phase='play';s.turn=0;s.goosePending=null;s.gooseLastEvent=null;s.path=[];s.movedPlayer=0;s.dice=[1,1];
+ for(const p of s.players){p.pos=0;p.wait=0;p.blocked=null;p.rolled=false;p.gooseRolls=0;p.feathers=2;p.grains=0;p.duels=0;p.duelsWon=0;p.choiceSingles=0;p.best=0;p.backtrack=0}
+ legacyGooseSeed(s);say(s,'Mode aventure : lancez, puis choisissez la somme ou un seul dé.');
+ return s;
+}
+function legacyGooseOccupant(s,pos,except){
+ if(pos<=0)return-1;
+ for(let i=0;i<s.players.length;i++)if(i!==except&&s.players[i].pos===pos&&!s.players[i].out)return i;
+ return-1;
+}
+function legacyGooseTarget(start,steps){
+ let pos=start,dir=1;
+ for(let i=0;i<steps;i++){if(pos===63)dir=-1;pos+=dir}
+ return Math.max(0,pos);
+}
+function legacyGooseWalk(start,steps,path){
+ let pos=start,dir=1;
+ for(let i=0;i<steps;i++){if(pos===63)dir=-1;pos+=dir;path.push(pos)}
+ return Math.max(0,pos);
+}
+function legacyGooseCross(s,i,depart,path,event){
+ const p=s.players[i],other=legacyGooseOccupant(s,p.pos,i);
+ if(other<0||LEGACY_GOOSE_TRAPS.includes(p.pos))return;
+ const a=1+Math.floor(Math.random()*6),d=1+Math.floor(Math.random()*6);p.duels++;s.players[other].duels++;
+ event.duel={attacker:i,defender:other,a,d};
+ if(a>d){p.duelsWon++;s.players[other].pos=depart;event.duel.winner=i;event.duel.loserTo=depart;s.gooseSecondary={player:other,to:depart}}
+ else{s.players[other].duelsWon++;p.pos=depart;path.push(depart);event.duel.winner=other;event.duel.loserTo=depart}
+}
+function legacyGooseEffects(s,i,steps,path,event,depth,depart){
+ const p=s.players[i],pos=p.pos;
+ if(pos===63){event.arrive=true;finish(s,i,p.name+' atteint exactement la case 63 !');return}
+ if(GEESE.includes(pos)&&depth<24){
+  event.geese=(event.geese||0)+1;
+  p.pos=legacyGooseWalk(p.pos,steps,path);p.best=Math.max(p.best,p.pos);
+  return legacyGooseEffects(s,i,steps,path,event,depth+1,pos);
+ }
+ if(pos===6){p.pos=12;path.push(12);event.trap='pont';legacyGooseCross(s,i,depart,path,event);return}
+ if(pos===42){p.backtrack+=12;p.pos=30;path.push(30);event.trap='labyrinthe';legacyGooseCross(s,i,depart,path,event);return}
+ if(pos===58){p.backtrack+=58;p.pos=0;path.push(0);event.trap='mort';return}
+ if(pos===19){p.wait=2;event.trap='auberge';return}
+ if(pos===31||pos===52){
+  const kind=pos===31?'puits':'prison';
+  for(let k=0;k<s.players.length;k++)if(k!==i&&s.players[k].blocked===kind&&s.players[k].pos===pos){s.players[k].blocked=null;s.players[k].pos=depart;s.gooseSecondary={player:k,to:depart}}
+  p.blocked=kind;event.trap=kind;return;
+ }
+ legacyGooseCross(s,i,depart,path,event);
+}
+function legacyGooseNext(s){
+ if(s.phase==='over')return;
+ for(let guard=0;guard<s.players.length*6+8;guard++){
+  s.turn=(s.turn+1)%s.players.length;const p=s.players[s.turn];
+  if(p.out)continue;
+  if(p.wait>0){p.wait--;continue}
+  if(p.blocked)continue;
+  return;
+ }
+ const trapped=s.players.findIndex(function(p){return p.blocked&&!p.out});
+ if(trapped>=0){s.players[trapped].blocked=null;s.turn=trapped;return}
+ finish(s,[],'Tous les pions sont immobilisés.');
+}
+function legacyGooseResolve(s,i,steps){
+ const p=s.players[i],pending=s.goosePending;if(!pending||pending.i!==i)return false;
+ const a=pending.dice[0],b=pending.dice[1],depart=p.pos,path=[depart],event={choice:steps};
+ s.goosePending=null;p.choiceSingles+=steps!==(a+b)?1:0;
+ if(p.gooseRolls===1&&a+b===9&&steps===9&&p.pos===0){
+  p.pos=(a===6||b===6)?26:53;path.push(p.pos);legacyGooseCross(s,i,depart,path,event);
+ }else{
+  p.pos=legacyGooseWalk(p.pos,steps,path);p.best=Math.max(p.best,p.pos);legacyGooseEffects(s,i,steps,path,event,0,depart);
+ }
+ if(s.phase!=='over'){
+  const grain=s.gooseGrains.indexOf(p.pos);
+  if(grain>=0){s.gooseGrains.splice(grain,1);p.grains++;p.feathers++;event.grain=p.pos}
+ }
+ s.path=path;s.movedPlayer=i;s.gooseLastEvent=event;s.moves++;
+ if(s.phase!=='over')legacyGooseNext(s);
+ say(s,p.name+' avance de '+steps+(event.grain?' et ramasse un grain doré.':event.duel?' · duel sur la case !':event.trap?' · '+event.trap+'.':'.'));
+ return true;
+}
+function legacyGooseAct(s,a){
+ if(s.phase==='over'||!a)return false;
+ const i=s.turn,p=s.players[i];
+ if(a.type==='roll'){
+  if(s.goosePending)return false;
+  const dice=Array.isArray(a.dice)&&a.dice.length===2?a.dice:[1+Math.floor(Math.random()*6),1+Math.floor(Math.random()*6)];
+  if(dice.some(function(x){return !Number.isInteger(x)||x<1||x>6}))return false;
+  s.dice=dice;p.gooseRolls++;p.rolled=true;s.goosePending={i,dice:dice.slice(),rerolls:0};s.path=[];s.movedPlayer=i;s.gooseLastEvent={roll:true};
+  say(s,p.name+' obtient '+dice[0]+' et '+dice[1]+'. Choisissez votre déplacement.');return true;
+ }
+ if(a.type==='gooseReroll'){
+  if(!s.goosePending||s.goosePending.i!==i||p.feathers<=0)return false;
+  p.feathers--;s.dice=[1+Math.floor(Math.random()*6),1+Math.floor(Math.random()*6)];s.goosePending.dice=s.dice.slice();s.goosePending.rerolls++;
+  s.gooseLastEvent={reroll:true};say(s,p.name+' dépense une plume et relance : '+s.dice[0]+' et '+s.dice[1]+'.');return true;
+ }
+ if(a.type==='gooseChoose'){
+  if(!s.goosePending||s.goosePending.i!==i||!Number.isInteger(a.steps))return false;
+  const d=s.goosePending.dice,valid=[d[0],d[1],d[0]+d[1]];
+  if(!valid.includes(a.steps))return false;
+  return legacyGooseResolve(s,i,a.steps);
+ }
+ return false;
+}
+function legacyGooseAI(s){
+ const p=player(s);
+ if(!s.goosePending)return{type:'roll'};
+ const d=s.goosePending.dice,opts=[d[0],d[1],d[0]+d[1]],score=function(n){
+  const t=legacyGooseTarget(p.pos,n);let v=t;
+  if(GEESE.includes(t))v+=25;if(t===6)v+=18;if(t===58)v-=200;if(t===42)v-=45;if(t===31||t===52)v-=70;if(t===19)v-=25;if(s.gooseGrains.includes(t))v+=14;if(t===63)v+=1000;return v;
+ };
+ let best=opts[0],bestScore=score(best);for(const n of opts){const v=score(n);if(v>bestScore){best=n;bestScore=v}}
+ if(p.feathers>0&&s.goosePending.rerolls<2&&bestScore<p.pos-4&&Math.random()<.62)return{type:'gooseReroll'};
+ return{type:'gooseChoose',steps:best};
+}
+
+createGame=function(id,config,old=null){
+ const s=LEGACY3_CREATE(id,config,old);
+ if(id==='cactus')return legacyCactusInit(s,old);
+ if(id==='oie')return legacyGooseInit(s);
+ return s;
+};
+act=function(s,a){
+ if(s&&s.id==='cactus')return legacyCactusAct(s,a);
+ if(s&&s.id==='oie')return legacyGooseAct(s,a);
+ return LEGACY3_ACT(s,a);
+};
+ai=function(s){
+ if(s&&s.id==='cactus')return legacyCactusAI(s);
+ if(s&&s.id==='oie')return legacyGooseAI(s);
+ return LEGACY3_AI(s);
+};
+
+function legacyCactusOwnQuickAllowed(owner){
+ if(!S||S.id!=='cactus'||S.phase==='over')return false;
+ if(isOnline())return !net.spectator&&owner===net.me;
+ if(S.mode==='solo')return owner===0;
+ return true;
+}
+function legacyCactusBoard(){
+ const mine=privateIndex(),players=S.players.map(function(p,i){
+  const cards=p.hand.map(function(c,j){
+   if(!c)return '<div class="cactus-empty-slot" aria-label="Emplacement vide">·</div>';
+   const visible=S.phase==='over'||S.phase==='peek'&&i===S.turn&&j>=2||S.phase==='reveal'&&S.reveal&&S.reveal.owner===i&&S.reveal.index===j;
+   let attr='',classes='',interactive=false;
+   if(canPlay()&&i===S.turn&&S.phase==='swap'&&c){interactive=true;attr=attrs({type:'swap',index:j});classes='pickable '}
+   else if(canPlay()&&i===S.turn&&S.phase==='power'&&c){interactive=true;attr=attrs({type:'target',owner:i,index:j});classes='pickable '}
+   else if(legacyCactusOwnQuickAllowed(i)&&!((i===S.turn)&&['swap','power','reveal','peek'].includes(S.phase))){interactive=true;attr='data-action="cactus-quick" data-owner="'+i+'" data-index="'+j+'"';classes='cactus-quick-card '}
+   return cardHTML(visible?c:null,{button:interactive,attr:attr,classes:classes,key:'cactus-'+i+'-'+j,label:'Carte '+(j+1)+' de '+p.name});
+  }).join('');
+  return '<div class="cactus-player '+(i===mine?'own':'')+'"><h3>'+esc(p.name)+(S.caller===i?' · Cactus !':'')+'</h3><div class="cactus-four">'+cards+'</div><div class="cactus-score">'+p.cactusScore+' pts cumulés · '+legacyCactusCount(p)+' carte'+(legacyCactusCount(p)>1?'s':'')+'</div></div>';
+ }).join('');
+ const drawn=S.drawn?'<div class="pile">'+cardHTML(canPlay()?S.drawn:null,{key:canPlay()?'c-'+S.drawn.id:'drawn-hidden'})+'<div class="pile-label">'+(canPlay()?'VOTRE PIOCHE':'CARTE PIOCHÉE')+'</div></div>':'';
+ return '<section data-motion-key="felt" class="felt cactus-felt legacy-cactus" aria-label="Table du Cactus"><div class="cactus-table">'+players+'</div>'+(S.phase!=='over'?'<div class="cactus-draw"><div class="pile">'+cardHTML(null,{button:canPlay()&&S.phase==='draw',attr:attrs({type:'draw'}),label:'Piocher au paquet'})+'<div class="pile-label">PIOCHE</div></div><div class="pile" data-cactus-discard="1">'+cardHTML(S.discard.at(-1),{button:canPlay()&&S.phase==='draw'&&S.discard.length>0,attr:attrs({type:'take'}),key:S.discard.length?'c-'+S.discard.at(-1).id:undefined})+'<div class="pile-label">DÉFAUSSE</div></div>'+drawn+'</div><div class="quick-hint">JET RAPIDE : même valeur que la défausse, même hors tour</div>':'')+'</section>';
+}
+function legacyGooseBoard(){
+ const pending=S.goosePending,dests=new Set(pending?[pending.dice[0],pending.dice[1],pending.dice[0]+pending.dice[1]].map(function(n){return legacyGooseTarget(player(S).pos,n)}):[]);
+ const pos=player(S).pos,coord=pos>0&&CELL_COORDS[pos-1]?CELL_COORDS[pos-1]:[4,3],camX=((4-coord[0])*1.8).toFixed(1)+'%',camY=((3-coord[1])*1.8).toFixed(1)+'%';
+ const board=CELL_COORDS.map(function(pair,k){
+  const x=pair[0],y=pair[1],n=k+1,symbol=GEESE.includes(n)?'♧':({6:'⌒',19:'☕',31:'◉',42:'⤴',52:'▥',58:'↶',63:'♛'}[n]||''),grain=S.gooseGrains.includes(n)?'<span class="goose-grain" aria-label="Grain doré">✦</span>':'';
+  return '<div class="goose-cell '+(GEESE.includes(n)?'goose ':'')+([6,19,31,42,52].includes(n)?'trap ':'')+(n===58?'danger ':'')+(n===63?'goal ':'')+(dests.has(n)?'goose-possible ':'')+'" data-cell="'+n+'" style="grid-column:'+(x+1)+';grid-row:'+(y+1)+'" title="Case '+n+(GEESE.includes(n)?' · Oie':SPECIAL[n]?' · '+SPECIAL[n]:'')+'"><span class="number">'+n+'</span><span class="cell-symbol" aria-hidden="true">'+symbol+'</span>'+grain+'<div class="tokens">'+S.players.map(function(p,i){return p.pos===n?pawnHTML(i):''}).join('')+'</div></div>';
+ }).join('');
+ return '<section data-motion-key="felt" class="felt goose-felt legacy-goose" aria-label="Plateau du jeu de l’oie"><div class="goose-controls"><div class="start-tokens">Départ '+S.players.map(function(p,i){return p.pos===0?pawnHTML(i):''}).join('')+'</div><div class="dice-pair" id="dice">'+S.dice.map(function(n){return dieHTML(n,busy)}).join('')+'</div><span class="table-text">'+S.dice[0]+' + '+S.dice[1]+'</span></div><div class="goose-board" style="--goose-cam-x:'+camX+';--goose-cam-y:'+camY+'">'+board+'</div><div class="goose-legend"><span>♧ Oie : repartez du même nombre</span><span>✦ Grain : +1 plume</span><span>⌒ Pont</span><span>☕ Auberge</span><span>◉ Puits</span><span>▥ Prison</span><span>↶ Départ</span></div><div class="goose-adventure-bar"><span class="goose-adventure-chip">🪶 '+player(S).feathers+' plume'+(player(S).feathers>1?'s':'')+'</span><span class="goose-adventure-chip">✦ '+player(S).grains+' grain'+(player(S).grains>1?'s':'')+'</span></div></section>';
+}
+boardHTML=function(){
+ if(S&&S.id==='cactus')return legacyCactusBoard();
+ if(S&&S.id==='oie')return legacyGooseBoard();
+ return LEGACY3_BOARD();
+};
+actionsHTML=function(){
+ if(S&&S.id==='cactus'){
+  if(!canPlay())return '<div class="action-zone"><p class="action-note">'+esc(isOnline()?onlineWaitingText():'La table joue…')+'</p></div>';
+  let html='';
+  if(S.phase==='peek')html=button('C’est mémorisé '+icon('check'),'ready');
+  else if(S.phase==='draw')html=button('Piocher','draw',{},false,'secondary')+button('Prendre la défausse','take',{},!S.discard.length,'secondary')+button('Cactus ! · ≤ 6','call',{},S.caller!==null);
+  else if(S.phase==='swap')html=S.source==='draw'?button('Jeter la pioche','discard',{},false,'secondary'):'<p class="action-note">La défausse doit remplacer une de vos cartes.</p>';
+  else if(S.phase==='power')html=button('Ignorer le coup d’œil','skip',{},false,'ghost')+'<p class="action-note">Le 8 vous autorise à regarder une de vos cartes.</p>';
+  else if(S.phase==='reveal')html=button('C’est noté '+icon('check'),'ready');
+  return '<div class="action-zone">'+html+'</div>';
+ }
+ if(S&&S.id==='oie'){
+  if(!canPlay())return LEGACY3_ACTIONS();
+  if(S.goosePending){
+   const d=S.goosePending.dice,opts=[d[0],d[1],d[0]+d[1]],labels=['Dé 1','Dé 2','Somme'];
+   const choices=opts.map(function(n,k){return '<button class="btn secondary goose-choice" '+attrs({type:'gooseChoose',steps:n})+'><strong>'+n+' case'+(n>1?'s':'')+'</strong><small>'+labels[k]+' · vers '+legacyGooseTarget(player(S).pos,n)+'</small></button>'}).join('');
+   return '<div class="goose-choice-grid">'+choices+'</div><div class="action-zone"><span class="goose-feather">🪶 '+player(S).feathers+' disponible'+(player(S).feathers>1?'s':'')+'</span>'+button('Relancer · 1 plume','gooseReroll',{},player(S).feathers<=0,'ghost')+'</div>';
+  }
+  return '<div class="action-zone">'+button('Lancer les dés','roll')+'</div>';
+ }
+ return LEGACY3_ACTIONS();
+};
+turnText=function(){
+ if(S&&S.id==='cactus'&&canPlay()){
+  const text={peek:'Regardez vos deux cartes du bas une seule fois.',draw:S.caller!==null?'Dernier tour : piochez ou prenez la défausse.':'Piochez, prenez la défausse ou annoncez Cactus.',swap:'Échangez la carte piochée avec une de vos cartes, ou jetez-la si elle vient du paquet.',power:'Votre 8 rejeté vous donne un coup d’œil.',reveal:'Mémorisez cette carte puis refermez-la.'}[S.phase];
+  return ['À vous de jouer',text||''];
+ }
+ if(S&&S.id==='oie'&&canPlay())return S.goosePending?['À vous de choisir','Avancez de '+S.goosePending.dice[0]+', '+S.goosePending.dice[1]+' ou '+(S.goosePending.dice[0]+S.goosePending.dice[1])+'. Vous pouvez aussi dépenser une plume.']:['À vous de lancer','Deux dés, puis vous choisirez votre déplacement.'];
+ return LEGACY3_TURN();
+};
+playerStatus=function(i){
+ if(S&&S.id==='cactus'){const p=S.players[i];return p.cactusScore+' pts · '+legacyCactusCount(p)+' carte'+(legacyCactusCount(p)>1?'s':'')+(S.caller===i?' · Cactus !':'')}
+ if(S&&S.id==='oie'){const p=S.players[i];return 'Case '+p.pos+' · 🪶 '+p.feathers+(p.blocked?' · '+p.blocked:p.wait?' · attente '+p.wait:'')}
+ return LEGACY3_STATUS(i);
+};
+sanitizeOnlineAction=function(id,raw){
+ if(id==='cactus'&&raw&&raw.type==='quick'){
+  if(!Number.isInteger(raw.index)||raw.index<0||raw.index>20)return null;
+  return{type:'quick',index:raw.index};
+ }
+ if(id==='oie'&&raw&&raw.type==='gooseChoose'){
+  if(!Number.isInteger(raw.steps)||raw.steps<1||raw.steps>12)return null;return{type:'gooseChoose',steps:raw.steps};
+ }
+ if(id==='oie'&&raw&&raw.type==='gooseReroll')return{type:'gooseReroll'};
+ return LEGACY3_SANITIZE(id,raw);
+};
+projectGame=function(source,viewer){
+ const v=LEGACY3_PROJECT(source,viewer);
+ if(source.id==='cactus'){
+  for(let i=0;i<source.players.length;i++){
+   v.players[i].hand=source.players[i].hand.map(function(c,j){
+    if(!c)return null;
+    const show=source.phase==='over'||viewer===source.turn&&(source.phase==='peek'&&i===viewer&&j>=2||source.phase==='reveal'&&source.reveal&&source.reveal.owner===i&&source.reveal.index===j);
+    return show?clone(c):{hidden:true,id:'private-'+i+'-'+j};
+   });
+  }
+ }
+ return v;
+};
+validateSaved=function(){
+ LEGACY3_VALIDATE();
+ if(saved&&saved.id==='cactus'&&saved.legacyCactusVersion!==LEGACY_CACTUS_VERSION)saved=null;
+ if(saved&&saved.id==='oie'&&saved.legacyGooseVersion!==LEGACY_GOOSE_VERSION)saved=null;
+};
+
+function legacyCactusQuickFX(sourceRect,card,good){
+ const target=document.querySelector('[data-cactus-discard="1"]');
+ if(good&&sourceRect&&target&&sceneMotion()){
+  const to=target.getBoundingClientRect();sceneFlight(cardHTML(card),sourceRect,to,{spin:10,duration:520});scenePulse('[data-cactus-discard="1"]',SCENES.cactus.accent,true);sceneBadge('Bien vu !',{felt:sceneRect(document.querySelector('.felt'))},'✳');
+ }else{
+  const own=document.querySelector('.cactus-player.own')||document.querySelector('.cactus-player');
+  if(own){own.classList.add('legacy-cactus-jet-bad');setTimeout(function(){own.classList.remove('legacy-cactus-jet-bad')},650)}
+  const r=sourceRect||own&&own.getBoundingClientRect();if(r)for(let i=0;i<10;i++){const sp=document.createElement('i');sp.className='legacy-cactus-spines';sp.textContent='✦';sp.style.left=(r.left+r.width/2)+'px';sp.style.top=(r.top+r.height/2)+'px';sp.style.setProperty('--sx',(Math.random()*120-60)+'px');sp.style.setProperty('--sy',(Math.random()*100-65)+'px');document.body.appendChild(sp);setTimeout(function(){sp.remove()},850)}
+  toast('Jet rapide raté : +1 carte.');
+ }
+}
+function legacyCactusQuickUI(owner,index,el){
+ if(!legacyCactusOwnQuickAllowed(owner))return;
+ const rect=el&&el.getBoundingClientRect(),before=S.players[owner]&&S.players[owner].hand[index],copy=before&&!before.hidden?clone(before):null;
+ if(isOnline()){onlineAct({type:'quick',index:index});return}
+ const previous=clone(S);
+ if(!legacyCactusQuick(S,owner,index))return;
+ const good=!!S.lastQuick&&S.lastQuick.good;record();save();renderGame(true);legacyCactusQuickFX(rect,copy||S.lastQuick.card,good);
+ if(S.phase==='over'&&previous.phase!=='over')celebrate();schedule();
+}
+document.addEventListener('click',function(e){
+ const b=e.target.closest('[data-action="cactus-quick"]');if(!b||S&&S.id!=='cactus')return;
+ e.preventDefault();e.stopImmediatePropagation();legacyCactusQuickUI(Number(b.dataset.owner),Number(b.dataset.index),b);
+},true);
+
+/* Jet rapide en ligne : c'est la seule action autorisée hors du tour. */
+applyOnlineAction=function(a,actor,internal=false){
+ if(net&&net.state&&net.state.id==='cactus'&&a&&a.type==='quick'){
+  if(net.role!=='host'||!net.connected||netPaused()||!Number.isInteger(actor)||actor<0||actor>=net.state.players.length)return false;
+  const previous=clone(net.state);const ok=legacyCactusQuick(net.state,actor,a.index);
+  if(!ok){net.state=previous;publishOnline();return false}
+  net.revision++;publishOnline({type:'quick',actor:actor,index:a.index,good:!!net.state.lastQuick&&net.state.lastQuick.good});scheduleOnline();return true;
+ }
+ return LEGACY3_APPLY_ONLINE(a,actor,internal);
+};
+onlineAct=function(raw){
+ if(S&&S.id==='cactus'&&raw&&raw.type==='quick'){
+  if(!net.active||!net.connected||netPaused()||net.pending||net.spectator)return;
+  const a=sanitizeOnlineAction('cactus',raw);if(!a)return;
+  if(net.role==='host'){applyOnlineAction(a,net.me);return}
+  const seq=++net.seq;net.pending=seq;
+  if(!netSend({type:'action',seq:seq,revision:net.revision,matchId:net.matchId,action:a})){net.pending=0;networkLost();return}
+  renderGame(false);netTimer('pending',function(){if(!net.pending)return;netSend({type:'sync'});netTimer('pending',function(){if(net.pending){const c=net.conn;try{c&&c.close()}catch(e){}networkLost()}},8000)},7000);return;
+ }
+ return LEGACY3_ONLINE_ACT(raw);
+};
+handleGuestAction=function(packet){
+ if(net&&net.state&&net.state.id==='cactus'&&packet&&packet.action&&packet.action.type==='quick'){
+  if(!net.connected||!Number.isSafeInteger(packet.seq)||packet.seq<1)return;
+  if(packet.seq<=net.lastSeq){publishOnline();return}
+  net.lastSeq=packet.seq;
+  if(packet.matchId!==net.matchId||packet.revision!==net.revision){publishOnline();return}
+  const a=sanitizeOnlineAction('cactus',packet.action);if(!a||netPaused()){publishOnline();return}
+  applyOnlineAction(a,1);return;
+ }
+ return LEGACY3_GUEST_ACTION(packet);
+};
+
+playSceneAction=function(ctx){
+ LEGACY3_SCENE(ctx);
+ if(!ctx||!S)return;
+ if(S.id==='oie'&&ctx.type==='gooseReroll'){sceneDice(ctx);sceneBadge('Une plume !',ctx,'🪶')}
+ if(S.id==='oie'&&ctx.type==='gooseChoose'&&S.gooseLastEvent){
+  const ev=S.gooseLastEvent;
+  if(ev.grain)sceneBadge('+1 plume',ctx,'✦');
+  else if(ev.duel){sceneBadge('Duel '+ev.duel.a+' – '+ev.duel.d,ctx,'⚄');document.querySelector('.goose-board')&&document.querySelector('.goose-board').classList.add('goose-duel-flash');}
+  else if(ev.geese)sceneBadge('Oie × '+ev.geese,ctx,'♧');
+  else if(ev.trap)sceneBadge(ev.trap,ctx,'!');
+ }
+};
 
 validateSaved();applyPrefs();showHome();bootOnlineInvite();musicMount();
 </script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="./shared/config.js"></script><script src="./shared/account.js?v=3"></script><script src="./shared/account-ui.js?v=4"></script><script src="./shared/profile.js"></script><script src="./shared/profile-ui.js?v=3"></script><script src="./shared/usage-tracker.js"></script><script src="./shared/user-stats.js"></script><script src="./shared/game-results.js"></script><script src="./shared/table-tools.js?v=2"></script><script src="./shared/game-history.js"></script><script src="./shared/puff-widget.js?v=18"></script><script src="./shared/global-nav.js?v=2"></script></body></html>
