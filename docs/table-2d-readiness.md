@@ -50,3 +50,24 @@ La préférence est stockée sous `salon_table_view_v1`. Elle n’appartient ni 
 6. Généraliser ensuite cartes, dés, pions et tuiles aux autres jeux.
 
 La vue 2D reste la référence fonctionnelle, la couche sémantique et le fallback permanent. Les modèles 3D externes ne sont pas encore requis : des géométries procédurales suffiront jusqu’à la phase de finition visuelle.
+
+
+## Premier renderer Three.js — 8 américain
+
+Le premier renderer 3D est volontairement procédural et ne dépend d’aucun modèle externe. Il est chargé à la demande par `shared/table-3d-loader.js`, qui importe `shared/table-3d.js` uniquement lorsqu’un utilisateur demande la vue 3D. Les utilisateurs restant en 2D ne chargent donc ni Three.js ni les ressources du renderer.
+
+Le prototype couvre :
+- table 3D, caméra perspective, éclairage et ombres ;
+- cartes avec faible épaisseur et textures Canvas mises en cache ;
+- dos de cartes, pioche, défausse, main locale en éventail et mains adverses masquées ;
+- dérivation des cartes jouables depuis `eightLegal()` sans réimplémenter les règles dans Three.js ;
+- clic et glisser-déposer d’une carte vers la défausse ;
+- clic sur la pioche ;
+- retour vers `eightPlayCardUI()` et `dispatch()`, donc exactement le même moteur en 2D et 3D ;
+- choix de couleur toujours géré par l’UI métier existante ;
+- désactivation des interactions 3D pendant ce choix ;
+- état de confidentialité local non transmis au renderer (`state: null` lorsque `gate` est actif) ;
+- spectateurs sans reconstruction de main privée ;
+- perte WebGL ou échec de chargement ramenant localement en 2D.
+
+Le switch 2D/3D n’est affiché que pour le 8 américain tant que les autres jeux n’ont pas d’adapter 3D. Les modèles finaux ne sont pas encore nécessaires : la prochaine phase peut continuer avec cartes, dés, pions et tuiles procéduraux, puis remplacer ces géométries par des GLB sans toucher au moteur de jeu.
