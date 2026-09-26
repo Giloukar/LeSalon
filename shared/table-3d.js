@@ -77,9 +77,8 @@ export function createTable3DRenderer({onFatal}={}){
       g.strokeStyle='rgba(255,255,255,.13)';g.lineWidth=3;g.stroke();
       g.fillStyle=accent;g.textAlign='center';g.textBaseline='middle';g.font='700 42px system-ui,sans-serif';g.fillText(text,w/2,h/2);
     },768,160);
-    disposableTextures.push(tex);
     const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false});
-    const sp=new THREE.Sprite(mat);sp.scale.set(4.2,.88,1);sp.userData.temporaryMaterial=mat;return sp;
+    const sp=new THREE.Sprite(mat);sp.scale.set(4.2,.88,1);sp.userData.temporaryMaterial=mat;sp.userData.temporaryTexture=tex;return sp;
   }
   function init(){
     if(renderer)return;
@@ -134,7 +133,7 @@ export function createTable3DRenderer({onFatal}={}){
     interactive.length=0;
     for(const child of [...objects.children]){
       objects.remove(child);
-      child.traverse?.(o=>{if(o.userData?.temporaryMaterial)o.userData.temporaryMaterial.dispose?.()});
+      child.traverse?.(o=>{o.userData?.temporaryMaterial?.dispose?.();o.userData?.temporaryTexture?.dispose?.()});
     }
   }
   function placeCard(mesh,x,z,y=TABLE_Y+.07,rot=0,scale=1){
@@ -148,9 +147,9 @@ export function createTable3DRenderer({onFatal}={}){
 
     const n=own.length,span=Math.min(7.1,Math.max(1.4,(n-1)*.62));
     own.forEach((card,i)=>{
-      const t=n<=1?.5:i/(n-1),x=(t-.5)*span,fan=(t-.5)*-.20,z=2.55+Math.abs(t-.5)*.26;
+      const t=n<=1 ? .5 : i/(n-1),x=(t-.5)*span,fan=(t-.5)*-.20,z=2.55+Math.abs(t-.5)*.26;
       const mesh=cardMesh(card,{id:card.id,interactiveCard:playable.has(card.id),playable:playable.has(card.id)});
-      const lift=playable.has(card.id)?.14:0;
+      const lift=playable.has(card.id) ? .14 : 0;
       placeCard(mesh,x,z,TABLE_Y+.12+lift,fan,playable.has(card.id)?1.035:1);
       mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};
     });
@@ -216,7 +215,7 @@ export function createTable3DRenderer({onFatal}={}){
     const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;if(!drag.moved&&Math.hypot(dx,dy)>6)drag.moved=true;
     if(!drag.moved)return;
     updatePointer(e);const p=new THREE.Vector3();if(raycaster.ray.intersectPlane(dragPlane,p)){drag.mesh.position.set(p.x,1.02,p.z);drag.mesh.rotation.set(-Math.PI/2,0,(dx*.0025));}
-    const near=Math.hypot(drag.mesh.position.x-1.25,drag.mesh.position.z-.05)<1.45;dropMarker.material.opacity=near?.82:.2;draw();e.preventDefault();
+    const near=Math.hypot(drag.mesh.position.x-1.25,drag.mesh.position.z-.05)<1.45;dropMarker.material.opacity=near ? .82 : .2;draw();e.preventDefault();
   }
   function finishDrag(e,cancelled=false){
     if(!drag||e.pointerId!==drag.pointerId)return;
