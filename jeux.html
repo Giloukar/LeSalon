@@ -2574,8 +2574,15 @@ function eightInsideDrop(x,y){
 function eightDragPoint(e,d){
  return{x:Number.isFinite(e?.clientX)?e.clientX:d?.lastX,y:Number.isFinite(e?.clientY)?e.clientY:d?.lastY};
 }
-function eightDragCleanup({suppressClick=false}={}){
- const d=eightDragState,moved=!!d?.moved;eightDragState=null;
+function eightGestureDispatch(phase,progress=0,lateral=0){
+ window.dispatchEvent(new CustomEvent('salon:local-card-gesture',{detail:{phase,progress,lateral}}));
+}
+function eightGestureFromPoint(d,x,y){
+ const target=eightDropTarget();if(!d||!target)return{progress:0,lateral:0};const r=target.getBoundingClientRect(),tx=r.left+r.width/2,ty=r.top+r.height/2,vx=tx-d.x,vy=ty-d.y,wx=x-d.x,wy=y-d.y,den=Math.max(1,vx*vx+vy*vy),len=Math.sqrt(den);
+ return{progress:Math.max(0,Math.min(1,(wx*vx+wy*vy)/den)),lateral:Math.max(-1,Math.min(1,(wx*vy-wy*vx)/(len*140)))};
+}
+function eightDragCleanup({suppressClick=false,gestureCancel=false}={}){
+ const d=eightDragState,moved=!!d?.moved;if(gestureCancel&&d)eightGestureDispatch('cancel',0,0);eightDragState=null;
  try{if(d?.source?.hasPointerCapture?.(d.id))d.source.releasePointerCapture(d.id)}catch{}
  d?.source?.classList?.remove('eight-drag-source');d?.ghost?.remove();
  document.querySelectorAll('.eight-drag-source').forEach(el=>el.classList.remove('eight-drag-source'));
@@ -2587,9 +2594,9 @@ document.addEventListener('pointerdown',e=>{
  if(S?.id!=='huit'||!canPlay()||e.button&&e.button!==0)return;
  const el=e.target.closest('[data-eight-card="1"]');if(!el)return;
  const c=player(S).hand.find(c=>c.id===el.dataset.id);if(!c||!eightLegal(S,c))return;
- eightDragCleanup();
+ eightDragCleanup({gestureCancel:true});
  const r=el.getBoundingClientRect();eightDragState={id:e.pointerId,pointerType:e.pointerType||'mouse',source:el,cardId:c.id,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,rect:r,ghost:null};
- try{el.setPointerCapture(e.pointerId)}catch{}
+ eightGestureDispatch('start',0,0);try{el.setPointerCapture(e.pointerId)}catch{}
 },{capture:true});
 document.addEventListener('pointermove',e=>{
  const d=eightDragState;if(!d||d.id!==e.pointerId)return;
@@ -2602,21 +2609,22 @@ document.addEventListener('pointermove',e=>{
  e.preventDefault();
  if(!d.ghost)return;
  d.ghost.style.left=(e.clientX-d.rect.width/2)+'px';d.ghost.style.top=(e.clientY-d.rect.height/2)+'px';d.ghost.style.transform='rotate('+(dx*.035).toFixed(1)+'deg) scale(1.07)';
+ const gesture=eightGestureFromPoint(d,e.clientX,e.clientY);eightGestureDispatch('move',gesture.progress,gesture.lateral);
  eightDropTarget()?.classList.toggle('eight-drop-hot',eightInsideDrop(e.clientX,e.clientY));
 },{capture:true,passive:false});
 function eightDragEnd(e){
  const d=eightDragState;if(!d||d.id!==e.pointerId)return;
  const point=eightDragPoint(e,d),drop=d.moved&&eightInsideDrop(point.x,point.y),cardId=d.cardId;
- eightDragCleanup({suppressClick:true});
+ eightGestureDispatch(drop?'commit':'cancel',drop?1:0,0);eightDragCleanup({suppressClick:true});
  if(!drop||S?.id!=='huit'||!canPlay())return;
  const card=player(S).hand.find(c=>c.id===cardId);if(card&&eightLegal(S,card))eightPlayCardUI(card);
 }
 document.addEventListener('pointerup',eightDragEnd,{capture:true});
-document.addEventListener('pointercancel',e=>{if(eightDragState?.id===e.pointerId)eightDragCleanup({suppressClick:true})},{capture:true});
-document.addEventListener('lostpointercapture',e=>{if(eightDragState?.id===e.pointerId)eightDragCleanup({suppressClick:true})},{capture:true});
-window.addEventListener('blur',()=>eightDragCleanup({suppressClick:true}));
-window.addEventListener('pagehide',()=>eightDragCleanup({suppressClick:true}));
-document.addEventListener('visibilitychange',()=>{if(document.hidden)eightDragCleanup({suppressClick:true})});
+document.addEventListener('pointercancel',e=>{if(eightDragState?.id===e.pointerId)eightDragCleanup({suppressClick:true,gestureCancel:true})},{capture:true});
+document.addEventListener('lostpointercapture',e=>{if(eightDragState?.id===e.pointerId)eightDragCleanup({suppressClick:true,gestureCancel:true})},{capture:true});
+window.addEventListener('blur',()=>eightDragCleanup({suppressClick:true,gestureCancel:true}));
+window.addEventListener('pagehide',()=>eightDragCleanup({suppressClick:true,gestureCancel:true}));
+document.addEventListener('visibilitychange',()=>{if(document.hidden)eightDragCleanup({suppressClick:true,gestureCancel:true})});
 
 
 /* =========================================================================
