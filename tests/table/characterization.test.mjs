@@ -122,6 +122,7 @@ test('Three.js hardening adapts mobile quality, motion and reusable geometry',as
  assert.match(source,/cactus-action/);
  assert.match(source,/ninety-action/);
  assert.match(source,/blackjack-action/);
+ assert.match(source,/card-action/);
  assert.match(source,/salon:table-3d-window/);
  assert.match(source,/function applyCameraFit\(\)/);
  assert.match(source,/portraitBoost=aspect<\.82\?Math\.min\(1\.95,\.82\/aspect\):1/);
@@ -180,4 +181,19 @@ test('Rummikub dense 3D layout and shared card motion remain presentation-only',
  assert.match(source,/queueCardFlight\(/);
  assert.doesNotMatch(source,/animateCardFamilyConfirmed[^\n]*dispatch\(/);
  assert.doesNotMatch(source,/animateCardFamilyConfirmed[^\n]*onlineAct\(/);
+});
+
+
+test('shared card games expose direct authoritative 3D actions',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'president','online');const r=await t.page.evaluate(async()=>{net.gameId='president';net.state.turn=0;net.state.trick=null;net.state.passed=[];S=projectGame(net.state,0);let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const id=net.state.players[0].hand[0].id,before=net.state.players[0].hand.length,selected=seen.interactions.cardSelect(id),played=seen.interactions.cardAction('play');return{selected,played,before,after:net.state.players[0].hand.length,trickId:net.state.trick?.cards?.[0]?.id,owner:net.state.trick?.owner};});assert.equal(r.selected,true);assert.equal(r.played,true);assert.equal(r.after,r.before-1);assert.equal(r.trickId!=null,true);assert.equal(r.owner,0);}finally{await browser.close();}});
+
+test('free 3D card manipulation is presentation-only until a card action is chosen',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/manipAnimations=\[\]/);
+ assert.match(source,/function beginLooseCardDrag\(/);
+ assert.match(source,/function moveLooseCardDrag\(/);
+ assert.match(source,/function returnManipulatedCard\(/);
+ assert.match(source,/kind==='card-select'\|\|drag\.kind==='special-select'/);
+ assert.doesNotMatch(source,/returnManipulatedCard[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/moveLooseCardDrag[^\n]*onlineAct\(/);
+ assert.match(source,/card-action/);
 });

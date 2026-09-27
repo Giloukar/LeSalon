@@ -74,7 +74,7 @@ export function createTable3DRenderer({onFatal}={}){
   const edgeMaterial=new THREE.MeshStandardMaterial({color:0xe9e2d1,roughness:.72,metalness:0});
   const tileMaterials=new Map(),rummiTileMaterials=new Map(),pawnMaterials=new Map(),dieFaceMaterials=new Map(),cellLabelMaterials=new Map(),boxTileMaterials=new Map(),cellLabelTextures=[];
   const neutralDieMaterial=new THREE.MeshStandardMaterial({color:0xd8d3c4,roughness:.82,metalness:0});
-  let animationRaf=0,diceAnimations=[],pawnAnimations=[],cardAnimations=[],lastDiceKey='',lastMoveKey='';
+  let animationRaf=0,diceAnimations=[],pawnAnimations=[],cardAnimations=[],manipAnimations=[],lastDiceKey='',lastMoveKey='';
   let wordSelection=[],wordDraftKey='';
   let codeDraft=[0,1,2],codeDraftKey='';
   let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='';
@@ -177,7 +177,7 @@ export function createTable3DRenderer({onFatal}={}){
     renderer.setSize(w,h,false);camera.aspect=aspect;applyCameraFit();draw();
   }
   function clearObjects(){
-    interactive.length=0;diceAnimations.length=0;pawnAnimations.length=0;cardAnimations.length=0;
+    interactive.length=0;diceAnimations.length=0;pawnAnimations.length=0;cardAnimations.length=0;manipAnimations.length=0;
     if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
     for(const child of [...objects.children]){
       objects.remove(child);
@@ -388,6 +388,23 @@ export function createTable3DRenderer({onFatal}={}){
       if(t<1)running=true;else{a.mesh.position.copy(a.to);a.done=true;cardFx.remove(a.mesh);a.onDone?.()}
     }
     if(cardAnimations.some(a=>a.done))cardAnimations=cardAnimations.filter(a=>!a.done);
+    for(const a of manipAnimations){
+      if(a.done)continue;
+      const t=Math.min(1,Math.max(0,(now-a.start)/a.duration)),ease=1-Math.pow(1-t,3),u=1-ease;
+      a.mesh.position.set(
+        u*u*a.from.x+2*u*ease*a.control.x+ease*ease*a.to.x,
+        u*u*a.from.y+2*u*ease*a.control.y+ease*ease*a.to.y,
+        u*u*a.from.z+2*u*ease*a.control.z+ease*ease*a.to.z
+      );
+      a.mesh.rotation.set(
+        THREE.MathUtils.lerp(a.fromRot.x,a.toRot.x,ease),
+        THREE.MathUtils.lerp(a.fromRot.y,a.toRot.y,ease),
+        THREE.MathUtils.lerp(a.fromRot.z,a.toRot.z,ease)
+      );
+      a.mesh.scale.lerpVectors(a.fromScale,a.toScale,ease);
+      if(t<1)running=true;else{a.mesh.position.copy(a.to);a.mesh.rotation.copy(a.toRot);a.mesh.scale.copy(a.toScale);a.done=true}
+    }
+    if(manipAnimations.some(a=>a.done))manipAnimations=manipAnimations.filter(a=>!a.done);
     for(const [actor,g] of remoteCardGestures){
       const age=now-g.lastAt;if(age>950&&!g.committed){g.target=0;g.targetLateral=0;g.returning=true}
       g.progress+=(g.target-g.progress)*.24;g.lateral+=(g.targetLateral-g.lateral)*.22;
@@ -636,6 +653,26 @@ export function createTable3DRenderer({onFatal}={}){
     }
     const currentSnapshot=cardFamilySnapshot(payload,center),previousSnapshot=lastCardFamilySnapshots.get(game);
     animateCardFamilyConfirmed(game,payload,center,previousSnapshot,currentSnapshot,opponentVisuals,centerVisuals);lastCardFamilySnapshots.set(game,currentSnapshot);
+    const action=data.cardAction||{};
+    if(payload.canInteract){
+      if(game==='president'){
+        if(action.canPlay){const play=actionSprite('POSER'+(action.count?' · '+action.count:''),'card-action',{command:'play'},'#dbea9e');play.position.set(-1.25,1.04,.92);objects.add(play)}
+        if(action.canPass){const pass=actionSprite('PASSER','card-action',{command:'pass'},'#d8ded9');pass.position.set(action.canPlay?1.25:0,1.04,.92);objects.add(pass)}
+      }else if(game==='menteur'){
+        if(action.phase==='challenge'){
+          const trust=actionSprite('JE TE CROIS','card-action',{command:'trust'},'#b7d5ee');trust.position.set(-1.35,1.04,1.02);objects.add(trust);
+          const challenge=actionSprite('MENTEUR !','card-action',{command:'challenge'},'#efaaa0');challenge.position.set(1.35,1.04,1.02);objects.add(challenge);
+        }else if(action.canPlay){const play=actionSprite('ANNONCER '+(action.count||1)+' × '+(RANK_NAME[action.required]||action.required),'card-action',{command:'play'},'#dbea9e');play.position.set(0,1.04,1.02);play.scale.set(3.15,.58,1);objects.add(play)}
+      }else if(game==='suites'){
+        if(action.canPlay){const play=actionSprite('POSER LA CARTE','card-action',{command:'play'},'#dbea9e');play.position.set(0,1.04,.88);objects.add(play)}
+        else if(action.canPass){const pass=actionSprite('PASSER','card-action',{command:'pass'},'#d8ded9');pass.position.set(0,1.04,.88);objects.add(pass)}
+      }else if(game==='plis'){
+        if(action.canCollect){const collect=actionSprite('RAMASSER LE PLI','card-action',{command:'collect'},'#e6d7b4');collect.position.set(0,1.04,1.10);objects.add(collect)}
+        else if(action.canPlay){const play=actionSprite('JOUER LA CARTE','card-action',{command:'play'},'#dbea9e');play.position.set(0,1.04,1.10);objects.add(play)}
+      }else if(game==='encheres'&&action.canBid){
+        const bid=actionSprite('CONFIRMER LA CARTE','card-action',{command:'bid'},'#dbea9e');bid.position.set(0,1.04,1.28);objects.add(bid);
+      }
+    }
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     const names={president:'PRÉSIDENT',menteur:'MENTEUR',suites:'QUATRE SUITES',plis:'CHASSE AUX PLIS',encheres:'ENCHÈRES'};
     if(title)title.textContent='VUE 3D · '+(names[game]||'CARTES');
@@ -646,7 +683,7 @@ export function createTable3DRenderer({onFatal}={}){
       else if(game==='plis')status.textContent='Atout '+(SUIT_SYMBOL[center.trump]||center.trump)+' · pli '+Math.min(6,(center.completedTricks||0)+1)+'/6';
       else if(game==='encheres')status.textContent='Tour '+(center.bidRound||1)+' · '+(center.pot||0)+' points à remporter';
     }
-    if(help)help.textContent=payload.canInteract?'Touchez une carte pour la sélectionner · validez ensuite avec les commandes habituelles':'La table 3D suit la partie · les commandes restent synchronisées dessous';
+    if(help)help.textContent=payload.canInteract?'Touchez pour sélectionner · glissez librement une carte · validez directement sur la table':'La table 3D suit la partie et les mouvements confirmés';
   }
 
   function syncEight(payload){
@@ -1069,13 +1106,52 @@ export function createTable3DRenderer({onFatal}={}){
     draw();
   }
   function capturePointer(id){try{canvas?.setPointerCapture?.(id)}catch(_){}}
+  function clampMotion(n,min,max){return Math.max(min,Math.min(max,Number(n)||0))}
+  function returnManipulatedCard(d,{snap=false}={}){
+    const mesh=d?.mesh,home=d?.home||mesh?.userData?.home;if(!mesh||!home)return;
+    if(snap||!motionAllowed()){mesh.position.copy(home.position);mesh.rotation.copy(home.rotation);mesh.scale.copy(home.scale);draw();return}
+    const throwX=clampMotion((d.velocityX||0)*.19,-1.8,1.8),throwZ=clampMotion((d.velocityY||0)*.16,-1.45,1.45),speed=Math.min(1,Math.hypot(d.velocityX||0,d.velocityY||0)/1.35);
+    manipAnimations.push({
+      mesh,
+      from:mesh.position.clone(),
+      control:mesh.position.clone().add(new THREE.Vector3(throwX,.38+.78*speed,throwZ)),
+      to:home.position.clone(),
+      fromRot:mesh.rotation.clone(),
+      toRot:home.rotation.clone(),
+      fromScale:mesh.scale.clone(),
+      toScale:home.scale.clone(),
+      start:performance.now(),
+      duration:300+Math.round(speed*170),
+      done:false
+    });
+    startMotion();
+  }
+  function beginLooseCardDrag(obj,e,kind){
+    const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()};
+    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind,mesh:obj,cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,moved:false,home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
+    host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
+  }
+  function moveLooseCardDrag(e){
+    const d=drag,now=performance.now(),dt=Math.max(8,now-(d.lastAt||now)),dx=e.clientX-d.startX,dy=e.clientY-d.startY;
+    if(!d.moved&&Math.hypot(dx,dy)>6)d.moved=true;
+    if(!d.moved)return false;
+    d.velocityX=(e.clientX-d.lastX)/dt*16.67;d.velocityY=(e.clientY-d.lastY)/dt*16.67;d.lastX=e.clientX;d.lastY=e.clientY;d.lastAt=now;
+    updatePointer(e);const p=new THREE.Vector3();
+    if(raycaster.ray.intersectPlane(dragPlane,p)){
+      d.mesh.position.set(p.x,1.05,p.z);
+      d.mesh.rotation.set(-Math.PI/2,clampMotion(-d.velocityY*.012,-.20,.20),clampMotion(dx*.0028,-.24,.24));
+      d.mesh.scale.copy(d.home.scale).multiplyScalar(1.045);
+    }
+    draw();e.preventDefault();return true;
+  }
   function cardDropRadius(d){return d?.pointerType==='touch'||matchMedia('(pointer: coarse)').matches?1.9:1.5}
   function onPointerDown(e){
     if(!active||!current?.canInteract)return;
     const obj=hit(e);setHover(obj);if(!obj)return;
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'deck',startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
-    if(obj.userData.kind==='card-select'){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card-select',cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
-    if(['maid-pick','special-select','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','cactus-action','ninety-action','blackjack-action','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,command:obj.userData.command,amount:obj.userData.amount,ace:obj.userData.ace,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
+    if(obj.userData.kind==='card-select'){beginLooseCardDrag(obj,e,'card-select');return}
+    if(obj.userData.kind==='special-select'){beginLooseCardDrag(obj,e,'special-select');return}
+    if(['maid-pick','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','cactus-action','ninety-action','blackjack-action','card-action','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,command:obj.userData.command,amount:obj.userData.amount,ace:obj.userData.ace,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
     if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue','intrus-spot','intrus-continue','code-cycle','code-submit','code-continue','golf-adjust','golf-shoot','golf-continue'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
       drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,control:obj.userData.control,delta:obj.userData.delta,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return;
@@ -1087,7 +1163,9 @@ export function createTable3DRenderer({onFatal}={}){
   function onPointerMove(e){
     if(!active)return;
     if(!drag){setHover(hit(e));return}
-    if(e.pointerId!==drag.pointerId||drag.kind!=='card')return;
+    if(e.pointerId!==drag.pointerId)return;
+    if(drag.kind==='card-select'||drag.kind==='special-select'){moveLooseCardDrag(e);return}
+    if(drag.kind!=='card')return;
     const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;if(!drag.moved&&Math.hypot(dx,dy)>6)drag.moved=true;
     if(!drag.moved)return;
     updatePointer(e);const p=new THREE.Vector3();if(raycaster.ray.intersectPlane(dragPlane,p)){drag.mesh.position.set(p.x,1.02,p.z);drag.mesh.rotation.set(-Math.PI/2,0,(dx*.0025));}
@@ -1099,7 +1177,16 @@ export function createTable3DRenderer({onFatal}={}){
     const d=drag;drag=null;host?.classList.remove('is-dragging');dropMarker.material.opacity=.2;
     if(cancelled){if(d.kind==='card')emitLocalCardGesture('cancel',0,0);syncCurrent(current);draw();return}
     const tap=Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
-    if(d.kind==='card-select'){if(tap)current?.interactions?.cardSelect?.(d.cardId);return}
+    if(d.kind==='card-select'){
+      if(tap)current?.interactions?.cardSelect?.(d.cardId);
+      else returnManipulatedCard(d);
+      return;
+    }
+    if(d.kind==='special-select'){
+      if(tap)current?.interactions?.specialCard?.('select',d.cardId);
+      else returnManipulatedCard(d);
+      return;
+    }
     if(d.kind==='maid-pick'){if(tap)current?.interactions?.specialCard?.('pick',d.index);return}
     if(d.kind==='special-select'){if(tap)current?.interactions?.specialCard?.('select',d.cardId);return}
     if(d.kind==='battle-action'){if(tap)current?.interactions?.specialCard?.('battle');return}
@@ -1111,6 +1198,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='cactus-action'){if(tap)current?.interactions?.cactus?.(d.command);return}
     if(d.kind==='ninety-action'){if(tap)current?.interactions?.specialCard?.(d.command,{id:d.cardId,ace:d.ace});return}
     if(d.kind==='blackjack-action'){if(tap)current?.interactions?.specialCard?.(d.command,d.amount);return}
+    if(d.kind==='card-action'){if(tap)current?.interactions?.cardAction?.(d.command);return}
     if(d.kind==='rummi-tile'){if(tap)current?.interactions?.rummi?.('select',d.tileId);return}
     if(d.kind==='rummi-dest'){if(tap)current?.interactions?.rummi?.('move',d.dest);return}
     if(d.kind==='deck'){if(tap)current?.interactions?.draw?.();return}
@@ -1146,7 +1234,8 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function cancelActiveDrag(pointerId=null){
     if(!drag||(pointerId!==null&&drag.pointerId!==pointerId))return;
-    const wasCard=drag.kind==='card';if(wasCard)emitLocalCardGesture('cancel',0,0);drag=null;host?.classList.remove('is-dragging');if(dropMarker)dropMarker.material.opacity=.2;
+    const d=drag,wasCard=d.kind==='card',wasLoose=d.kind==='card-select'||d.kind==='special-select';if(wasCard)emitLocalCardGesture('cancel',0,0);drag=null;host?.classList.remove('is-dragging');if(dropMarker)dropMarker.material.opacity=.2;
+    if(wasLoose){returnManipulatedCard(d,{snap:document.hidden});return}
     if(wasCard&&current){syncEight(current);draw()}
   }
   function onPointerUp(e){finishDrag(e,false)}
@@ -1157,7 +1246,7 @@ export function createTable3DRenderer({onFatal}={}){
 
   function activate(){active=true;init()}
   function deactivate(){
-    cancelActiveDrag();active=false;hovered=null;wordSelection=[];wordDraftKey='';codeDraft=[0,1,2];codeDraftKey='';golfAim={angle:0,power:50};golfAimKey='';lastGolfKey='';diceAnimations.length=0;pawnAnimations.length=0;
+    cancelActiveDrag();active=false;hovered=null;wordSelection=[];wordDraftKey='';codeDraft=[0,1,2];codeDraftKey='';golfAim={angle:0,power:50};golfAimKey='';lastGolfKey='';diceAnimations.length=0;pawnAnimations.length=0;manipAnimations.length=0;
     if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
     resizeObserver?.disconnect();resizeObserver=null;host?.remove();host=null;
     document.documentElement.removeAttribute('data-table-3d-game');document.documentElement.removeAttribute('data-table-3d-phase');
