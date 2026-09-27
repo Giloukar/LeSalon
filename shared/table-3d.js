@@ -588,6 +588,32 @@ export function createTable3DRenderer({onFatal}={}){
     if(help)help.textContent=phase==='watch'?'Mémorisez les lumières dans l’ordre puis cachez la séquence':phase==='repeat'?'Touchez les quatre pads dans le bon ordre':phase==='result'?(data.feedback||'Séquence terminée'):'Scores synchronisés avec le moteur';
   }
 
+  function syncIntrus(payload){
+    clearObjects();dropMarker.visible=false;
+    const s=payload.state,data=payload.viewData?.intrus||{},phase=data.phase||s?.phase||'play',count=Math.max(0,Number(data.count||0)),tiles=Array.isArray(data.tiles)?data.tiles:[],tried=new Set(Array.isArray(data.tried)?data.tried:[]),stage=Math.max(1,Math.min(5,Number(data.stage||1))),revealed=phase==='result'||phase==='over';
+    const cols=count<=9?3:count<=16?4:5,rows=Math.max(1,Math.ceil(count/cols)),xGap=1.42,zGap=1.08;
+    camera.position.set(0,7.1,8.8);camera.lookAt(0,.28,-.15);
+    const baseMat=new THREE.MeshStandardMaterial({color:0x253a35,roughness:.95}),base=new THREE.Mesh(new THREE.BoxGeometry(9.4,.16,5.75),baseMat);base.position.set(0,TABLE_Y-.015,-.15);base.receiveShadow=true;base.userData.temporaryMaterial=baseMat;objects.add(base);
+    const symbols=['⊙','◇','◌','✦','⬡'],normalOffsets=[[.22,.15],[-.2,.17],[.18,.14],[0,.2],[-.16,-.16]],oddOffsets=[[.22,-.15],[.2,.17],[.29,.02],[0,.08],[-.16,.16]];
+    for(let i=0;i<count;i++){
+      const row=Math.floor(i/cols),col=i%cols,rowCount=Math.min(cols,count-row*cols),x=(col-(rowCount-1)/2)*xGap,z=(row-(rows-1)/2)*zGap-.18,different=!!tiles[i],wasTried=tried.has(i),found=revealed&&different;
+      const mat=new THREE.MeshStandardMaterial({color:found?0x657844:wasTried?0x49383a:0x314943,roughness:.84,metalness:.02,emissive:found?0x48552c:0x000000,emissiveIntensity:found?.4:0}),tile=new THREE.Mesh(tileGeometry,mat);
+      tile.scale.set(1.28,.34,1.3);tile.position.set(x,TABLE_Y+.38,z);tile.castShadow=true;tile.receiveShadow=true;tile.userData.temporaryMaterial=mat;
+      if(phase==='play'&&payload.canInteract&&!wasTried){tile.userData={...tile.userData,kind:'intrus-spot',index:i,interactive:true,home:{scale:tile.scale.clone()}};interactive.push(tile)}
+      objects.add(tile);
+      const label=makeLabel(symbols[stage-1],wasTried?'#aa9791':found?'#f5ebb0':'#e2cd96');label.scale.set(.72,.52,1);label.position.set(x,TABLE_Y+.7,z);objects.add(label);
+      const offset=(different?oddOffsets:normalOffsets)[stage-1],dotGeo=new THREE.SphereGeometry(.055,12,8),dotMat=new THREE.MeshStandardMaterial({color:found?0xf4e4ae:0xe4d29d,roughness:.55,emissive:found?0x766c37:0x241f12,emissiveIntensity:found?.55:.18}),dot=new THREE.Mesh(dotGeo,dotMat);
+      dot.position.set(x+offset[0],TABLE_Y+.69,z+offset[1]);dot.userData.temporaryGeometry=dotGeo;dot.userData.temporaryMaterial=dotMat;objects.add(dot);
+      if(found){const check=makeLabel('✓','#f4e4ae');check.scale.set(.46,.3,1);check.position.set(x+.43,TABLE_Y+.9,z-.34);objects.add(check)}
+    }
+    if(phase==='result'&&payload.canInteract){const next=actionSprite('CONTINUER','intrus-continue');next.position.set(0,1.05,2.5);objects.add(next)}
+    (data.players||[]).forEach((p,i)=>{const tag=makeLabel((p.name||'Joueur')+' · '+Number(p.score||0),i===s?.turn?'#dbea9e':'#d8ded9');tag.scale.set(1.72,.34,1);tag.position.set((i-(data.players.length-1)/2)*2.18,.92,-2.7);objects.add(tag)});
+    const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]'),remaining=Math.max(0,3-tried.size);
+    if(title)title.textContent='VUE 3D · L’INTRUS';
+    if(status)status.textContent='Manche '+stage+' / 5 · '+(phase==='play'?remaining+' essai'+(remaining>1?'s':'')+' restant'+(remaining>1?'s':''):phase==='result'?(data.feedback||'Constellation terminée'):'partie terminée');
+    if(help)help.textContent=phase==='play'?'Repérez le seul petit détail différent puis touchez son symbole':phase==='result'?'L’intrus est révélé · continuez pour la constellation suivante':'Scores synchronisés';
+  }
+
   function syncAnagram(payload){
     clearObjects();dropMarker.visible=false;
     const s=payload.state,data=payload.viewData?.anagram||{},phase=data.phase||s?.phase||'play',letters=Array.isArray(data.letters)?data.letters:[],attempts=Math.max(0,Number(data.attempts||0));
@@ -684,7 +710,8 @@ export function createTable3DRenderer({onFatal}={}){
   }
 
   function syncCurrent(payload){
-    if(payload?.gameId==='anagrammes')syncAnagram(payload);
+    if(payload?.gameId==='intrus')syncIntrus(payload);
+    else if(payload?.gameId==='anagrammes')syncAnagram(payload);
     else if(payload?.gameId==='ballon')syncBalloon(payload);
     else if(payload?.gameId==='echo')syncEcho(payload);
     else if(payload?.gameId==='metropole')syncMetropole(payload);
@@ -719,7 +746,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(hovered===mesh)return;
     if(hovered&&!drag){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale);}
     hovered=mesh;
-    if(hovered&&!drag&&['card','card-select','maid-pick','special-select','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-dest'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
+    if(hovered&&!drag&&['card','card-select','maid-pick','special-select','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-dest','intrus-spot'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
     draw();
   }
   function onPointerDown(e){
@@ -728,7 +755,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,kind:'deck',startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(obj.userData.kind==='card-select'){drag={pointerId:e.pointerId,kind:'card-select',cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(['maid-pick','special-select','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
-    if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue'].includes(obj.userData.kind)){
+    if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue','intrus-spot','intrus-continue'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
       drag={pointerId:e.pointerId,kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return;
     }
@@ -763,6 +790,8 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='rummi-dest'){if(tap)current?.interactions?.rummi?.('move',d.dest);return}
     if(d.kind==='deck'){if(tap)current?.interactions?.draw?.();return}
     if(d.kind==='goose-roll'||d.kind==='goose-choice'){if(tap)current?.interactions?.goose?.(d.kind==='goose-roll'?'roll':'choose',d.steps);return}
+    if(d.kind==='intrus-spot'){if(tap)current?.interactions?.intrus?.('spot',d.index);return}
+    if(d.kind==='intrus-continue'){if(tap)current?.interactions?.intrus?.('continue');return}
     if(d.kind==='word-letter'){if(tap&&!wordSelection.includes(d.index)){wordSelection.push(d.index);syncAnagram(current);draw()}return}
     if(d.kind==='word-answer'){if(tap&&d.index>=0&&d.index<wordSelection.length){wordSelection.splice(d.index,1);syncAnagram(current);draw()}return}
     if(d.kind==='word-clear'){if(tap){wordSelection=[];syncAnagram(current);draw()}return}
