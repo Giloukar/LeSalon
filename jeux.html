@@ -3116,7 +3116,8 @@ playSceneAction=function(ctx){
 const TABLE_VIEW_2D_RENDER=renderGame,TABLE_VIEW_SHOW_HOME=showHome;
 const TABLE_3D_CARD_GAMES=['president','menteur','suites','plis','encheres'];
 const TABLE_3D_SPECIAL_CARD_GAMES=['pouilleux','quatrevingtdixneuf','vingtetun','bataille'];
-function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
+const TABLE_3D_CORE_GAMES=['rummikub','metropole','cactus'];
+function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES,...TABLE_3D_CORE_GAMES].includes(S.id)}
 function tableViewMountControl(){
  if(!window.SalonTableView)return;
  const supported=tableViewSupports3D();
@@ -3186,6 +3187,32 @@ if(window.SalonTableView){
     data.battle={number:S.battleNumber,winner:S.battleWinner,pot:S.battlePot,counts:S.players.map(p=>p.hand.length),reveals:(S.battleReveal||[]).map(r=>r.hidden?{owner:r.owner,hidden:true}:{owner:r.owner,hidden:false,card:r.card})};
    }
   }
+  if(S?.id==='rummikub'){
+   const oldIds=new Set(S.refTable.flat().map(t=>t.id)),rack=!gate&&!net.spectator?[...player(S).hand]:[],table=S.table.map(g=>g.map(t=>({...t}))),selectable=[];
+   if(canPlay()){
+    rack.forEach(t=>selectable.push(t.id));
+    table.flat().forEach(t=>{if(player(S).opened||!oldIds.has(t.id))selectable.push(t.id)});
+   }
+   data.rummi={rack,table,selectedIds:[...selection],selectableIds:selectable,oldIds:[...oldIds],opened:!!player(S).opened,deckCount:S.deck.length,diagnostic:canPlay()?rummiDiagnostic(S):null,groupDestinations:table.map((g,k)=>({index:k,allowed:canPlay()&&selection.size>0&&(player(S).opened||g.every(t=>!oldIds.has(t.id)))}))};
+  }
+  if(S?.id==='metropole'){
+   data.city={board:CITY_BOARD.map((c,i)=>({index:i,name:c.name,type:c.type,group:c.group??null,price:c.price??null,rent:c.rent??null,build:c.build??null})),owners:[...S.owners],houses:[...S.houses],mortgaged:[...S.mortgaged],dice:[...S.dice],lap:S.lap,phase:S.phase,turn:S.turn,offer:S.offer,players:S.players.map((p,i)=>({name:p.name,pos:p.pos,cash:p.cash,jailed:p.jailed,out:!!p.out,color:COLORS[i%COLORS.length]}))};
+  }
+  if(S?.id==='cactus'){
+   const mineIndex=privateIndex(),players=S.players.map((p,i)=>({name:p.name,score:p.cactusScore,caller:S.caller===i,hand:p.hand.map((c,j)=>{
+    if(!c)return null;
+    const visible=!c.hidden&&(S.phase==='over'||S.phase==='peek'&&i===S.turn&&j>=2||S.phase==='reveal'&&S.reveal?.owner===i&&S.reveal.index===j);
+    return visible?{...c}:{hidden:true,id:c.id||('cactus-hidden-'+i+'-'+j)};
+   })}));
+   const modes=S.players.map((p,i)=>p.hand.map((c,j)=>{
+    if(!c)return '';
+    if(canPlay()&&i===S.turn&&S.phase==='swap')return 'swap';
+    if(canPlay()&&i===S.turn&&S.phase==='power')return 'target';
+    if(legacyCactusOwnQuickAllowed(i)&&!((i===S.turn)&&['swap','power','reveal','peek'].includes(S.phase)))return 'quick';
+    return '';
+   }));
+   data.cactus={mine:mineIndex,phase:S.phase,turn:S.turn,caller:S.caller,players,modes,discard:S.discard.at(-1)||null,drawn:S.drawn?(canPlay()&&!S.drawn.hidden?{...S.drawn}:{hidden:true,id:'cactus-drawn-hidden'}):null,deckCount:S.deck.length,lastQuick:S.lastQuick?{owner:S.lastQuick.owner,index:S.lastQuick.index,good:S.lastQuick.good}:null};
+  }
   return window.SalonTableView.render({
    args,
    state:gate?null:S,
@@ -3232,6 +3259,33 @@ if(window.SalonTableView){
       selection.clear();selection.add(id);renderGame(false);return true;
      }
      if(S.id==='bataille'&&type==='battle'){dispatch({type:'battle'});return true}
+     return false;
+    },
+    rummi(type,value){
+     if(!S||S.id!=='rummikub'||!canPlay())return false;
+     const oldIds=new Set(S.refTable.flat().map(t=>t.id));
+     if(type==='select'){
+      const id=String(value),rack=player(S).hand.some(t=>t.id===id),tableTile=S.table.flat().find(t=>t.id===id);
+      if(!rack&&!tableTile)return false;if(tableTile&&!player(S).opened&&oldIds.has(id))return false;
+      if(selection.has(id))selection.delete(id);else selection.add(id);renderGame(false);return true;
+     }
+     if(type==='place'&&selection.size){
+      const dest=Number(value);if(!Number.isInteger(dest)||dest<0||dest>=S.table.length)return false;
+      if(!player(S).opened&&S.table[dest].some(t=>oldIds.has(t.id)))return false;
+      dispatch({type:'move',ids:[...selection],dest});return true;
+     }
+     return false;
+    },
+    cityInspect(index){
+     if(!S||S.id!=='metropole'||!Number.isInteger(index)||index<0||index>=CITY_BOARD.length)return false;
+     cityInspect(index);return true;
+    },
+    cactusCard(type,owner,index){
+     if(!S||S.id!=='cactus'||!Number.isInteger(owner)||!Number.isInteger(index))return false;
+     if(type==='quick'){legacyCactusQuickUI(owner,index,null);return true}
+     if(!canPlay()||owner!==S.turn)return false;
+     if(type==='swap'){dispatch({type:'swap',index});return true}
+     if(type==='target'){dispatch({type:'target',owner,index});return true}
      return false;
     }
    }
