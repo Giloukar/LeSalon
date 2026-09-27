@@ -70,7 +70,7 @@ Le prototype couvre :
 - spectateurs sans reconstruction de main privée ;
 - perte WebGL ou échec de chargement ramenant localement en 2D.
 
-Le switch 2D/3D n’est affiché que pour le 8 américain tant que les autres jeux n’ont pas d’adapter 3D. Les modèles finaux ne sont pas encore nécessaires : la prochaine phase peut continuer avec cartes, dés, pions et tuiles procéduraux, puis remplacer ces géométries par des GLB sans toucher au moteur de jeu.
+Le switch 2D/3D a d’abord été validé sur le 8 américain, puis étendu progressivement aux jeux dont la projection 3D est explicitement adaptée. Les modèles finaux ne sont pas encore nécessaires : les géométries procédurales restent des remplaçants sûrs jusqu’à la phase de finition.
 
 
 ## Dice3D et Jeu de l’oie
@@ -88,3 +88,24 @@ Pour le Jeu de l’oie :
 - le renderer Three.js n’utilise aucun `Math.random()`.
 
 Cette couche `Dice3D` et les géométries de pion/tile sont conçues pour être réutilisées ensuite par Yam, Ferme la boîte et les autres jeux concernés.
+
+
+## Réutilisation Dice3D — Yam et Ferme la boîte
+
+La même primitive de dé est réutilisée sans nouvelle logique aléatoire.
+
+Pour Yam :
+- les cinq valeurs viennent directement de `S.dice` ;
+- les dés conservés viennent de `S.held` et sont signalés par un support visuel ;
+- toucher un dé appelle l’action `hold` existante ;
+- « Lancer / Relancer » appelle l’action `roll` existante ;
+- les catégories et leur score restent dans l’interface 2D synchronisée et sont toujours calculés par `yamScore()`.
+
+Pour Ferme la boîte :
+- les dés viennent de `S.boxDice` ;
+- les volets ouverts viennent de `S.boxNumbers` ;
+- sélectionner un volet ne modifie que la sélection UI locale ;
+- le moteur `playBox()` reste seul responsable de valider que la somme choisie égale le lancer ;
+- la possibilité de lancer un seul dé est dérivée de l’état existant (7, 8 et 9 fermés), sans règle dupliquée dans Three.js.
+
+Le `pointercancel` du renderer est désormais générique : il resynchronise le jeu actif au lieu de supposer qu’il s’agit du 8 américain.
