@@ -382,3 +382,12 @@ Le 8 américain anime maintenant aussi les transitions du joueur local à partir
 Les vols de cartes utilisent désormais une légère inclinaison sur les axes X/Y en plus de la rotation de table, ce qui évite l'effet de translation parfaitement plate tout en conservant une orientation exacte à l'atterrissage. Aucun aléa de gameplay n'est introduit.
 
 Cactus bénéficie d'un geste physique spécifique : une carte éligible au jet rapide peut être glissée vers la défausse pour tenter le jet au lieu de devoir uniquement la toucher. Le mouvement est visible en direct par les autres joueurs, même hors tour, mais le paquet de présence ne contient toujours aucune identité, valeur ou couleur de carte. L'hôte autorise ce flux hors tour uniquement dans les phases où le jet rapide est réellement disponible ; le coup lui-même continue de passer par l'interaction Cactus autoritative existante.
+
+
+## Cactus — transitions physiques autoritatives
+
+La scène Cactus conserve désormais un snapshot visuel minimal de l'état précédent : compteur de pioche, sommet public de défausse, carte tirée lorsqu'elle est visible pour le client, phase, tour et nombres de cartes. La scène compare ce snapshot à l'état confirmé suivant pour reconstruire des mouvements sans inventer d'action.
+
+Les transitions couvertes sont : pioche vers carte tirée pour le joueur concerné, prise de la défausse, carte tirée ensuite jetée sur la défausse, jet rapide depuis une main vers la pile, ainsi que des versions masquées destinées aux observateurs lorsqu'une carte adverse ne doit pas être révélée. Une carte déjà publique peut rester face visible pendant son déplacement ; une carte privée adverse reste un dos de carte.
+
+Cette couche n'appelle aucune règle et ne modifie jamais l'état : elle ne démarre qu'après observation d'une transition autoritative entre deux snapshots.
