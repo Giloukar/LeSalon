@@ -988,8 +988,8 @@ export function createTable3DRenderer({onFatal}={}){
       drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,control:obj.userData.control,delta:obj.userData.delta,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return;
     }
     if(obj.userData.kind!=='card'||!obj.userData.playable)return;
-    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card',mesh:obj,cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY,moved:false,overDrop:false};
-    host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
+    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card',mesh:obj,cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY,moved:false,overDrop:false,gestureHome:obj.userData.home?.position?.clone?.()||obj.position.clone()};
+    emitLocalCardGesture('start',0,0);host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
   }
   function onPointerMove(e){
     if(!active)return;
@@ -998,12 +998,13 @@ export function createTable3DRenderer({onFatal}={}){
     const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;if(!drag.moved&&Math.hypot(dx,dy)>6)drag.moved=true;
     if(!drag.moved)return;
     updatePointer(e);const p=new THREE.Vector3();if(raycaster.ray.intersectPlane(dragPlane,p)){drag.mesh.position.set(p.x,1.02,p.z);drag.mesh.rotation.set(-Math.PI/2,0,(dx*.0025));}
-    const near=Math.hypot(drag.mesh.position.x-1.25,drag.mesh.position.z-.05)<cardDropRadius(drag);drag.overDrop=near;dropMarker.material.opacity=near ? .82 : .2;draw();e.preventDefault();
+    const near=Math.hypot(drag.mesh.position.x-1.25,drag.mesh.position.z-.05)<cardDropRadius(drag);drag.overDrop=near;dropMarker.material.opacity=near ? .82 : .2;
+    const gesture=eightGestureCoordinates(drag.mesh,drag.gestureHome);emitLocalCardGesture('move',gesture.progress,gesture.lateral);draw();e.preventDefault();
   }
   function finishDrag(e,cancelled=false){
     if(!drag||e.pointerId!==drag.pointerId)return;
     const d=drag;drag=null;host?.classList.remove('is-dragging');dropMarker.material.opacity=.2;
-    if(cancelled){syncCurrent(current);draw();return}
+    if(cancelled){if(d.kind==='card')emitLocalCardGesture('cancel',0,0);syncCurrent(current);draw();return}
     const tap=Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
     if(d.kind==='card-select'){if(tap)current?.interactions?.cardSelect?.(d.cardId);return}
     if(d.kind==='maid-pick'){if(tap)current?.interactions?.specialCard?.('pick',d.index);return}
@@ -1044,12 +1045,12 @@ export function createTable3DRenderer({onFatal}={}){
       if(tap)current?.interactions?.box?.(d.kind==='box-roll'?'roll':d.kind==='box-toggle'?'toggle':'close',d.kind==='box-roll'?d.count:d.number);return;
     }
     const near=d.moved&&(d.overDrop||Math.hypot(d.mesh.position.x-1.25,d.mesh.position.z-.05)<cardDropRadius(d));
-    if(!d.moved||near){current?.interactions?.playCard?.(d.cardId);return}
-    syncEight(current);draw();
+    if(!d.moved||near){emitLocalCardGesture('commit',1,0);current?.interactions?.playCard?.(d.cardId);return}
+    emitLocalCardGesture('cancel',0,0);syncEight(current);draw();
   }
   function cancelActiveDrag(pointerId=null){
     if(!drag||(pointerId!==null&&drag.pointerId!==pointerId))return;
-    const wasCard=drag.kind==='card';drag=null;host?.classList.remove('is-dragging');if(dropMarker)dropMarker.material.opacity=.2;
+    const wasCard=drag.kind==='card';if(wasCard)emitLocalCardGesture('cancel',0,0);drag=null;host?.classList.remove('is-dragging');if(dropMarker)dropMarker.material.opacity=.2;
     if(wasCard&&current){syncEight(current);draw()}
   }
   function onPointerUp(e){finishDrag(e,false)}
