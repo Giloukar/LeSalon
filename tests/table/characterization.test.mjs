@@ -295,7 +295,11 @@ test('physical drop routing remembers release coordinates but leaves validation 
  assert.match(source,/function rememberCardDropOrigin\(game,id,mesh\)/);
  assert.match(source,/function rememberNinetyDropOrigin\(id,mesh\)/);
  assert.match(source,/function rememberRummiDropOrigin\(id,mesh\)/);
+ assert.match(source,/function showDropMarkerAt\(x,z,active=true\)/);
+ assert.match(source,/function rummiDropTarget\(position\)/);
  assert.match(source,/function rummiDropDestination\(position\)/);
+ assert.match(source,/d\.rummiDrop=rummiDropTarget\(d\.mesh\.position\)/);
+ assert.match(source,/showDropMarkerAt\(target\.x,target\.z,d\.overDrop\)/);
  assert.match(source,/current\?\.interactions\?\.cardDrop\?\.\(d\.cardId\)/);
  assert.match(source,/current\?\.interactions\?\.rummi\?\.\('drop',\{id:d\.tileId,dest\}\)/);
  assert.match(html,/cardDrop\(id\)\{/);
