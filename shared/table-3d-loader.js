@@ -16,7 +16,7 @@ view.register('3d',{
   available(){return webglAvailable()&&supportedHere()},
   async prepare(){
     if(!webglAvailable())throw new Error('WebGL indisponible');
-    modulePromise??=import(new URL('./table-3d.js?v=13',SRC).href);
+    modulePromise??=import(new URL('./table-3d.js?v=14',SRC).href);
     const mod=await modulePromise;
     renderer??=mod.createTable3DRenderer({
       onFatal(error){view.fallback('webgl-failed',error)}
@@ -25,7 +25,7 @@ view.register('3d',{
   },
   activate(){renderer?.activate?.()},
   render(payload){
-    if(!['huit','oie','yam','boite','cactus','rummikub','president','menteur','suites','plis','encheres','pouilleux','quatrevingtdixneuf','vingtetun','bataille','metropole','echo','ballon','anagrammes','intrus','code'].includes(payload?.gameId)){view.fallback('unsupported-game');return}
+    if(!['huit','oie','yam','boite','cactus','rummikub','president','menteur','suites','plis','encheres','pouilleux','quatrevingtdixneuf','vingtetun','bataille','metropole','echo','ballon','anagrammes','intrus','code','golf'].includes(payload?.gameId)){view.fallback('unsupported-game');return}
     renderer?.render?.(payload);
   },
   deactivate(){renderer?.deactivate?.()},

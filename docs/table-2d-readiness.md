@@ -231,3 +231,12 @@ Code secret dispose désormais d’un coffre Three.js avec trois gemmes manipula
 L’historique 3D affiche exclusivement les propositions déjà validées ainsi que les compteurs `exact` et `near` calculés par `codeFeedback()`. Le renderer ne recalcule donc jamais les indices.
 
 Pendant la phase `play`, `secret` est absent de `payload.state` et `viewData.code3d.secret` reste vide. Le code n’est transmis à la vue qu’une fois la phase `result` atteinte, lorsqu’il est légitime de le révéler. Les gemmes procédurales pourront être remplacées par un coffre et des symboles GLB/Astra sans modifier les actions métier.
+
+
+## Mini-golf cosmique 3D
+
+Mini-golf cosmique dispose désormais d’un parcours Three.js complet : surface, rochers, portail, balle, trace du dernier coup et réglage local de la visée. La direction est initialisée vers le portail puis peut être affinée par pas de 5°, tout comme la puissance par pas de 5 %.
+
+La scène 3D ne contient aucune physique de golf. Lors de « Tirer », elle transmet uniquement `{angle, power}` à l’action `shoot`. La fonction `golfShot()` du moteur reste seule responsable des murs, collisions avec les obstacles, friction, détection du portail et calcul du chemin. Three.js transforme ensuite `golfPath` en trace et en animation de balle.
+
+Le contrat Playwright place la balle à proximité du portail et vérifie qu’un tir 3D produit, via le moteur, un chemin autoritaire, un coup réussi et les 100 points du premier coup, sans consommer de hasard. Parcours, rochers, portail et balle sont des placeholders procéduraux remplaçables par des modèles GLB/Astra.
