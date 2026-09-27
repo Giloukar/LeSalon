@@ -287,43 +287,93 @@ export function createTable3DRenderer({onFatal}={}){
     else{gesture.returning=false;gesture.committed=false}
     startMotion();
   }
+  function visualCardSnapshot(card){
+    return card?{id:card.id,suit:card.suit,rank:card.rank,joker:!!card.joker,hidden:!!card.hidden}:null;
+  }
   function cardFamilySnapshot(payload,center){
-    const state=payload?.state,game=payload?.viewData?.cardGame||payload?.gameId,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0,players=state?.players||[];
-    const base={game,key:[game,state?.startedAt||'',players.map(p=>p?.name||'').join('|')].join('~'),viewer,handCounts:players.map(p=>p?.hand?.length||0)};
-    if(game==='president')base.centerIds=(center.cards||[]).map(c=>c?.id).filter(Boolean);
-    else if(game==='menteur'){base.backCount=Number(center.backCount)||0;base.centerIds=(center.cards||[]).map(c=>c?.id).filter(Boolean)}
-    else if(game==='suites')base.centerIds=Object.values(center.lanes||{}).flat().map(c=>c?.id).filter(Boolean);
-    else if(game==='plis')base.centerIds=(center.entries||[]).map(e=>e?.card?.id).filter(Boolean);
-    else if(game==='encheres')base.bidIds=(center.bids||[]).map(c=>c?.id||null);
+    const state=payload?.state,game=payload?.viewData?.cardGame||payload?.gameId,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0,players=state?.players||[],own=payload?.spectator?[]:(players[viewer]?.hand||[]);
+    const base={game,key:[game,state?.startedAt||'',players.map(p=>p?.name||'').join('|')].join('~'),viewer,turn:Number(state?.turn??0),phase:String(state?.phase||''),ownIds:own.map(c=>c?.id).filter(Boolean),handCounts:players.map(p=>p?.hand?.length||0)};
+    if(game==='president'){
+      base.centerIds=(center.cards||[]).map(c=>c?.id).filter(Boolean);base.centerCards=(center.cards||[]).map(visualCardSnapshot).filter(Boolean);
+    }else if(game==='menteur'){
+      base.backCount=Number(center.backCount)||0;base.centerIds=(center.cards||[]).map(c=>c?.id).filter(Boolean);
+    }else if(game==='suites')base.centerIds=Object.values(center.lanes||{}).flat().map(c=>c?.id).filter(Boolean);
+    else if(game==='plis'){
+      base.centerIds=(center.entries||[]).map(e=>e?.card?.id).filter(Boolean);
+      base.entries=(center.entries||[]).map(e=>({owner:e.owner,card:visualCardSnapshot(e.card)})).filter(e=>e.card);
+      base.dealNumber=Number(center.dealNumber)||0;base.completedTricks=Number(center.completedTricks)||0;
+    }else if(game==='encheres'){
+      base.bidIds=(center.bids||[]).map(c=>c?.id||null);base.bidCards=(center.bids||[]).map(visualCardSnapshot);
+      base.bidRound=Number(center.bidRound)||0;base.prize=visualCardSnapshot(center.prize);base.lastWinner=Number.isInteger(center.lastAuction?.winner)?center.lastAuction.winner:null;
+    }
     return base;
   }
   function cardFamilyOrigin(actor,viewer,opponentVisuals){
     if(actor===viewer)return new THREE.Vector3(0,TABLE_Y+.30,2.45);
     const seat=opponentVisuals.get(actor);return seat?new THREE.Vector3(seat.x,TABLE_Y+.30,seat.z+.08):new THREE.Vector3(0,TABLE_Y+.30,-2.25);
   }
+  function exactLocalCardOrigin(previous,id,index=0){
+    const at=previous?.ownIds?.indexOf(id);if(at<0)return null;
+    const slot=handCardSlot(previous.ownIds.length,at);return new THREE.Vector3(slot.x,TABLE_Y+.30+slot.yOffset,slot.z);
+  }
   function animateCardFamilyConfirmed(game,payload,center,previous,currentSnapshot,opponentVisuals,centerVisuals){
     if(!previous||previous.key!==currentSnapshot.key||!motionAllowed())return;
+    const viewer=currentSnapshot.viewer,discardCorner=new THREE.Vector3(4.35,TABLE_Y+.24,-1.85);
+
+    if(game==='president'&&(previous.centerIds||[]).length&&!(currentSnapshot.centerIds||[]).length){
+      const cards=previous.centerCards||[];
+      cards.slice(0,6).forEach((card,i)=>{
+        const from=new THREE.Vector3((i-(cards.length-1)/2)*.72,TABLE_Y+.23,.05),mesh=cardMesh(card,{back:!!card?.hidden});
+        queueCardFlight(mesh,from,discardCorner.clone().add(new THREE.Vector3(i*.035,0,-i*.025)),{duration:430+i*30,delay:i*35,lift:.42,fromRot:(i-(cards.length-1)/2)*.05,toRot:.14,bank:.09,roll:.08});
+      });
+    }
+
+    if(game==='plis'&&previous.phase==='trickResult'&&currentSnapshot.phase==='play'&&previous.entries?.length){
+      const target=cardFamilyOrigin(previous.turn,viewer,opponentVisuals);
+      previous.entries.forEach((entry,i)=>{
+        const visual=centerVisuals.get(entry.card.id),count=previous.entries.length,a=(Math.PI*2*i/Math.max(1,count))-Math.PI/2;
+        const from=visual?.position?.clone?.()||new THREE.Vector3(Math.cos(a)*1.45,TABLE_Y+.26,Math.sin(a)*1.1);
+        if(visual?.mesh)visual.mesh.visible=false;
+        const mesh=cardMesh(entry.card,{back:!!entry.card.hidden});
+        queueCardFlight(mesh,from,target.clone().add(new THREE.Vector3((i-(count-1)/2)*.08,0,0)),{duration:500+i*35,delay:i*45,lift:.66,fromRot:i*.06,toRot:0,bank:.13,roll:(i%2?-.10:.10)});
+      });
+    }
+
+    if(game==='encheres'&&previous.bidRound&&currentSnapshot.bidRound>previous.bidRound){
+      const bids=(previous.bidCards||[]).filter(Boolean),winner=previous.lastWinner;
+      bids.forEach((card,i)=>{
+        const from=new THREE.Vector3((i-((previous.bidCards||[]).length-1)/2)*1.18,TABLE_Y+.23,.75),mesh=cardMesh(card,{back:!!card.hidden});
+        queueCardFlight(mesh,from,discardCorner.clone().add(new THREE.Vector3(i*.04,0,-i*.025)),{duration:440+i*30,delay:i*38,lift:.48,fromRot:(i-1)*.03,toRot:.12,bank:.09,roll:(i%2?-.08:.08)});
+      });
+      if(previous.prize){
+        const target=Number.isInteger(winner)?cardFamilyOrigin(winner,viewer,opponentVisuals):discardCorner.clone().add(new THREE.Vector3(.35,0,.10));
+        const prize=cardMesh(previous.prize,{back:!!previous.prize.hidden});
+        queueCardFlight(prize,new THREE.Vector3(0,TABLE_Y+.25,-.55),target,{duration:580,delay:90,lift:.82,fromRot:0,toRot:0,bank:.14,roll:.10});
+      }
+    }
+
     const actors=currentSnapshot.handCounts.map((count,i)=>({i,delta:(previous.handCounts?.[i]??count)-count})).filter(x=>x.delta>0);
     if(!actors.length)return;
-    const actor=actors[0].i,amount=Math.min(4,actors[0].delta),from=cardFamilyOrigin(actor,currentSnapshot.viewer,opponentVisuals);
+    const actor=actors[0].i,amount=Math.min(4,actors[0].delta),fallback=cardFamilyOrigin(actor,viewer,opponentVisuals),removedIds=actor===viewer?(previous.ownIds||[]).filter(id=>!(currentSnapshot.ownIds||[]).includes(id)):[];
     const oldIds=new Set(previous.centerIds||[]),newIds=(currentSnapshot.centerIds||[]).filter(id=>!oldIds.has(id));
-    const queue=(card,target,index,back=false,finalMesh=null)=>{
+    const source=(id,index)=>actor===viewer?(exactLocalCardOrigin(previous,id,index)||exactLocalCardOrigin(previous,removedIds[index],index)||fallback):fallback.clone().add(new THREE.Vector3((index-(amount-1)/2)*.10,0,0));
+    const queue=(card,target,index,back=false,finalMesh=null,id=null)=>{
       if(!target)return;const mesh=cardMesh(back?null:card,{back});if(finalMesh)finalMesh.visible=false;
-      queueCardFlight(mesh,from.clone().add(new THREE.Vector3((index-(amount-1)/2)*.10,0,0)),target.clone(),{duration:640+index*45,delay:index*85,lift:.86,fromRot:.03*(index-(amount-1)/2),toRot:0,onDone:()=>{if(finalMesh)finalMesh.visible=true}});
+      queueCardFlight(mesh,source(id||card?.id,index),target.clone(),{duration:560+index*45,delay:index*70,lift:.78,fromRot:.03*(index-(amount-1)/2),toRot:0,bank:.12,roll:(index%2?-.09:.09),onDone:()=>{if(finalMesh)finalMesh.visible=true}});
     };
     if(game==='menteur'){
       const diff=Math.max(0,(currentSnapshot.backCount||0)-(previous.backCount||0));
-      for(let i=0;i<Math.min(amount,diff);i++)queue(null,new THREE.Vector3((i-(diff-1)/2)*.05,TABLE_Y+.24,.08-i*.018),i,true,null);
+      for(let i=0;i<Math.min(amount,diff);i++)queue(null,new THREE.Vector3((i-(diff-1)/2)*.05,TABLE_Y+.24,.08-i*.018),i,true,null,removedIds[i]);
       return;
     }
     if(game==='encheres'){
       const bids=center.bids||[],prev=previous.bidIds||[];
-      bids.forEach((card,i)=>{if(!card||prev[i]===card.id)return;const visual=centerVisuals.get('bid-'+i);queue(card,visual?.position||new THREE.Vector3((i-(bids.length-1)/2)*1.18,TABLE_Y+.23,.75),0,!!card.hidden,visual?.mesh||null)});
+      bids.forEach((card,i)=>{if(!card||prev[i]===card.id)return;const visual=centerVisuals.get('bid-'+i);queue(card,visual?.position||new THREE.Vector3((i-(bids.length-1)/2)*1.18,TABLE_Y+.23,.75),0,!!card.hidden,visual?.mesh||null,card.id)});
       return;
     }
     newIds.slice(0,amount).forEach((id,i)=>{
       const visual=centerVisuals.get(id);if(!visual)return;
-      queue(visual.card,visual.position,i,!!visual.card?.hidden,visual.mesh);
+      queue(visual.card,visual.position,i,!!visual.card?.hidden,visual.mesh,id);
     });
   }
   function rummiBoardLayout(groups){
