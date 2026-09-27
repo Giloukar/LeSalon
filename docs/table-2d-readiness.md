@@ -404,3 +404,16 @@ Le 99 possède désormais une pioche visible en 3D. Après un coup confirmé, la
 Rummikub conserve un snapshot des positions et échelles de chaque tuile visible. Une tuile déplacée entre le chevalet et un groupe, entre deux groupes, ou réorganisée par le recalcul du layout glisse depuis sa position précédente vers sa nouvelle position. Le changement d'échelle est interpolé lorsque la densité du groupe évolue. Une pioche physique de tuiles masquées est affichée près du chevalet et une nouvelle tuile arrive depuis cette pile après confirmation du moteur.
 
 Ces animations utilisent uniquement les différences entre états déjà confirmés. Elles ne produisent aucun coup, ne modifient aucune règle et restent désactivables avec les préférences de mouvement.
+
+
+## Dépôt physique comme action de jeu
+
+La manipulation 3D peut désormais se terminer directement par une action autoritative lorsque l'objet est lâché dans une zone cohérente.
+
+Pour Président, Menteur, Quatre Suites, Chasse aux plis et Enchères, une carte peut être glissée jusqu'à la zone centrale. Le renderer ne décide pas si le coup est légal : il transmet l'ID au nouvel adaptateur `cardDrop`, qui réutilise les fonctions de légalité et les actions déjà employées par les contrôles 2D. Président et Menteur conservent la sélection multiple : si la carte lâchée fait partie de la sélection, tout le groupe sélectionné est proposé au moteur ; sinon seule la carte réellement manipulée est proposée.
+
+Au 99, une carte non ambiguë peut être déposée directement sur la défausse. Un As reste volontairement soumis aux boutons lorsque +1 et +11 sont tous deux légaux ; si un seul choix est possible, le dépôt direct utilise automatiquement cet unique effet légal.
+
+Rummikub accepte le dépôt d'une tuile sur une combinaison existante, dans l'espace de table pour créer un nouveau groupe, ou sur le chevalet. La destination est déterminée géométriquement par la couche 3D, mais le déplacement est ensuite envoyé par la même action `move` que l'interface classique. Les anciennes tuiles restent protégées par les contraintes d'ouverture et une tuile de table de référence ne peut pas être ramenée illicitement au chevalet.
+
+Avant le dispatch, la couche de présentation mémorise la position exacte du relâchement. Le snapshot suivant peut ainsi continuer l'animation depuis la main de l'utilisateur plutôt que de faire revenir brièvement l'objet à son emplacement d'origine.
