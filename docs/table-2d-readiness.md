@@ -204,3 +204,12 @@ Le contrat Playwright vérifie également que plusieurs rendus 3D consécutifs n
 La couche 3D ne reçoit désormais plus l’état moteur brut en solo/local. Avant d’être transmis au renderer, `state` passe par `projectGame()` avec l’index privé courant. En online, l’état déjà projeté est simplement cloné.
 
 Cette frontière protège notamment les mains adverses et les réponses internes des jeux d’arcade. Par exemple, pendant la phase `repeat` d’Écho néon, la séquence reste présente dans l’état autoritaire utilisé par le moteur mais elle est absente à la fois de `viewData.echo.sequence` et de `payload.state.sequence`.
+
+
+## Lettres en folie 3D
+
+Lettres en folie utilise désormais des tuiles 3D procédurales. La composition du mot est un état d’interface local au renderer : toucher une lettre la place dans la réponse, toucher une lettre déjà composée la retire, et Effacer remet uniquement cette sélection locale à zéro.
+
+Aucune lettre sélectionnée individuellement n’est envoyée au moteur. Seule l’action Valider transmet le mot composé à l’action `word` existante. Passer et Continuer délèguent respectivement à `giveup` et `continue`.
+
+Le payload 3D contient l’indice, les lettres mélangées, le nombre d’essais et les scores, mais jamais `answer` pendant la phase de jeu. Le test couvre également Écho néon en solo afin de vérifier que la projection de confidentialité retire réellement la séquence de `payload.state` pendant `repeat`, tout en la laissant intacte dans l’état moteur autoritaire.

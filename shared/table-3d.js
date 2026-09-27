@@ -60,6 +60,7 @@ export function createTable3DRenderer({onFatal}={}){
   const tileMaterials=new Map(),rummiTileMaterials=new Map(),pawnMaterials=new Map(),dieFaceMaterials=new Map(),cellLabelMaterials=new Map(),boxTileMaterials=new Map(),cellLabelTextures=[];
   const neutralDieMaterial=new THREE.MeshStandardMaterial({color:0xd8d3c4,roughness:.82,metalness:0});
   let animationRaf=0,diceAnimations=[],pawnAnimations=[],lastDiceKey='',lastMoveKey='';
+  let wordSelection=[],wordDraftKey='';
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
   let objects=new THREE.Group(),dropMarker=null,tableMesh=null;
@@ -587,6 +588,38 @@ export function createTable3DRenderer({onFatal}={}){
     if(help)help.textContent=phase==='watch'?'Mémorisez les lumières dans l’ordre puis cachez la séquence':phase==='repeat'?'Touchez les quatre pads dans le bon ordre':phase==='result'?(data.feedback||'Séquence terminée'):'Scores synchronisés avec le moteur';
   }
 
+  function syncAnagram(payload){
+    clearObjects();dropMarker.visible=false;
+    const s=payload.state,data=payload.viewData?.anagram||{},phase=data.phase||s?.phase||'play',letters=Array.isArray(data.letters)?data.letters:[],attempts=Math.max(0,Number(data.attempts||0));
+    const key=[s?.turn??0,data.stage||1,attempts,phase].join('|');if(wordDraftKey!==key){wordDraftKey=key;wordSelection=[]}
+    camera.position.set(0,6.55,8.35);camera.lookAt(0,.35,.05);
+    const clue=makeLabel(data.clue||'Remettez les lettres dans l’ordre','#f2d6b8');clue.scale.set(5.6,.72,1);clue.position.set(0,2.68,-1.95);objects.add(clue);
+    const span=Math.min(8.2,Math.max(2.2,(letters.length-1)*.92));
+    letters.forEach((letter,i)=>{
+      const t=letters.length<=1?.5:i/(letters.length-1),selected=wordSelection.includes(i),mat=new THREE.MeshStandardMaterial({color:selected?0x514b43:0xd9c7a5,roughness:.82,emissive:selected?0x000000:0x44351f,emissiveIntensity:selected?0:.12}),tile=new THREE.Mesh(tileGeometry,mat);
+      tile.scale.set(.96,.4,1.08);tile.position.set((t-.5)*span,TABLE_Y+.43,.68);tile.castShadow=true;tile.receiveShadow=true;tile.userData.temporaryMaterial=mat;
+      if(phase==='play'&&payload.canInteract&&!selected){tile.userData={...tile.userData,kind:'word-letter',index:i,interactive:true};interactive.push(tile)}
+      objects.add(tile);const label=makeLabel(String(letter||''),selected?'#8e918b':'#2b241c');label.scale.set(.68,.46,1);label.position.set(tile.position.x,TABLE_Y+.72,.67);objects.add(label);
+    });
+    const draft=wordSelection.map(i=>letters[i]||'').join('');
+    const answerSpan=Math.min(8.2,Math.max(2.2,(Math.max(letters.length,1)-1)*.92));
+    for(let order=0;order<letters.length;order++){
+      const x=(letters.length<=1?.5:order/(letters.length-1)-.5)*answerSpan,filled=order<wordSelection.length,mat=new THREE.MeshStandardMaterial({color:filled?0x9dbb8f:0x33423a,roughness:.86,emissive:filled?0x273c21:0x000000,emissiveIntensity:filled?.18:0}),slot=new THREE.Mesh(tileGeometry,mat);
+      slot.scale.set(.96,.32,1.02);slot.position.set(x,TABLE_Y+.37,-.72);slot.userData.temporaryMaterial=mat;
+      if(filled&&phase==='play'&&payload.canInteract){slot.userData={...slot.userData,kind:'word-answer',index:order,interactive:true};interactive.push(slot)}
+      objects.add(slot);if(filled){const label=makeLabel(String(letters[wordSelection[order]]||''),'#eef0dc');label.scale.set(.68,.44,1);label.position.set(x,TABLE_Y+.65,-.73);objects.add(label)}
+    }
+    if(phase==='play'&&payload.canInteract){
+      if(wordSelection.length){const clear=actionSprite('EFFACER','word-clear',{},'#d5d8d3');clear.position.set(-2.5,1.02,2.28);objects.add(clear);const submit=actionSprite('VALIDER · '+draft,'word-submit',{},'#dbea9e');submit.position.set(0,1.02,2.28);objects.add(submit)}
+      const give=actionSprite('PASSER','word-giveup',{},'#efbc88');give.position.set(2.5,1.02,2.28);objects.add(give);
+    }else if(phase==='result'&&payload.canInteract){const next=actionSprite('CONTINUER','word-continue');next.position.set(0,1.02,2.28);objects.add(next)}
+    (data.players||[]).forEach((p,i)=>{const tag=makeLabel((p.name||'Joueur')+' · '+Number(p.score||0),i===s?.turn?'#dbea9e':'#d8ded9');tag.scale.set(1.72,.34,1);tag.position.set((i-(data.players.length-1)/2)*2.18,.92,-2.62);objects.add(tag)});
+    const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
+    if(title)title.textContent='VUE 3D · LETTRES EN FOLIE';
+    if(status)status.textContent='Manche '+(data.stage||1)+' / 5 · '+(phase==='play'?(3-attempts)+' essai'+(3-attempts>1?'s':'')+' restant'+(3-attempts>1?'s':''):phase==='result'?(data.feedback||'Mot terminé'):'partie terminée');
+    if(help)help.textContent=phase==='play'?'Touchez les lettres pour composer le mot · touchez une lettre de la réponse pour la retirer':phase==='result'?(data.feedback||'Résultat validé par le moteur'):'Scores synchronisés';
+  }
+
   function syncBalloon(payload){
     clearObjects();dropMarker.visible=false;
     const s=payload.state,data=payload.viewData?.balloon||{},phase=data.phase||s?.phase||'play',pumps=Math.max(0,Number(data.pumps||0)),pot=Math.max(0,Number(data.pot||0)),risk=Math.max(10,Math.min(90,Number(data.risk||10))),burst=!!data.burst;
@@ -651,7 +684,8 @@ export function createTable3DRenderer({onFatal}={}){
   }
 
   function syncCurrent(payload){
-    if(payload?.gameId==='ballon')syncBalloon(payload);
+    if(payload?.gameId==='anagrammes')syncAnagram(payload);
+    else if(payload?.gameId==='ballon')syncBalloon(payload);
     else if(payload?.gameId==='echo')syncEcho(payload);
     else if(payload?.gameId==='metropole')syncMetropole(payload);
     else if(payload?.gameId==='rummikub')syncRummikub(payload);
@@ -694,7 +728,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,kind:'deck',startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(obj.userData.kind==='card-select'){drag={pointerId:e.pointerId,kind:'card-select',cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(['maid-pick','special-select','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
-    if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue'].includes(obj.userData.kind)){
+    if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
       drag={pointerId:e.pointerId,kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return;
     }
@@ -729,6 +763,12 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='rummi-dest'){if(tap)current?.interactions?.rummi?.('move',d.dest);return}
     if(d.kind==='deck'){if(tap)current?.interactions?.draw?.();return}
     if(d.kind==='goose-roll'||d.kind==='goose-choice'){if(tap)current?.interactions?.goose?.(d.kind==='goose-roll'?'roll':'choose',d.steps);return}
+    if(d.kind==='word-letter'){if(tap&&!wordSelection.includes(d.index)){wordSelection.push(d.index);syncAnagram(current);draw()}return}
+    if(d.kind==='word-answer'){if(tap&&d.index>=0&&d.index<wordSelection.length){wordSelection.splice(d.index,1);syncAnagram(current);draw()}return}
+    if(d.kind==='word-clear'){if(tap){wordSelection=[];syncAnagram(current);draw()}return}
+    if(d.kind==='word-submit'){if(tap){const letters=current?.viewData?.anagram?.letters||[],word=wordSelection.map(i=>letters[i]||'').join('');wordSelection=[];if(word)current?.interactions?.anagram?.('submit',word);else{syncAnagram(current);draw()}}return}
+    if(d.kind==='word-giveup'){if(tap){wordSelection=[];current?.interactions?.anagram?.('giveup')}return}
+    if(d.kind==='word-continue'){if(tap){wordSelection=[];current?.interactions?.anagram?.('continue')}return}
     if(d.kind==='balloon-pump'){if(tap)current?.interactions?.balloon?.('pump');return}
     if(d.kind==='balloon-bank'){if(tap)current?.interactions?.balloon?.('bank');return}
     if(d.kind==='balloon-continue'){if(tap)current?.interactions?.balloon?.('continue');return}
@@ -749,7 +789,7 @@ export function createTable3DRenderer({onFatal}={}){
 
   function activate(){active=true;init()}
   function deactivate(){
-    active=false;drag=null;hovered=null;diceAnimations.length=0;pawnAnimations.length=0;
+    active=false;drag=null;hovered=null;wordSelection=[];wordDraftKey='';diceAnimations.length=0;pawnAnimations.length=0;
     if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
     resizeObserver?.disconnect();resizeObserver=null;host?.remove();host=null;
     document.documentElement.removeAttribute('data-table-3d-game');document.documentElement.removeAttribute('data-table-3d-phase');
