@@ -376,6 +376,16 @@ export function createTable3DRenderer({onFatal}={}){
       queue(visual.card,visual.position,i,!!visual.card?.hidden,visual.mesh,id);
     });
   }
+  function rummiMotionSnapshot(payload,data,visuals){
+    const s=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0;
+    const positions=new Map();
+    for(const [id,v] of visuals)positions.set(id,{position:v.position.clone(),scale:v.scale.clone(),rotation:v.rotation||0,zone:v.zone,tile:{id:v.tile.id,num:v.tile.num,color:v.tile.color,joker:!!v.tile.joker}});
+    return{
+      key:[s?.startedAt||'',viewer,(s?.players||[]).map(p=>p?.name||'').join('|')].join('~'),
+      viewer,turn:Number(data?.turn??s?.turn??0),deckCount:Math.max(0,Number(data?.deckCount)||0),
+      handIds:(data?.hand||[]).map(t=>t?.id).filter(Boolean),positions
+    };
+  }
   function rummiBoardLayout(groups){
     const active=(groups||[]).map((group,index)=>({group,index})).filter(x=>x.group?.length),count=Math.max(1,active.length),maxLen=Math.max(1,...active.map(x=>x.group.length));
     let cols=count<=2?count:maxLen>=10?2:count>=7?3:Math.min(3,Math.ceil(Math.sqrt(count*1.25)));
