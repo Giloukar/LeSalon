@@ -54,6 +54,7 @@ function cardBackTexture(){
 export function createTable3DRenderer({onFatal}={}){
   let renderer=null,scene=null,camera=null,host=null,canvas=null,resizeObserver=null;
   let active=false,current=null,drag=null,hovered=null;
+  const externalAssets=window.SalonTable3DAssets||null;
   const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2(),dragPlane=new THREE.Plane(new THREE.Vector3(0,1,0),-1.02);
   const interactive=[],faceTextures=new Map(),frontMaterials=new Map();
   const disposableTextures=[];
@@ -102,11 +103,23 @@ export function createTable3DRenderer({onFatal}={}){
     const mat=new THREE.MeshStandardMaterial({map:tex,roughness:.66,metalness:0});
     frontMaterials.set(key,mat);return mat;
   }
+  function externalAsset(kind,context,userData={}){
+    const obj=externalAssets?.create?.(kind,{THREE,...context});if(!obj?.isObject3D)return null;
+    obj.userData={...obj.userData,...userData,externalAssetKind:kind};
+    obj.traverse?.(child=>{
+      if(child.isMesh){child.castShadow=true;child.receiveShadow=true}
+      if(child!==obj)child.userData={...child.userData,table3dRoot:obj};
+    });
+    return obj;
+  }
   function cardMesh(card,{back=false,id=null,interactiveCard=false,playable=false}={}){
+    const userData={kind:'card',cardId:id,interactive:interactiveCard,playable};
+    const visual=card?Object.freeze({suit:card.suit,rank:card.rank,joker:!!card.joker,hidden:!!card.hidden}):null;
+    const external=externalAsset('card',{card:visual,back,id,playable,canonicalSize:{width:CARD_W,height:CARD_H,depth:CARD_D}},userData);
+    if(external){if(interactiveCard)interactive.push(external);return external}
     const mats=[edgeMaterial,edgeMaterial,edgeMaterial,edgeMaterial,back?backMaterial:frontMaterial(card),backMaterial];
     const mesh=new THREE.Mesh(cardGeometry,mats);
-    mesh.castShadow=true;mesh.receiveShadow=true;
-    mesh.userData={kind:'card',cardId:id,interactive:interactiveCard,playable};
+    mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData=userData;
     if(interactiveCard)interactive.push(mesh);
     return mesh;
   }
@@ -320,6 +333,11 @@ export function createTable3DRenderer({onFatal}={}){
     const key=String(color||'#dbea9e');if(pawnMaterials.has(key))return pawnMaterials.get(key);
     const mat=new THREE.MeshStandardMaterial({color:key,roughness:.58,metalness:.04});pawnMaterials.set(key,mat);return mat;
   }
+  function pawnMesh(color){
+    const key=String(color||'#dbea9e'),external=externalAsset('pawn',{color:key,canonicalSize:{radius:.24,height:.46}});
+    if(external)return external;
+    const mesh=new THREE.Mesh(pawnGeometry,pawnMaterial(key));mesh.castShadow=true;mesh.receiveShadow=true;return mesh;
+  }
   function dieFaceMaterial(value){
     const n=Math.max(1,Math.min(6,Number(value)||1));if(dieFaceMaterials.has(n))return dieFaceMaterials.get(n);
     const tex=canvasTexture((g,w,h)=>{
@@ -330,8 +348,9 @@ export function createTable3DRenderer({onFatal}={}){
     const mat=new THREE.MeshStandardMaterial({map:tex,roughness:.72});dieFaceMaterials.set(n,mat);return mat;
   }
   function dieMesh(value){
-    const v=Math.max(1,Math.min(6,Number(value)||1)),sides=[2,5,v,7-v,3,4].map(dieFaceMaterial);
-    const mesh=new THREE.Mesh(dieGeometry,sides);mesh.castShadow=true;mesh.receiveShadow=true;return mesh;
+    const v=Math.max(1,Math.min(6,Number(value)||1)),external=externalAsset('die',{value:v,blank:false,canonicalSize:{edge:.68}});
+    if(external)return external;
+    const sides=[2,5,v,7-v,3,4].map(dieFaceMaterial),mesh=new THREE.Mesh(dieGeometry,sides);mesh.castShadow=true;mesh.receiveShadow=true;return mesh;
   }
   function cellLabelMaterial(n){
     if(cellLabelMaterials.has(n))return cellLabelMaterials.get(n);
@@ -343,6 +362,7 @@ export function createTable3DRenderer({onFatal}={}){
     const sp=makeLabel(text,accent);sp.scale.set(2.55,.58,1);sp.userData={...sp.userData,kind,interactive:true,...data};interactive.push(sp);return sp;
   }
   function blankDieMesh(){
+    const external=externalAsset('die',{value:null,blank:true,canonicalSize:{edge:.68}});if(external)return external;
     const mesh=new THREE.Mesh(dieGeometry,neutralDieMaterial);mesh.castShadow=true;mesh.receiveShadow=true;return mesh;
   }
   function boxTileMaterial(closed=false,selected=false){
@@ -361,7 +381,10 @@ export function createTable3DRenderer({onFatal}={}){
     const mat=new THREE.MeshStandardMaterial({map:tex,roughness:.76,emissive:selected?0x33370d:0x000000,emissiveIntensity:selected?.28:0});rummiTileMaterials.set(key,mat);return mat;
   }
   function rummiTileMesh(tile,selected=false,interactiveTile=false){
-    const mesh=new THREE.Mesh(rummiTileGeometry,rummiTileMaterial(tile,selected));mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData={kind:'rummi-tile',tileId:tile.id,interactive:interactiveTile};if(interactiveTile)interactive.push(mesh);return mesh;
+    const userData={kind:'rummi-tile',tileId:tile.id,interactive:interactiveTile},visual=Object.freeze({num:tile?.num,color:tile?.color,joker:!!tile?.joker});
+    const external=externalAsset('rummikub-tile',{tile:visual,selected,canonicalSize:{width:.62,height:.9,depth:.085}},userData);
+    if(external){if(interactiveTile)interactive.push(external);return external}
+    const mesh=new THREE.Mesh(rummiTileGeometry,rummiTileMaterial(tile,selected));mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData=userData;if(interactiveTile)interactive.push(mesh);return mesh;
   }
   function worldForCell(n,coords){
     if(!Number.isInteger(n)||n<=0)return new THREE.Vector3(-4.75,TABLE_Y+.42,3.15);
@@ -444,7 +467,7 @@ export function createTable3DRenderer({onFatal}={}){
     const moveKey=(s?.moves||0)+'|'+(s?.movedPlayer??-1)+'|'+(s?.path||[]).join('-'),animateMove=moveKey!==lastMoveKey&&Array.isArray(s?.path)&&s.path.length>1;
     if(animateMove)lastMoveKey=moveKey;
     (s?.players||[]).forEach((pl,i)=>{
-      const pawn=new THREE.Mesh(pawnGeometry,pawnMaterial(colors[i]||['#dbea9e','#aacdf7','#e4ad91','#c9afe7'][i%4]));pawn.castShadow=true;
+      const pawn=pawnMesh(colors[i]||['#dbea9e','#aacdf7','#e4ad91','#c9afe7'][i%4]);
       const target=worldForCell(pl.pos,coords),offset=new THREE.Vector3(((i%3)-1)*.13,.12,Math.floor(i/3)*.12);target.add(offset);
       if(animateMove&&i===s.movedPlayer){
         const points=s.path.map(n=>worldForCell(n,coords).add(offset.clone()));pawn.position.copy(points[0]);pawnAnimations.push({mesh:pawn,points,start:performance.now(),duration:Math.min(1700,Math.max(480,points.length*105))});
@@ -1056,7 +1079,7 @@ export function createTable3DRenderer({onFatal}={}){
       if(owner>=0){const ownMat=new THREE.MeshStandardMaterial({color:new THREE.Color(playerColors[owner]||'#dbea9e'),roughness:.72}),peg=new THREE.Mesh(cityPegGeometry,ownMat);peg.position.set(p.x+.47,TABLE_Y+.34,p.z+.25);peg.userData.temporaryMaterial=ownMat;objects.add(peg)}
     });
     (data.players||[]).forEach((pl,i)=>{
-      if(pl.out)return;const p=cityWorld(Number(pl.pos)||0),pawn=new THREE.Mesh(pawnGeometry,pawnMaterial(playerColors[i]||['#dbea9e','#aacdf7','#e4ad91','#c9afe7'][i%4]));pawn.position.set(p.x+((i%2)? .17:-.17),TABLE_Y+.48,p.z+(i>1?.17:-.17));pawn.castShadow=true;objects.add(pawn);
+      if(pl.out)return;const p=cityWorld(Number(pl.pos)||0),pawn=pawnMesh(playerColors[i]||['#dbea9e','#aacdf7','#e4ad91','#c9afe7'][i%4]);pawn.position.set(p.x+((i%2)? .17:-.17),TABLE_Y+.48,p.z+(i>1?.17:-.17));objects.add(pawn);
       const tag=makeLabel((pl.name||'Joueur')+' · '+pl.cash+' ¤'+(pl.jailed?' · détenu':''),i===s.turn?'#dbea9e':'#d8ded9');tag.scale.set(1.65,.31,1);tag.position.set(pawn.position.x,TABLE_Y+.92,pawn.position.z);objects.add(tag);
     });
     const dice=Array.isArray(data.dice)?data.dice:[1,1],key='city|'+(s?.moves??0)+'|'+dice.join('-'),animate=s?.moves>0&&key!==lastDiceKey;if(animate)lastDiceKey=key;
@@ -1102,7 +1125,7 @@ export function createTable3DRenderer({onFatal}={}){
     const r=canvas.getBoundingClientRect();pointer.x=((e.clientX-r.left)/Math.max(1,r.width))*2-1;pointer.y=-((e.clientY-r.top)/Math.max(1,r.height))*2+1;raycaster.setFromCamera(pointer,camera);
   }
   function hit(e){
-    updatePointer(e);return raycaster.intersectObjects(interactive,false)[0]?.object||null;
+    updatePointer(e);const raw=raycaster.intersectObjects(interactive,true)[0]?.object||null;return raw?.userData?.table3dRoot||raw;
   }
   function setHover(mesh){
     if(hovered===mesh)return;
