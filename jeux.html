@@ -3116,7 +3116,7 @@ playSceneAction=function(ctx){
 const TABLE_VIEW_2D_RENDER=renderGame,TABLE_VIEW_SHOW_HOME=showHome;
 const TABLE_3D_CARD_GAMES=['president','menteur','suites','plis','encheres'];
 const TABLE_3D_SPECIAL_CARD_GAMES=['pouilleux','quatrevingtdixneuf','vingtetun','bataille'];
-function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite','cactus','rummikub','metropole','echo','ballon','anagrammes','intrus','code',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
+function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite','cactus','rummikub','metropole','echo','ballon','anagrammes','intrus','code','golf',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
 function tableViewMountControl(){
  if(!window.SalonTableView)return;
  const supported=tableViewSupports3D();
@@ -3225,6 +3225,21 @@ if(window.SalonTableView){
     turn:S.turn,
     history:S.codeHistory.map(h=>({colors:[...h.colors],exact:h.exact,near:h.near})),
     secret:reveal&&Array.isArray(S.secret)?[...S.secret]:[],
+    feedback:S.feedback||'',
+    players:S.players.map(p=>({name:p.name,score:p.score}))
+   };
+  }
+  if(S?.id==='golf'){
+   const course=GOLF_COURSES[S.stage-1];
+   data.golf3d={
+    phase:S.phase,
+    stage:S.stage,
+    turn:S.turn,
+    course:{hole:{x:course.hole.x,y:course.hole.y},obstacles:course.obstacles.map(o=>({x:o.x,y:o.y,r:o.r}))},
+    pos:{x:S.golfPos.x,y:S.golfPos.y},
+    path:S.golfPath.map(p=>[p[0],p[1]]),
+    stroke:S.golfStroke,
+    sunk:!!S.golfSunk,
     feedback:S.feedback||'',
     players:S.players.map(p=>({name:p.name,score:p.score}))
    };
@@ -3387,6 +3402,12 @@ if(window.SalonTableView){
     codePuzzle(type,value){
      if(!S||S.id!=='code'||!canPlay())return false;
      if(type==='guess'&&S.phase==='play'&&Array.isArray(value)&&value.length===3&&value.every(n=>Number.isInteger(n)&&n>=0&&n<6)){dispatch({type:'codeGuess',colors:[...value]});return true}
+     if(type==='continue'&&S.phase==='result'){dispatch({type:'continue'});return true}
+     return false;
+    },
+    golf(type,value){
+     if(!S||S.id!=='golf'||!canPlay())return false;
+     if(type==='shoot'&&S.phase==='play'&&value&&Number.isInteger(value.angle)&&value.angle>=-180&&value.angle<=180&&Number.isInteger(value.power)&&value.power>=5&&value.power<=100){dispatch({type:'shoot',angle:value.angle,power:value.power});return true}
      if(type==='continue'&&S.phase==='result'){dispatch({type:'continue'});return true}
      return false;
     },
