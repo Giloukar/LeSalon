@@ -3210,7 +3210,7 @@ if(window.SalonTableView){
    spectator:!!net.spectator,
    gated:!!gate,
    privateIndex:S?privateIndex():0,
-   canInteract:!!(S&&canPlay()&&(S.id!=='huit'||!showSuit)),
+   canInteract:!!(S&&((S.id==='cactus'&&!net.spectator)||(canPlay()&&(S.id!=='huit'||!showSuit)))),
    viewData:data,
    interactions:{
     playCard(id){if(!S||S.id!=='huit'||!canPlay())return false;const c=player(S).hand.find(c=>c.id===id);if(!c)return false;eightPlayCardUI(c);return true},
