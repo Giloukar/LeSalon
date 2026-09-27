@@ -313,8 +313,21 @@ export function createTable3DRenderer({onFatal}={}){
     const seat=opponentVisuals.get(actor);return seat?new THREE.Vector3(seat.x,TABLE_Y+.30,seat.z+.08):new THREE.Vector3(0,TABLE_Y+.30,-2.25);
   }
   function exactLocalCardOrigin(previous,id,index=0){
+    const direct=previous?.dragOrigins?.get?.(id);if(direct?.position)return direct.position.clone();
     const at=previous?.ownIds?.indexOf(id);if(at<0)return null;
     const slot=handCardSlot(previous.ownIds.length,at);return new THREE.Vector3(slot.x,TABLE_Y+.30+slot.yOffset,slot.z);
+  }
+  function rememberCardDropOrigin(game,id,mesh){
+    const snapshot=lastCardFamilySnapshots.get(game);if(!snapshot||!id||!mesh)return;
+    snapshot.dragOrigins??=new Map();snapshot.dragOrigins.set(id,{position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()});
+  }
+  function rememberNinetyDropOrigin(id,mesh){
+    if(!lastNinetySnapshot||!id||!mesh)return;
+    lastNinetySnapshot.dragOrigins??=new Map();lastNinetySnapshot.dragOrigins.set(id,{position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()});
+  }
+  function rememberRummiDropOrigin(id,mesh){
+    const entry=lastRummiSnapshot?.positions?.get?.(id);if(!entry||!mesh)return;
+    entry.position=mesh.position.clone();entry.scale=mesh.scale.clone();entry.rotation=mesh.rotation.z;
   }
   function animateCardFamilyConfirmed(game,payload,center,previous,currentSnapshot,opponentVisuals,centerVisuals){
     if(!previous||previous.key!==currentSnapshot.key||!motionAllowed())return;
@@ -714,8 +727,9 @@ export function createTable3DRenderer({onFatal}={}){
         const actor=previous.turn,viewerActor=actor===viewer,publicCard=ninety.last,discardTarget=new THREE.Vector3(1.5,TABLE_Y+.24,.05);
         let playFrom;
         if(viewerActor){
-          const removed=(previous.ownIds||[]).find(id=>!(snapshot.ownIds||[]).includes(id))||snapshot.lastId,index=Math.max(0,(previous.ownIds||[]).indexOf(removed)),slot=handCardSlot(previous.ownIds.length,index);
-          playFrom=new THREE.Vector3(slot.x,TABLE_Y+.28+slot.yOffset,slot.z);
+          const removed=(previous.ownIds||[]).find(id=>!(snapshot.ownIds||[]).includes(id))||snapshot.lastId,direct=previous.dragOrigins?.get?.(removed);
+          if(direct?.position)playFrom=direct.position.clone();
+          else{const index=Math.max(0,(previous.ownIds||[]).indexOf(removed)),slot=handCardSlot(previous.ownIds.length,index);playFrom=new THREE.Vector3(slot.x,TABLE_Y+.28+slot.yOffset,slot.z)}
         }else{
           const visual=opponentVisuals.get(actor);playFrom=new THREE.Vector3(visual?.x||0,TABLE_Y+.29,(visual?.z||-2.2)+.08);
         }
@@ -1442,10 +1456,25 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.gestureEnabled){
       if(!d.gestureStarted){d.gestureStarted=true;emitLocalCardGesture('start',0,0)}
       const gesture=cardGestureCoordinates(d.mesh,d.gestureHome);emitLocalCardGesture('move',gesture.progress,gesture.lateral);
+      d.overDrop=directCardDropNear(d);if(dropMarker?.visible)dropMarker.material.opacity=d.overDrop?.82:.2;
     }
     draw();e.preventDefault();return true;
   }
   function cardDropRadius(d){return d?.pointerType==='touch'||matchMedia('(pointer: coarse)').matches?1.9:1.5}
+  function directCardDropNear(d,game=current?.gameId){
+    const target=cardGestureTarget(game),radius=cardDropRadius(d);return Math.hypot(d.mesh.position.x-target.x,d.mesh.position.z-target.z)<radius;
+  }
+  function rummiDropDestination(position){
+    const data=current?.viewData?.rummi;if(!data||!position)return null;
+    const groups=data.table||[],layout=rummiBoardLayout(groups);
+    for(let order=0;order<layout.active.length;order++){
+      const entry=layout.active[order],col=order%layout.cols,row=Math.floor(order/layout.cols),cx=(col-(layout.cols-1)/2)*layout.cellW,cz=layout.baseZ+row*layout.cellD;
+      if(Math.abs(position.x-cx)<=layout.cellW*.48&&Math.abs(position.z-cz)<=layout.cellD*.42)return entry.index;
+    }
+    if(position.z>1.18)return 'hand';
+    if(position.z<1.25)return 'new';
+    return null;
+  }
   function onPointerDown(e){
     if(!active)return;
     const obj=hit(e);setHover(obj);if(!obj)return;
@@ -1482,8 +1511,19 @@ export function createTable3DRenderer({onFatal}={}){
     const tap=Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
     if(d.loose&&!tap){
       if(d.kind==='cactus-quick'&&d.gestureStarted){
-        const target=cardGestureTarget('cactus'),near=Math.hypot(d.mesh.position.x-target.x,d.mesh.position.z-target.z)<cardDropRadius(d);
-        if(near){emitLocalCardGesture('commit',1,0);current?.interactions?.cactus?.('quick',d.index);return}
+        if(directCardDropNear(d,'cactus')){emitLocalCardGesture('commit',1,0);current?.interactions?.cactus?.('quick',d.index);return}
+      }
+      if(d.kind==='card-select'&&d.gestureStarted&&directCardDropNear(d)){
+        rememberCardDropOrigin(current?.gameId,d.cardId,d.mesh);
+        if(current?.interactions?.cardDrop?.(d.cardId)){emitLocalCardGesture('commit',1,0);return}
+      }
+      if(d.kind==='special-select'&&current?.gameId==='quatrevingtdixneuf'&&d.gestureStarted&&directCardDropNear(d,'quatrevingtdixneuf')){
+        rememberNinetyDropOrigin(d.cardId,d.mesh);
+        if(current?.interactions?.specialCard?.('drop',d.cardId)){emitLocalCardGesture('commit',1,0);return}
+      }
+      if(d.kind==='rummi-tile'){
+        const dest=rummiDropDestination(d.mesh.position);
+        if(dest!==null){rememberRummiDropOrigin(d.tileId,d.mesh);if(current?.interactions?.rummi?.('drop',{id:d.tileId,dest}))return}
       }
       if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d);return
     }
