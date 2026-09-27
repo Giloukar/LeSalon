@@ -3116,7 +3116,7 @@ playSceneAction=function(ctx){
 const TABLE_VIEW_2D_RENDER=renderGame,TABLE_VIEW_SHOW_HOME=showHome;
 const TABLE_3D_CARD_GAMES=['president','menteur','suites','plis','encheres'];
 const TABLE_3D_SPECIAL_CARD_GAMES=['pouilleux','quatrevingtdixneuf','vingtetun','bataille'];
-function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite','cactus','rummikub','metropole','echo','ballon',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
+function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite','cactus','rummikub','metropole','echo','ballon','anagrammes',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
 function tableViewMountControl(){
  if(!window.SalonTableView)return;
  const supported=tableViewSupports3D();
@@ -3189,6 +3189,18 @@ if(window.SalonTableView){
     pumps:S.pumps,
     burst:!!S.burst,
     risk:Math.min(90,10+S.pumps*10),
+    feedback:S.feedback||'',
+    players:S.players.map(p=>({name:p.name,score:p.score}))
+   };
+  }
+  if(S?.id==='anagrammes'){
+   data.anagram={
+    phase:S.phase,
+    stage:S.stage,
+    turn:S.turn,
+    clue:S.clue||'',
+    letters:[...S.letters],
+    attempts:S.attempts,
     feedback:S.feedback||'',
     players:S.players.map(p=>({name:p.name,score:p.score}))
    };
@@ -3332,6 +3344,13 @@ if(window.SalonTableView){
      if(!S||S.id!=='ballon'||!canPlay())return false;
      if(type==='pump'&&S.phase==='play'){dispatch({type:'pump'});return true}
      if(type==='bank'&&S.phase==='play'&&S.pot>0){dispatch({type:'bank'});return true}
+     if(type==='continue'&&S.phase==='result'){dispatch({type:'continue'});return true}
+     return false;
+    },
+    anagram(type,value){
+     if(!S||S.id!=='anagrammes'||!canPlay())return false;
+     if(type==='submit'&&S.phase==='play'&&typeof value==='string'&&normalizeWord(value)){dispatch({type:'word',word:value});return true}
+     if(type==='giveup'&&S.phase==='play'){dispatch({type:'giveup'});return true}
      if(type==='continue'&&S.phase==='result'){dispatch({type:'continue'});return true}
      return false;
     },
