@@ -222,3 +222,12 @@ L’Intrus dispose désormais d’une constellation Three.js jouable de 9 à 25 
 La frontière de données ne transmet jamais `intrusIndex` au renderer, y compris après révélation. Le tableau booléen `intrusTiles` / `viewData.intrus.tiles` ne sert qu’à construire la différence visuelle que le joueur doit observer, comme dans la vue 2D. Le renderer ne décide jamais si un clic est correct : chaque case envoie uniquement `spot(index)` au moteur, qui gère les essais, le score et la fin du tour.
 
 Les symboles actuels sont procéduraux et pourront être remplacés par des objets GLB/Astra sans modifier l’action `spot` ni le protocole de projection.
+
+
+## Code secret 3D
+
+Code secret dispose désormais d’un coffre Three.js avec trois gemmes manipulables. Toucher une gemme fait défiler localement les six symboles ; cette sélection reste entièrement dans le renderer jusqu’à l’appui sur « Tester le code ». À ce moment seulement, les trois valeurs sont transmises au moteur par l’action `codeGuess`.
+
+L’historique 3D affiche exclusivement les propositions déjà validées ainsi que les compteurs `exact` et `near` calculés par `codeFeedback()`. Le renderer ne recalcule donc jamais les indices.
+
+Pendant la phase `play`, `secret` est absent de `payload.state` et `viewData.code3d.secret` reste vide. Le code n’est transmis à la vue qu’une fois la phase `result` atteinte, lorsqu’il est légitime de le révéler. Les gemmes procédurales pourront être remplacées par un coffre et des symboles GLB/Astra sans modifier les actions métier.
