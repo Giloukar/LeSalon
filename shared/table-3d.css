@@ -1,7 +1,7 @@
-.table-view-switch{display:inline-flex;align-items:center;gap:2px;padding:3px;border:1px solid #ffffff20;border-radius:11px;background:#0e1512b8;backdrop-filter:blur(10px)}
-.table-view-switch button{min-width:38px;height:31px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:var(--muted);font:800 10px/1 system-ui;letter-spacing:.06em;cursor:pointer}
-.table-view-switch button[aria-pressed="true"]{background:var(--ink);color:var(--bg);box-shadow:0 3px 10px #0005}
-.table-view-switch button:disabled{opacity:.38;cursor:not-allowed}
+.table-view-switch{display:inline-flex;align-items:center;padding:3px;border:1px solid #ffffff20;border-radius:11px;background:#0e1512b8;backdrop-filter:blur(10px)}
+.table-view-switch button{min-width:44px;height:31px;padding:0 10px;border:0;border-radius:8px;background:var(--ink);color:var(--bg);font:850 10px/1 system-ui;letter-spacing:.08em;cursor:pointer;box-shadow:0 3px 10px #0005}
+.table-view-switch button:hover:not(:disabled){transform:translateY(-1px)}
+.table-view-switch button:disabled{opacity:.38;cursor:not-allowed;transform:none}
 .table-3d-host{position:relative;width:100%;height:clamp(430px,62vh,700px);margin:12px 0 18px;border:1px solid #ffffff18;border-radius:24px;overflow:hidden;background:radial-gradient(circle at 50% 20%,#24352b,#0c1210 72%);box-shadow:inset 0 1px #ffffff0d,0 18px 50px #0006;touch-action:none;contain:layout paint;overscroll-behavior:contain}
 .table-3d-host canvas{display:block;width:100%;height:100%;outline:none;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
 .table-3d-host.is-dragging canvas{cursor:grabbing}
@@ -10,29 +10,11 @@
 .table-3d-hud .table-3d-accent{color:#dbea9e}
 .table-3d-help{position:absolute;z-index:3;left:50%;bottom:12px;transform:translateX(-50%);padding:7px 11px;border-radius:999px;background:#09100dcc;border:1px solid #ffffff18;color:#c8d2c9;font:650 10px/1.2 system-ui;pointer-events:none;white-space:nowrap}
 .table-3d-fallback{display:grid;place-items:center;min-height:240px;padding:28px;text-align:center;color:var(--muted)}
-html[data-table-view="3d"][data-table-3d-game="huit"] .table-column .felt,
-html[data-table-view="3d"][data-table-3d-game="huit"] .table-column .hand-panel,
-html[data-table-view="3d"][data-table-3d-game="oie"] .table-column .felt,
-html[data-table-view="3d"][data-table-3d-game="boite"] .table-column .felt{display:none!important}
-html[data-table-view="3d"][data-table-3d-game="yam"] .table-column .yam-dice,
-html[data-table-view="3d"][data-table-3d-game="yam"] .table-column .yam-instruction{display:none!important}
-html[data-table-view="3d"][data-table-3d-game="president"] .table-column .felt,
-html[data-table-view="3d"][data-table-3d-game="president"] .table-column .hand-panel,
-html[data-table-view="3d"][data-table-3d-game="menteur"] .table-column .felt,
-html[data-table-view="3d"][data-table-3d-game="menteur"] .table-column .hand-panel,
-html[data-table-view="3d"][data-table-3d-game="suites"] .table-column .felt,
-html[data-table-view="3d"][data-table-3d-game="suites"] .table-column .hand-panel,
-html[data-table-view="3d"][data-table-3d-game="plis"] .table-column .felt,
-html[data-table-view="3d"][data-table-3d-game="plis"] .table-column .hand-panel,
-html[data-table-view="3d"][data-table-3d-game="encheres"] .table-column .felt,
-html[data-table-view="3d"][data-table-3d-game="encheres"] .table-column .hand-panel,
-html[data-table-view="3d"][data-table-3d-game="pouilleux"] .table-column .felt,
-html[data-table-view="3d"][data-table-3d-game="pouilleux"] .table-column .hand-panel,
-html[data-table-view="3d"][data-table-3d-game="quatrevingtdixneuf"] .table-column .felt,
-html[data-table-view="3d"][data-table-3d-game="quatrevingtdixneuf"] .table-column .hand-panel,
-html[data-table-view="3d"][data-table-3d-game="bataille"] .table-column .felt,
-html[data-table-view="3d"][data-table-3d-game="vingtetun"] .table-column .hand-panel{display:none!important}
-html[data-table-view="3d"][data-table-3d-game="vingtetun"]:not([data-table-3d-phase="bet"]) .table-column .felt{display:none!important}
-html[data-table-view="3d"][data-table-3d-game="huit"] .table-column{min-width:0}
-@media(max-width:700px){.table-view-switch{order:-1}.table-view-switch button{min-width:34px;height:30px;padding:0 6px}.table-3d-host{height:clamp(360px,58svh,560px);border-radius:18px;margin-top:8px}.table-3d-hud{left:9px;right:9px;top:9px}.table-3d-hud span:last-child{max-width:56%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.table-3d-help{bottom:8px;font-size:9px;max-width:90%;white-space:normal;text-align:center}}@media(max-width:440px){.table-3d-host{height:clamp(340px,54svh,500px);border-radius:15px}.table-3d-hud span{padding:6px 8px;font-size:9px}.table-3d-help{max-width:94%;padding:6px 9px}}
+html[data-table3d-supported="yes"] .scene-toggle{display:none!important}
+html[data-table-view="3d"] .table-column>.scene-surface,
+html[data-table-view="3d"] .table-column>.arcade-arena,
+html[data-table-view="3d"] .table-column>.hand-panel{display:none!important}
+html[data-table-view="3d"] .table-column{min-width:0}
+
+@media(max-width:700px){.table-view-switch{order:-1}.table-view-switch button{min-width:40px;height:30px;padding:0 8px}.table-3d-host{height:clamp(360px,58svh,560px);border-radius:18px;margin-top:8px}.table-3d-hud{left:9px;right:9px;top:9px}.table-3d-hud span:last-child{max-width:56%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.table-3d-help{bottom:8px;font-size:9px;max-width:90%;white-space:normal;text-align:center}}@media(max-width:440px){.table-3d-host{height:clamp(340px,54svh,500px);border-radius:15px}.table-3d-hud span{padding:6px 8px;font-size:9px}.table-3d-help{max-width:94%;padding:6px 9px}}
 @media(prefers-reduced-motion:reduce){.table-view-switch button{transition:none}}

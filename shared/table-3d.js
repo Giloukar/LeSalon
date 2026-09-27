@@ -136,8 +136,11 @@ export function createTable3DRenderer({onFatal}={}){
     canvas.addEventListener('pointermove',onPointerMove);
     canvas.addEventListener('pointerup',onPointerUp);
     canvas.addEventListener('pointercancel',onPointerCancel);
+    canvas.addEventListener('lostpointercapture',onLostPointerCapture);
     canvas.addEventListener('pointerleave',()=>setHover(null));
     canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();onFatal?.(new Error('Contexte WebGL perdu'));});
+    window.addEventListener('blur',onWindowBlur);
+    document.addEventListener('visibilitychange',onVisibilityChange);
   }
   function ensureHost(){
     const column=document.querySelector('.table-column');if(!column)return null;
@@ -846,19 +849,21 @@ export function createTable3DRenderer({onFatal}={}){
     if(hovered&&!drag&&['card','card-select','maid-pick','special-select','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-dest','intrus-spot','code-cycle'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
     draw();
   }
+  function capturePointer(id){try{canvas?.setPointerCapture?.(id)}catch(_){}}
+  function cardDropRadius(d){return d?.pointerType==='touch'||matchMedia('(pointer: coarse)').matches?1.9:1.5}
   function onPointerDown(e){
     if(!active||!current?.canInteract)return;
     const obj=hit(e);setHover(obj);if(!obj)return;
-    if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,kind:'deck',startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
-    if(obj.userData.kind==='card-select'){drag={pointerId:e.pointerId,kind:'card-select',cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
-    if(['maid-pick','special-select','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
+    if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'deck',startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
+    if(obj.userData.kind==='card-select'){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card-select',cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
+    if(['maid-pick','special-select','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
     if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue','intrus-spot','intrus-continue','code-cycle','code-submit','code-continue','golf-adjust','golf-shoot','golf-continue'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
-      drag={pointerId:e.pointerId,kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,control:obj.userData.control,delta:obj.userData.delta,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return;
+      drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,control:obj.userData.control,delta:obj.userData.delta,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return;
     }
     if(obj.userData.kind!=='card'||!obj.userData.playable)return;
-    drag={pointerId:e.pointerId,kind:'card',mesh:obj,cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY,moved:false};
-    host?.classList.add('is-dragging');canvas.setPointerCapture?.(e.pointerId);e.preventDefault();
+    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card',mesh:obj,cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY,moved:false,overDrop:false};
+    host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
   }
   function onPointerMove(e){
     if(!active)return;
@@ -867,7 +872,7 @@ export function createTable3DRenderer({onFatal}={}){
     const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;if(!drag.moved&&Math.hypot(dx,dy)>6)drag.moved=true;
     if(!drag.moved)return;
     updatePointer(e);const p=new THREE.Vector3();if(raycaster.ray.intersectPlane(dragPlane,p)){drag.mesh.position.set(p.x,1.02,p.z);drag.mesh.rotation.set(-Math.PI/2,0,(dx*.0025));}
-    const near=Math.hypot(drag.mesh.position.x-1.25,drag.mesh.position.z-.05)<1.45;dropMarker.material.opacity=near ? .82 : .2;draw();e.preventDefault();
+    const near=Math.hypot(drag.mesh.position.x-1.25,drag.mesh.position.z-.05)<cardDropRadius(drag);drag.overDrop=near;dropMarker.material.opacity=near ? .82 : .2;draw();e.preventDefault();
   }
   function finishDrag(e,cancelled=false){
     if(!drag||e.pointerId!==drag.pointerId)return;
@@ -912,23 +917,31 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='box-roll'||d.kind==='box-toggle'||d.kind==='box-close'){
       if(tap)current?.interactions?.box?.(d.kind==='box-roll'?'roll':d.kind==='box-toggle'?'toggle':'close',d.kind==='box-roll'?d.count:d.number);return;
     }
-    const near=d.moved&&Math.hypot(d.mesh.position.x-1.25,d.mesh.position.z-.05)<1.45;
+    const near=d.moved&&(d.overDrop||Math.hypot(d.mesh.position.x-1.25,d.mesh.position.z-.05)<cardDropRadius(d));
     if(!d.moved||near){current?.interactions?.playCard?.(d.cardId);return}
     syncEight(current);draw();
   }
+  function cancelActiveDrag(pointerId=null){
+    if(!drag||(pointerId!==null&&drag.pointerId!==pointerId))return;
+    const wasCard=drag.kind==='card';drag=null;host?.classList.remove('is-dragging');if(dropMarker)dropMarker.material.opacity=.2;
+    if(wasCard&&current){syncEight(current);draw()}
+  }
   function onPointerUp(e){finishDrag(e,false)}
-  function onPointerCancel(e){finishDrag(e,true)}
+  function onPointerCancel(e){cancelActiveDrag(e.pointerId)}
+  function onLostPointerCapture(e){cancelActiveDrag(e.pointerId)}
+  function onWindowBlur(){cancelActiveDrag()}
+  function onVisibilityChange(){if(document.hidden)cancelActiveDrag()}
 
   function activate(){active=true;init()}
   function deactivate(){
-    active=false;drag=null;hovered=null;wordSelection=[];wordDraftKey='';codeDraft=[0,1,2];codeDraftKey='';golfAim={angle:0,power:50};golfAimKey='';lastGolfKey='';diceAnimations.length=0;pawnAnimations.length=0;
+    cancelActiveDrag();active=false;hovered=null;wordSelection=[];wordDraftKey='';codeDraft=[0,1,2];codeDraftKey='';golfAim={angle:0,power:50};golfAimKey='';lastGolfKey='';diceAnimations.length=0;pawnAnimations.length=0;
     if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
     resizeObserver?.disconnect();resizeObserver=null;host?.remove();host=null;
     document.documentElement.removeAttribute('data-table-3d-game');document.documentElement.removeAttribute('data-table-3d-phase');
   }
   function destroy(){
     deactivate();clearObjects();
-    canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);
+    canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);canvas?.removeEventListener('lostpointercapture',onLostPointerCapture);window.removeEventListener('blur',onWindowBlur);document.removeEventListener('visibilitychange',onVisibilityChange);
     cardGeometry.dispose();tileGeometry.dispose();pawnGeometry.dispose();dieGeometry.dispose();rummiTileGeometry.dispose();grainGeometry.dispose();heldPadGeometry.dispose();codeGemGeometry.dispose();intrusDotGeometry.dispose();balloonGeometry.dispose();golfBallGeometry.dispose();cityTileGeometry.dispose();cityHouseGeometry.dispose();cityPegGeometry.dispose();edgeMaterial.dispose();backMaterial.dispose();for(const m of frontMaterials.values())m.dispose();for(const m of tileMaterials.values())m.dispose();for(const m of rummiTileMaterials.values())m.dispose();for(const m of pawnMaterials.values())m.dispose();for(const m of dieFaceMaterials.values())m.dispose();for(const m of cellLabelMaterials.values())m.dispose();for(const m of boxTileMaterials.values())m.dispose();neutralDieMaterial.dispose();for(const t of disposableTextures)t.dispose();for(const t of cellLabelTextures)t.dispose();
     tableMesh?.geometry?.dispose();tableMesh?.material?.dispose();dropMarker?.geometry?.dispose();dropMarker?.material?.dispose();renderer?.dispose();
     renderer=scene=camera=canvas=null;current=null;
