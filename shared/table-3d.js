@@ -147,6 +147,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(!host?.isConnected){
       host=document.createElement('section');host.className='table-3d-host';host.setAttribute('aria-label','Vue 3D de la table');
       host.innerHTML='<div class="table-3d-window-controls" aria-label="Affichage 3D"><button type="button" class="table-3d-window-button table-3d-minimize" data-table-3d-window="embedded" aria-label="Réduire la vue 3D dans la page" title="Réduire la vue 3D">↙</button><button type="button" class="table-3d-window-button table-3d-expand" data-table-3d-window="full" aria-label="Agrandir la vue 3D" title="Plein écran">⛶</button><button type="button" class="table-3d-window-button table-3d-close" data-table-view-mode="2d" aria-label="Revenir à la vue 2D" title="Revenir à la vue 2D">×</button></div><div class="table-3d-hud"><span class="table-3d-accent" data-table-3d-title>VUE 3D</span><span data-table-3d-status>Table synchronisée</span></div><div class="table-3d-help" data-table-3d-help>Vue immersive synchronisée avec la partie</div>';
+      host.querySelectorAll('[data-table-3d-window]').forEach(button=>button.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.dispatchEvent(new CustomEvent('salon:table-3d-window',{detail:{mode:button.dataset.table3dWindow}}))}));
       const banner=column.querySelector('.turn-banner');banner?.after(host);if(!banner)column.prepend(host);
       host.append(canvas);
       resizeObserver?.disconnect();resizeObserver=new ResizeObserver(resize);resizeObserver.observe(host);resize();
