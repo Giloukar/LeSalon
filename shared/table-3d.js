@@ -54,10 +54,14 @@ export function createTable3DRenderer({onFatal}={}){
   const disposableTextures=[];
   const cardGeometry=new THREE.BoxGeometry(CARD_W,CARD_H,CARD_D,1,1,1);
   const tileGeometry=new THREE.BoxGeometry(.88,.12,.64);
+  const rummiGeometry=new THREE.BoxGeometry(.68,.13,.94);
+  const cityGeometry=new THREE.BoxGeometry(1.16,.13,.80);
+  const houseGeometry=new THREE.BoxGeometry(.18,.24,.18);
   const pawnGeometry=new THREE.CylinderGeometry(.16,.24,.46,18);
   const dieGeometry=new THREE.BoxGeometry(.68,.68,.68);
   const edgeMaterial=new THREE.MeshStandardMaterial({color:0xe9e2d1,roughness:.72,metalness:0});
-  const tileMaterials=new Map(),pawnMaterials=new Map(),dieFaceMaterials=new Map(),cellLabelMaterials=new Map(),boxTileMaterials=new Map(),cellLabelTextures=[];
+  const rummiEdgeMaterial=new THREE.MeshStandardMaterial({color:0xd9d3c2,roughness:.82,metalness:0});
+  const tileMaterials=new Map(),pawnMaterials=new Map(),dieFaceMaterials=new Map(),cellLabelMaterials=new Map(),boxTileMaterials=new Map(),rummiMaterials=new Map(),cityMaterials=new Map(),cellLabelTextures=[];
   const neutralDieMaterial=new THREE.MeshStandardMaterial({color:0xd8d3c4,roughness:.82,metalness:0});
   let animationRaf=0,diceAnimations=[],pawnAnimations=[],lastDiceKey='',lastMoveKey='';
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
@@ -153,6 +157,37 @@ export function createTable3DRenderer({onFatal}={}){
     const colors={normal:0xd8d3b5,goose:0xaabd8a,trap:0xc4a36e,danger:0x9e6b5e,goal:0xdbea9e};
     const mat=new THREE.MeshStandardMaterial({color:colors[kind]||colors.normal,roughness:.9,emissive:highlight?0x6b7240:0x000000,emissiveIntensity:highlight ? .42 : 0});
     tileMaterials.set(key,mat);return mat;
+  }
+  function rummiMaterial(tile){
+    const key=tile?.joker?'joker':String(tile?.color??0)+'-'+String(tile?.num??0);if(rummiMaterials.has(key))return rummiMaterials.get(key);
+    const palette=['#b34b43','#4f78a8','#c78a38','#303532'],ink=tile?.joker?'#6d4a83':palette[Number(tile?.color)||0]||palette[3];
+    const tex=canvasTexture((g,w,h)=>{
+      g.fillStyle='#f3efdf';roundRect(g,6,6,w-12,h-12,30);g.fill();g.strokeStyle='#d4cbb7';g.lineWidth=7;g.stroke();
+      g.fillStyle=ink;g.textAlign='center';g.textBaseline='middle';
+      if(tile?.joker){g.font='800 78px system-ui,sans-serif';g.fillText('★',w/2,h*.40);g.font='800 30px system-ui,sans-serif';g.fillText('JOKER',w/2,h*.65)}
+      else{g.font='800 118px system-ui,sans-serif';g.fillText(String(tile?.num??''),w/2,h*.46);g.beginPath();g.arc(w/2,h*.72,28,0,Math.PI*2);g.fill()}
+    },360,500);cellLabelTextures.push(tex);
+    const mat=new THREE.MeshStandardMaterial({map:tex,roughness:.78,metalness:0});rummiMaterials.set(key,mat);return mat;
+  }
+  function rummiMesh(tile,interactiveTile=false,selected=false){
+    const top=rummiMaterial(tile),mats=[rummiEdgeMaterial,rummiEdgeMaterial,top,rummiEdgeMaterial,rummiEdgeMaterial,rummiEdgeMaterial],mesh=new THREE.Mesh(rummiGeometry,mats);
+    mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData={kind:'rummi-select',tileId:tile?.id,interactive:interactiveTile};
+    if(interactiveTile)interactive.push(mesh);if(selected)mesh.scale.setScalar(1.07);return mesh;
+  }
+  function cityMaterial(cell,ownerColor='',mortgaged=false,current=false){
+    const key=[cell?.type,cell?.group,ownerColor,mortgaged,current].join('|');if(cityMaterials.has(key))return cityMaterials.get(key);
+    const groups=[0xd19a72,0xa8d4dd,0xdca6c3,0xe1b269,0xe58f86,0xd9c873,0x8eb99c,0x99a6d7];
+    let color=cell?.type==='property'?groups[Number(cell.group)||0]||0xbba884:{start:0x95b895,tax:0xa7786e,chance:0xb598c9,jail:0x8796a5,park:0xb5a781,gojail:0x8a6c6c}[cell?.type]||0x718176;
+    if(mortgaged)color=0x414944;
+    const mat=new THREE.MeshStandardMaterial({color,roughness:.9,emissive:current?0x4d5e35:0x000000,emissiveIntensity:current ? .42 : 0});
+    cityMaterials.set(key,mat);return mat;
+  }
+  function cityWorld(index){
+    const i=Math.max(0,Math.min(23,Number(index)||0)),sx=1.30,sz=1.00;
+    if(i<=6)return new THREE.Vector3((i-3)*sx,TABLE_Y+.09,-3*sz);
+    if(i<=11)return new THREE.Vector3(3*sx,TABLE_Y+.09,(i-8-2)*sz);
+    if(i<=18)return new THREE.Vector3((3-(i-12))*sx,TABLE_Y+.09,3*sz);
+    return new THREE.Vector3(-3*sx,TABLE_Y+.09,(2-(i-19))*sz);
   }
   function pawnMaterial(color){
     const key=String(color||'#dbea9e');if(pawnMaterials.has(key))return pawnMaterials.get(key);
