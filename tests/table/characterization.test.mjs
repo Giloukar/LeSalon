@@ -308,6 +308,22 @@ test('physical drop routing remembers release coordinates but leaves validation 
  assert.doesNotMatch(source,/rummiDropDestination[^\n]*dispatch\(/);
 });
 
+test('President direct drop preserves a selected multi-card group',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'president','online');const r=await t.page.evaluate(async()=>{net.gameId='president';net.state.turn=0;net.state.trick=null;net.state.passed=[];const hand=net.state.players[0].hand;if(hand.length<2)throw Error('President fixture needs two cards');hand[1]={...hand[1],rank:hand[0].rank};S=projectGame(net.state,0);let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const ids=[S.players[0].hand[0].id,S.players[0].hand[1].id],before=net.state.players[0].hand.length;selection.clear();selection.add(ids[0]);selection.add(ids[1]);renderGame(false);const dropped=seen.interactions.cardDrop(ids[0]);return{ids,dropped,before,after:net.state.players[0].hand.length,trick:(net.state.trick?.cards||[]).map(c=>c.id),owner:net.state.trick?.owner};});assert.equal(r.dropped,true);assert.equal(r.after,r.before-2);assert.deepEqual(new Set(r.trick),new Set(r.ids));assert.equal(r.owner,0);}finally{await browser.close();}});
+
+test('Rummikub direct drop preserves the selected tile group',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'rummikub','online');const r=await t.page.evaluate(async()=>{net.gameId='rummikub';let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const ids=S.players[0].hand.slice(0,2).map(t=>t.id),before={hand:net.state.players[0].hand.length,table:net.state.table.flat().length,random:__test.random};selection.clear();ids.forEach(id=>selection.add(id));renderGame(false);const dropped=seen.interactions.rummi('drop',{id:ids[0],dest:'new'});return{ids,dropped,before,after:{hand:net.state.players[0].hand.length,table:net.state.table.flat().length,contains:ids.every(id=>net.state.table.flat().some(t=>t.id===id)),random:__test.random}};});assert.equal(r.dropped,true);assert.equal(r.after.hand,r.before.hand-2);assert.equal(r.after.table,r.before.table+2);assert.equal(r.after.contains,true);assert.equal(r.after.random,r.before.random);}finally{await browser.close();}});
+
+test('grouped 3D drag keeps selected companions presentation-only',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/function dragSelectionIds\(obj,kind\)/);
+ assert.match(source,/function groupedDragCompanions\(obj,kind\)/);
+ assert.match(source,/companions=groupedDragCompanions\(obj,kind\)/);
+ assert.match(source,/\(d\.companions\|\|\[\]\)\.forEach/);
+ assert.match(source,/function rememberGroupedCardDropOrigins\(d\)/);
+ assert.match(source,/function rememberGroupedRummiDropOrigins\(d\)/);
+ assert.doesNotMatch(source,/groupedDragCompanions[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/restoreManipulatedMesh[^\n]*onlineAct\(/);
+});
+
 test('free 3D tabletop manipulation stays presentation-only until an explicit valid action',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/manipAnimations=\[\]/);
