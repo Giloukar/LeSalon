@@ -100,7 +100,7 @@ Chaque entrée accepte :
 - `tintFrom` : nom d'un champ couleur du contexte, utile pour les pions et marqueurs ;
 - `configure(object, context)` : hook optionnel lorsque le manifest est défini en JavaScript et qu'une adaptation plus spécifique est nécessaire.
 
-Les transformations ne sont appliquées que lorsqu'elles sont déclarées : les transformations natives du fichier restent donc intactes par défaut.
+Les transformations ne sont appliquées que lorsqu'elles sont déclarées : les transformations natives du fichier restent donc intactes par défaut. Avec le chargeur GLB intégré, le modèle corrigé est placé dans un `THREE.Group` externe. Le renderer déplace, tourne et redimensionne ce wrapper, ce qui évite d'écraser les corrections internes du fichier ou du manifest.
 
 Le chargement est tolérant aux erreurs par asset. Un fichier qui échoue apparaît dans `result.failed` et conserve son placeholder procédural, pendant que les autres modèles du pack sont activés. `result.unload()` ou `SalonTable3DModelPack.unload(id)` retire les factories du pack et revient immédiatement aux placeholders.
 
