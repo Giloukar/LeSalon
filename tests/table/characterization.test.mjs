@@ -184,6 +184,33 @@ test('shared live card presence remains presentation-only in renderer and protoc
  assert.doesNotMatch(html,/card-gesture[^\n]*(cardId|suit|rank)/);
 });
 
+test('Cactus quick-drag presence is allowed out of turn without leaking the card',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'cactus','online');const r=await t.page.evaluate(()=>{net.gameId='cactus';net.state.phase='draw';net.state.turn=1;S.phase='draw';S.turn=1;__test.packets.length=0;const before={view:clone(S),host:clone(net.state),revision:net.revision,random:__test.random};window.dispatchEvent(new CustomEvent('salon:local-card-gesture',{detail:{gameId:'cactus',phase:'start',progress:0,lateral:0}}));window.dispatchEvent(new CustomEvent('salon:local-card-gesture',{detail:{gameId:'cactus',phase:'move',progress:.63,lateral:.18}}));window.dispatchEvent(new CustomEvent('salon:local-card-gesture',{detail:{gameId:'cactus',phase:'cancel',progress:0,lateral:0}}));return{before,after:{view:clone(S),host:clone(net.state),revision:net.revision,random:__test.random},packets:clone(__test.packets).filter(p=>p.type==='card-gesture')};});assert.deepEqual(r.after,r.before);assert.equal(r.packets.length>=2,true);for(const p of r.packets){assert.equal(p.gameId,'cactus');assert.equal(p.actor,0);assert.equal('cardId'in p,false);assert.equal('suit'in p,false);assert.equal('rank'in p,false);}}finally{await browser.close();}});
+
+test('host relays out-of-turn Cactus quick presence but blocks the active protected phase',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'cactus','online');const r=await t.page.evaluate(()=>{net.gameId='cactus';net.state.phase='draw';net.state.turn=0;S.phase='draw';S.turn=0;const seen=[];window.addEventListener('salon:remote-card-gesture',e=>seen.push(clone(e.detail)));const before={state:clone(net.state),revision:net.revision,random:__test.random},conn=net.seats[2].conn;const good=receiveSocial({type:'card-gesture',gameId:'cactus',matchId:net.matchId,revision:net.revision,gesture:21,phase:'move',progress:.52,lateral:-.11},2,conn);net.state.phase='swap';net.state.turn=2;S.phase='swap';S.turn=2;const blocked=receiveSocial({type:'card-gesture',gameId:'cactus',matchId:net.matchId,revision:net.revision,gesture:22,phase:'move',progress:.72,lateral:0},2,conn);return{good,blocked,seen,before,after:{state:{...clone(net.state),phase:'draw',turn:0},revision:net.revision,random:__test.random}};});assert.equal(r.good,true);assert.equal(r.blocked,true);assert.equal(r.seen.length,1);assert.equal(r.seen[0].actor,2);assert.equal(r.seen[0].gameId,'cactus');assert.equal(r.after.revision,r.before.revision);assert.equal(r.after.random,r.before.random);assert.deepEqual(r.after.state,r.before.state);}finally{await browser.close();}});
+
+test('Eight local confirmed play and draw reuse physical card flights',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/ownIds:own\.map\(c=>c\?\.id\)/);
+ assert.match(source,/const ownPlayed=discardChanged/);
+ assert.match(source,/const ownDrawnIds=snapshot\.deckCount<previous\.deckCount/);
+ assert.match(source,/previous\.ownIds\.indexOf\(top\.id\)/);
+ assert.match(source,/ownDrawnIds\.slice\(0,4\)\.forEach/);
+ assert.match(source,/a\.mesh\.rotation\.x=-Math\.PI\/2\+arc/);
+ assert.match(source,/a\.mesh\.rotation\.y=arc/);
+ assert.doesNotMatch(source,/ownDrawnIds[^\n]*dispatch\(/);
+});
+
+test('Cactus physical quick throw commits only through the existing engine interaction',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ const html=await readFile(path.join(root,'jeux.html'),'utf8');
+ assert.match(source,/kind==='cactus-quick'/);
+ assert.match(source,/cardGestureTarget\('cactus'\)/);
+ assert.match(source,/current\?\.interactions\?\.cactus\?\.\('quick',d\.index\)/);
+ assert.match(html,/function cardGestureActorAllowed\(gameId,actor,state\)/);
+ assert.match(html,/gameId==='cactus'/);
+ assert.doesNotMatch(source,/cactus-quick[^\n]*onlineAct\(/);
+});
+
 test('Eight 3D staging keeps opponent motion presentation-only',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/cardFx=new THREE\.Group\(\)/);
