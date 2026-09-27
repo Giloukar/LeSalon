@@ -257,7 +257,7 @@ test('free 3D tabletop manipulation stays presentation-only until an explicit va
  assert.match(source,/if\(!current\?\.canInteract&&!obj\.userData\.looseManip\)return/);
  assert.match(source,/if\(drag\.loose\)\{moveLooseCardDrag\(e\);return\}/);
  assert.match(source,/makeLooseManipulable\(mesh,\{kind:'rummi-tile'/);
- assert.match(source,/if\(mine\)makeLooseManipulable\(mesh,\{kind:mesh\.userData\.kind/);
+ assert.match(source,/if\(mine\)\{makeLooseManipulable\(mesh,\{kind:mesh\.userData\.kind/);
  assert.match(source,/interactiveCard:true,playable:playable\.has\(card\.id\)/);
  assert.doesNotMatch(source,/returnManipulatedCard[^\n]*dispatch\(/);
  assert.doesNotMatch(source,/moveLooseCardDrag[^\n]*onlineAct\(/);
