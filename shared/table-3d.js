@@ -110,6 +110,11 @@ export function createTable3DRenderer({onFatal}={}){
     if(interactiveCard)interactive.push(mesh);
     return mesh;
   }
+  function makeLooseManipulable(mesh,{kind=mesh.userData.kind,tapEnabled=false,...data}={}){
+    mesh.userData={...mesh.userData,...data,kind,interactive:true,looseManip:true,tapEnabled:!!tapEnabled};
+    if(!interactive.includes(mesh))interactive.push(mesh);
+    return mesh;
+  }
   function makeLabel(text,accent='#dbea9e'){
     const tex=canvasTexture((g,w,h)=>{
       g.clearRect(0,0,w,h);g.fillStyle='rgba(8,14,11,.84)';roundRect(g,8,8,w-16,h-16,42);g.fill();
@@ -525,11 +530,11 @@ export function createTable3DRenderer({onFatal}={}){
 
     if(game==='pouilleux'){
       const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length;
-      own.forEach((card,i)=>{const slot=handCardSlot(n,i),mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,slot.x,slot.z,TABLE_Y+.11+slot.yOffset,slot.fan,slot.scale)});
+      own.forEach((card,i)=>{const slot=handCardSlot(n,i),mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,slot.x,slot.z,TABLE_Y+.11+slot.yOffset,slot.fan,slot.scale);makeLooseManipulable(mesh,{kind:'loose-card'})});
       const maid=data.maid||{},count=Number(maid.targetCount)||0,visible=Math.min(24,count);
       for(let i=0;i<visible;i++){
         const slot=pickCardSlot(visible,i),mesh=cardMesh(null,{back:true});placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.rot,slot.scale);
-        if(payload.canInteract){mesh.userData={kind:'maid-pick',index:i,interactive:true};mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};interactive.push(mesh)}
+        if(payload.canInteract){mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'maid-pick',tapEnabled:true,index:i})}
       }
       if(title)title.textContent='VUE 3D · POUILLEUX';
       if(status)status.textContent='Piochez chez '+(maid.targetName||'le joueur suivant')+' · '+count+' carte'+(count>1?'s':'');
@@ -542,7 +547,7 @@ export function createTable3DRenderer({onFatal}={}){
       own.forEach((card,i)=>{
         const slot=handCardSlot(n,i),chosen=selected.has(card.id),isLegal=legal.has(card.id),mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:selectable.has(card.id),playable:selectable.has(card.id)});
         mesh.userData.kind='special-select';mesh.userData.cardId=card.id;mesh.userData.home={position:new THREE.Vector3(slot.x,TABLE_Y+.12+slot.yOffset+(chosen?.25:isLegal?.08:0),slot.z),rotation:new THREE.Euler(-Math.PI/2,0,slot.fan),scale:new THREE.Vector3(1,1,1).multiplyScalar(slot.scale*(chosen?1.07:isLegal?1.025:.98))};
-        mesh.position.copy(mesh.userData.home.position);mesh.rotation.copy(mesh.userData.home.rotation);mesh.scale.copy(mesh.userData.home.scale);objects.add(mesh);
+        mesh.position.copy(mesh.userData.home.position);mesh.rotation.copy(mesh.userData.home.rotation);mesh.scale.copy(mesh.userData.home.scale);makeLooseManipulable(mesh,{kind:'special-select',tapEnabled:selectable.has(card.id),cardId:card.id});objects.add(mesh);
       });
       if(ninety.last){const top=cardMesh(ninety.last,{back:!!ninety.last.hidden});placeCard(top,1.5,.05,TABLE_Y+.13,0,.9)}
       const counter=makeLabel('TOTAL '+Number(ninety.total||0)+' / 99',Number(ninety.total)>=85?'#f0b3a6':'#dbea9e');counter.scale.set(3.1,.72,1);counter.position.set(-.35,1.08,-.05);objects.add(counter);
@@ -567,7 +572,7 @@ export function createTable3DRenderer({onFatal}={}){
       const bj=data.blackjack||{},dealer=bj.dealer||[],own=bj.hand||[];
       dealer.forEach((card,i)=>{const mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,(i-(dealer.length-1)/2)*.82,-.9,TABLE_Y+.13+i*.012,(i-(dealer.length-1)/2)*.04,.78)});
       const dn=own.length;
-      own.forEach((card,i)=>{const slot=handCardSlot(dn,i),mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.fan,slot.scale*.92)});
+      own.forEach((card,i)=>{const slot=handCardSlot(dn,i),mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.fan,slot.scale*.92);makeLooseManipulable(mesh,{kind:'loose-card'})});
       const dealerLabel=makeLabel('BANQUE · '+(dealer.length?(bj.dealerRevealed?bj.dealerValue:bj.dealerValue+' + ?'):'—'),'#e6d7b4');dealerLabel.position.set(0,1.02,-2.1);dealerLabel.scale.set(3,.62,1);objects.add(dealerLabel);
       if(bj.phase==='bet'){
         const bet=makeLabel('FAITES VOS JEUX','#dbea9e');bet.position.set(0,1.05,-.05);bet.scale.set(3.6,.8,1);objects.add(bet);
@@ -614,7 +619,7 @@ export function createTable3DRenderer({onFatal}={}){
       const mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:canSelect,playable:canSelect});
       mesh.userData.kind='card-select';mesh.userData.cardId=card.id;mesh.userData.playable=canSelect;mesh.userData.legal=legal;
       mesh.position.set(slot.x,TABLE_Y+.12+slot.yOffset+(chosen?.26:legal?.09:0),slot.z);mesh.rotation.set(-Math.PI/2,0,slot.fan);mesh.scale.setScalar(slot.scale*(chosen?1.075:legal?1.025:.98));
-      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};objects.add(mesh);
+      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'card-select',tapEnabled:canSelect,cardId:card.id});objects.add(mesh);
     });
     const opponents=s.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer),opponentVisuals=new Map();
     opponents.forEach(({p,i},k)=>{
@@ -695,10 +700,10 @@ export function createTable3DRenderer({onFatal}={}){
 
     const n=own.length;
     own.forEach((card,i)=>{
-      const slot=handCardSlot(n,i),mesh=cardMesh(card,{id:card.id,interactiveCard:playable.has(card.id),playable:playable.has(card.id)});
+      const slot=handCardSlot(n,i),mesh=cardMesh(card,{id:card.id,interactiveCard:true,playable:playable.has(card.id)});
       const lift=playable.has(card.id)?.14:0,scale=slot.scale*(playable.has(card.id)?1.025:1);
       placeCard(mesh,slot.x,slot.z,TABLE_Y+.12+slot.yOffset+lift,slot.fan,scale);
-      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};
+      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};mesh.userData.looseManip=true;
     });
 
     const deckCount=Array.isArray(s.deck)?s.deck.length:Number(s.deckCount||0);
@@ -767,7 +772,7 @@ export function createTable3DRenderer({onFatal}={}){
       group.forEach((tile,ti)=>{
         const slot=rummiGroupSlot(layout,order,group.length,ti),movable=data.canMove&&(data.canMoveOld||!oldIds.has(tile.id)),mesh=rummiTileMesh(tile,selected.has(tile.id),movable);
         mesh.position.set(slot.x,TABLE_Y+.37,slot.z);mesh.rotation.x=-Math.PI/2;mesh.scale.setScalar(slot.scale);
-        mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};objects.add(mesh);
+        mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};if(movable)makeLooseManipulable(mesh,{kind:'rummi-tile',tapEnabled:true,tileId:tile.id});objects.add(mesh);
       });
       if(data.canMove&&selected.size){
         const slot=rummiGroupSlot(layout,order,Math.max(1,group.length),Math.floor(Math.max(0,group.length-1)/2)),target=actionSprite('AJOUTER','rummi-dest',{dest:gi},'#dbea9e');
@@ -783,7 +788,7 @@ export function createTable3DRenderer({onFatal}={}){
     hand.forEach((tile,i)=>{
       const slot=rummiRackSlot(hand.length,i),mesh=rummiTileMesh(tile,selected.has(tile.id),!!data.canMove);
       mesh.position.set(slot.x,TABLE_Y+.42+slot.yOffset,slot.z);mesh.rotation.x=-Math.PI/2;mesh.scale.setScalar(slot.scale);
-      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};objects.add(mesh);
+      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'rummi-tile',tapEnabled:!!data.canMove,tileId:tile.id});objects.add(mesh);
     });
 
     if(data.canMove&&selected.size){
@@ -814,6 +819,7 @@ export function createTable3DRenderer({onFatal}={}){
         mesh.userData.index=index;mesh.userData.owner=i;mesh.userData.interactive=interactiveCard;
         placeCard(mesh,x,z,TABLE_Y+.11,(col-.5)*.035,mine?0.76:0.62);
         mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};
+        if(mine)makeLooseManipulable(mesh,{kind:mesh.userData.kind,tapEnabled:interactiveCard,index,owner:i});
       });
       const label=makeLabel((p.name||'Joueur')+' · '+p.score+' pts'+(data.caller===i?' · CACTUS !':''),i===data.turn?'#dbea9e':'#d8ded9');
       label.position.set(cx,1.08,cz+(mine?.95:-.88));label.scale.set(mine?3.4:2.65,mine?.72:.58,1);objects.add(label);
@@ -1128,7 +1134,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function beginLooseCardDrag(obj,e,kind){
     const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()};
-    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind,mesh:obj,cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,moved:false,home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
+    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind,loose:true,mesh:obj,cardId:obj.userData.cardId,tileId:obj.userData.tileId,index:obj.userData.index,owner:obj.userData.owner,tapEnabled:!!obj.userData.tapEnabled,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,moved:false,home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
     host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
   }
   function moveLooseCardDrag(e){
@@ -1146,47 +1152,44 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function cardDropRadius(d){return d?.pointerType==='touch'||matchMedia('(pointer: coarse)').matches?1.9:1.5}
   function onPointerDown(e){
-    if(!active||!current?.canInteract)return;
+    if(!active)return;
     const obj=hit(e);setHover(obj);if(!obj)return;
+    if(!current?.canInteract&&!obj.userData.looseManip)return;
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'deck',startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
-    if(obj.userData.kind==='card-select'){beginLooseCardDrag(obj,e,'card-select');return}
-    if(obj.userData.kind==='special-select'){beginLooseCardDrag(obj,e,'special-select');return}
+    if(obj.userData.looseManip&&obj.userData.kind!=='card'){beginLooseCardDrag(obj,e,obj.userData.kind);return}
     if(['maid-pick','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','cactus-action','ninety-action','blackjack-action','card-action','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,command:obj.userData.command,amount:obj.userData.amount,ace:obj.userData.ace,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
     if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue','intrus-spot','intrus-continue','code-cycle','code-submit','code-continue','golf-adjust','golf-shoot','golf-continue'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
       drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,control:obj.userData.control,delta:obj.userData.delta,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return;
     }
-    if(obj.userData.kind!=='card'||!obj.userData.playable)return;
-    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card',mesh:obj,cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY,moved:false,overDrop:false,gestureHome:obj.userData.home?.position?.clone?.()||obj.position.clone()};
-    emitLocalCardGesture('start',0,0);host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
+    if(obj.userData.kind!=='card')return;
+    const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()},canPlay=!!obj.userData.playable;
+    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card',mesh:obj,cardId:obj.userData.cardId,canPlay,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,moved:false,overDrop:false,gestureHome:home.position.clone(),home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
+    if(canPlay)emitLocalCardGesture('start',0,0);host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
   }
   function onPointerMove(e){
     if(!active)return;
     if(!drag){setHover(hit(e));return}
     if(e.pointerId!==drag.pointerId)return;
-    if(drag.kind==='card-select'||drag.kind==='special-select'){moveLooseCardDrag(e);return}
+    if(drag.loose){moveLooseCardDrag(e);return}
     if(drag.kind!=='card')return;
-    const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;if(!drag.moved&&Math.hypot(dx,dy)>6)drag.moved=true;
+    const now=performance.now(),dt=Math.max(8,now-(drag.lastAt||now)),dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;if(!drag.moved&&Math.hypot(dx,dy)>6)drag.moved=true;
     if(!drag.moved)return;
-    updatePointer(e);const p=new THREE.Vector3();if(raycaster.ray.intersectPlane(dragPlane,p)){drag.mesh.position.set(p.x,1.02,p.z);drag.mesh.rotation.set(-Math.PI/2,0,(dx*.0025));}
-    const near=Math.hypot(drag.mesh.position.x-1.25,drag.mesh.position.z-.05)<cardDropRadius(drag);drag.overDrop=near;dropMarker.material.opacity=near ? .82 : .2;
-    const gesture=eightGestureCoordinates(drag.mesh,drag.gestureHome);emitLocalCardGesture('move',gesture.progress,gesture.lateral);draw();e.preventDefault();
+    drag.velocityX=(e.clientX-drag.lastX)/dt*16.67;drag.velocityY=(e.clientY-drag.lastY)/dt*16.67;drag.lastX=e.clientX;drag.lastY=e.clientY;drag.lastAt=now;
+    updatePointer(e);const p=new THREE.Vector3();if(raycaster.ray.intersectPlane(dragPlane,p)){drag.mesh.position.set(p.x,1.02,p.z);drag.mesh.rotation.set(-Math.PI/2,clampMotion(-drag.velocityY*.010,-.16,.16),(dx*.0025));}
+    const near=drag.canPlay&&Math.hypot(drag.mesh.position.x-1.25,drag.mesh.position.z-.05)<cardDropRadius(drag);drag.overDrop=near;dropMarker.material.opacity=near ? .82 : .2;
+    if(drag.canPlay){const gesture=eightGestureCoordinates(drag.mesh,drag.gestureHome);emitLocalCardGesture('move',gesture.progress,gesture.lateral)}draw();e.preventDefault();
   }
   function finishDrag(e,cancelled=false){
     if(!drag||e.pointerId!==drag.pointerId)return;
     const d=drag;drag=null;host?.classList.remove('is-dragging');dropMarker.material.opacity=.2;
-    if(cancelled){if(d.kind==='card')emitLocalCardGesture('cancel',0,0);syncCurrent(current);draw();return}
+    if(cancelled){if(d.kind==='card'&&d.canPlay)emitLocalCardGesture('cancel',0,0);if(d.loose)returnManipulatedCard(d,{snap:document.hidden});else{syncCurrent(current);draw()}return}
     const tap=Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
-    if(d.kind==='card-select'){
-      if(tap)current?.interactions?.cardSelect?.(d.cardId);
-      else returnManipulatedCard(d);
-      return;
-    }
-    if(d.kind==='special-select'){
-      if(tap)current?.interactions?.specialCard?.('select',d.cardId);
-      else returnManipulatedCard(d);
-      return;
-    }
+    if(d.loose&&!tap){returnManipulatedCard(d);return}
+    if(d.loose&&(!d.tapEnabled||!current?.canInteract)){returnManipulatedCard(d,{snap:true});return}
+    if(d.kind==='loose-card'){returnManipulatedCard(d,{snap:true});return}
+    if(d.kind==='card-select'){current?.interactions?.cardSelect?.(d.cardId);return}
+    if(d.kind==='special-select'){current?.interactions?.specialCard?.('select',d.cardId);return}
     if(d.kind==='maid-pick'){if(tap)current?.interactions?.specialCard?.('pick',d.index);return}
     if(d.kind==='special-select'){if(tap)current?.interactions?.specialCard?.('select',d.cardId);return}
     if(d.kind==='battle-action'){if(tap)current?.interactions?.specialCard?.('battle');return}
@@ -1228,15 +1231,14 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='box-roll'||d.kind==='box-toggle'||d.kind==='box-close'){
       if(tap)current?.interactions?.box?.(d.kind==='box-roll'?'roll':d.kind==='box-toggle'?'toggle':'close',d.kind==='box-roll'?d.count:d.number);return;
     }
-    const near=d.moved&&(d.overDrop||Math.hypot(d.mesh.position.x-1.25,d.mesh.position.z-.05)<cardDropRadius(d));
-    if(!d.moved||near){emitLocalCardGesture('commit',1,0);current?.interactions?.playCard?.(d.cardId);return}
-    emitLocalCardGesture('cancel',0,0);syncEight(current);draw();
+    const near=d.canPlay&&d.moved&&(d.overDrop||Math.hypot(d.mesh.position.x-1.25,d.mesh.position.z-.05)<cardDropRadius(d));
+    if(d.canPlay&&(!d.moved||near)){emitLocalCardGesture('commit',1,0);current?.interactions?.playCard?.(d.cardId);return}
+    if(d.canPlay)emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d);
   }
   function cancelActiveDrag(pointerId=null){
     if(!drag||(pointerId!==null&&drag.pointerId!==pointerId))return;
-    const d=drag,wasCard=d.kind==='card',wasLoose=d.kind==='card-select'||d.kind==='special-select';if(wasCard)emitLocalCardGesture('cancel',0,0);drag=null;host?.classList.remove('is-dragging');if(dropMarker)dropMarker.material.opacity=.2;
-    if(wasLoose){returnManipulatedCard(d,{snap:document.hidden});return}
-    if(wasCard&&current){syncEight(current);draw()}
+    const d=drag,wasCard=d.kind==='card',wasLoose=!!d.loose;if(wasCard&&d.canPlay)emitLocalCardGesture('cancel',0,0);drag=null;host?.classList.remove('is-dragging');if(dropMarker)dropMarker.material.opacity=.2;
+    if(wasLoose||wasCard){returnManipulatedCard(d,{snap:document.hidden});return}
   }
   function onPointerUp(e){finishDrag(e,false)}
   function onPointerCancel(e){cancelActiveDrag(e.pointerId)}
