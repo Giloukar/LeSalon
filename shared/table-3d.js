@@ -5,6 +5,7 @@ const SUIT_NAME={S:'pique',H:'cœur',D:'carreau',C:'trèfle',X:'joker'};
 const RANK_NAME={1:'A',11:'V',12:'D',13:'R'};
 const CARD_W=1.22,CARD_H=1.78,CARD_D=.045;
 const TABLE_Y=.28;
+const LIVE_CARD_GAMES=new Set(['huit','president','menteur','suites','plis','encheres','quatrevingtdixneuf']);
 const visualHash=str=>{
   let h=2166136261;
   for(const ch of String(str)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}
@@ -227,32 +228,47 @@ export function createTable3DRenderer({onFatal}={}){
     const scale=rows===1?.76:rows===2?.70:.64,spacing=CARD_W*scale+.12,t=rowCount<=1?.5:local/(rowCount-1);
     return{x:(local-(rowCount-1)/2)*spacing,z:-.82+row*.82,rot:(t-.5)*.10,scale,yOffset:row*.01+local*.002};
   }
+  function cardGestureTarget(game,y=1.02){
+    const target={
+      huit:[1.25,.05],
+      president:[0,.05],
+      menteur:[0,.08],
+      suites:[0,0],
+      plis:[0,0],
+      encheres:[0,.75],
+      quatrevingtdixneuf:[1.5,.05]
+    }[game]||[0,.05];
+    return new THREE.Vector3(target[0],y,target[1]);
+  }
   function emitLocalCardGesture(phase,progress=0,lateral=0){
-    if(current?.gameId!=='huit')return;
-    const detail={phase,progress:Math.max(0,Math.min(1,Number(progress)||0)),lateral:Math.max(-1,Math.min(1,Number(lateral)||0))};
+    const gameId=current?.gameId;if(!LIVE_CARD_GAMES.has(gameId))return;
+    const detail={gameId,phase,progress:Math.max(0,Math.min(1,Number(progress)||0)),lateral:Math.max(-1,Math.min(1,Number(lateral)||0))};
     window.dispatchEvent(new CustomEvent('salon:local-card-gesture',{detail}));
   }
-  function eightGestureCoordinates(mesh,home){
-    const target=new THREE.Vector3(1.25,1.02,.05),origin=home||mesh?.userData?.home?.position;if(!origin||!mesh)return{progress:0,lateral:0};
+  function cardGestureCoordinates(mesh,home,game=current?.gameId){
+    const target=cardGestureTarget(game),origin=home||mesh?.userData?.home?.position;if(!origin||!mesh)return{progress:0,lateral:0};
     const vx=target.x-origin.x,vz=target.z-origin.z,wx=mesh.position.x-origin.x,wz=mesh.position.z-origin.z,den=Math.max(.0001,vx*vx+vz*vz),len=Math.sqrt(den);
     const progress=Math.max(0,Math.min(1,(wx*vx+wz*vz)/den)),lateral=Math.max(-1,Math.min(1,(wx*vz-wz*vx)/(len*1.7)));
     return{progress,lateral};
   }
-  function currentEightOpponentSeat(actor){
-    const state=current?.state,viewer=Number.isInteger(current?.privateIndex)?current.privateIndex:0;
+  function eightGestureCoordinates(mesh,home){return cardGestureCoordinates(mesh,home,'huit')}
+  function currentCardOpponentSeat(actor){
+    const state=current?.state,viewer=Number.isInteger(current?.privateIndex)?current.privateIndex:0,game=current?.gameId;
     if(!state?.players?.length||!Number.isInteger(actor)||actor===viewer)return null;
-    const opponents=state.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer),index=opponents.findIndex(x=>x.i===actor);
+    const opponents=state.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer&&!(game==='quatrevingtdixneuf'&&x.p?.out)),index=opponents.findIndex(x=>x.i===actor);
     if(index<0)return null;return eightOpponentSeat(opponents.length,index);
   }
+  function currentEightOpponentSeat(actor){return currentCardOpponentSeat(actor)}
   function onRemoteCardGesture(event){
-    if(!active||!motionAllowed()||current?.gameId!=='huit')return;
-    const d=event?.detail||{},actor=Number(d.actor),seat=currentEightOpponentSeat(actor);if(!seat)return;
+    const game=current?.gameId,d=event?.detail||{};
+    if(!active||!motionAllowed()||!LIVE_CARD_GAMES.has(game)||(d.gameId&&d.gameId!==game))return;
+    const actor=Number(d.actor),seat=currentCardOpponentSeat(actor);if(!seat)return;
     const phase=['start','move','cancel','commit'].includes(d.phase)?d.phase:null;if(!phase)return;
     let gesture=remoteCardGestures.get(actor);
     if(!gesture||phase==='start'){
       if(gesture?.mesh)cardFx.remove(gesture.mesh);
       const mesh=cardMesh(null,{back:true});mesh.scale.setScalar(.74);mesh.rotation.set(-Math.PI/2,0,0);cardFx.add(mesh);
-      gesture={mesh,actor,from:new THREE.Vector3(seat.x,TABLE_Y+.28,seat.z+.10),to:new THREE.Vector3(1.25,TABLE_Y+.26,.05),progress:0,target:0,lateral:0,targetLateral:0,lastAt:performance.now(),returning:false,committed:false};
+      gesture={mesh,actor,game,from:new THREE.Vector3(seat.x,TABLE_Y+.28,seat.z+.10),to:cardGestureTarget(game,TABLE_Y+.26),progress:0,target:0,lateral:0,targetLateral:0,lastAt:performance.now(),returning:false,committed:false};
       mesh.position.copy(gesture.from);remoteCardGestures.set(actor,gesture);
     }
     gesture.target=Math.max(0,Math.min(1,Number(d.progress)||0));gesture.targetLateral=Math.max(-1,Math.min(1,Number(d.lateral)||0));gesture.lastAt=performance.now();
@@ -1175,8 +1191,8 @@ export function createTable3DRenderer({onFatal}={}){
     startMotion();
   }
   function beginLooseCardDrag(obj,e,kind){
-    const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()};
-    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind,loose:true,mesh:obj,cardId:obj.userData.cardId,tileId:obj.userData.tileId,index:obj.userData.index,owner:obj.userData.owner,tapEnabled:!!obj.userData.tapEnabled,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,moved:false,home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
+    const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()},gestureEnabled=!!(current?.canInteract&&LIVE_CARD_GAMES.has(current?.gameId)&&['card-select','special-select'].includes(kind));
+    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind,loose:true,mesh:obj,cardId:obj.userData.cardId,tileId:obj.userData.tileId,index:obj.userData.index,owner:obj.userData.owner,tapEnabled:!!obj.userData.tapEnabled,gestureEnabled,gestureStarted:false,gestureHome:home.position.clone(),startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,moved:false,home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
     host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
   }
   function moveLooseCardDrag(e){
@@ -1189,6 +1205,10 @@ export function createTable3DRenderer({onFatal}={}){
       d.mesh.position.set(p.x,1.05,p.z);
       d.mesh.rotation.set(-Math.PI/2,clampMotion(-d.velocityY*.012,-.20,.20),clampMotion(dx*.0028,-.24,.24));
       d.mesh.scale.copy(d.home.scale).multiplyScalar(1.045);
+    }
+    if(d.gestureEnabled){
+      if(!d.gestureStarted){d.gestureStarted=true;emitLocalCardGesture('start',0,0)}
+      const gesture=cardGestureCoordinates(d.mesh,d.gestureHome);emitLocalCardGesture('move',gesture.progress,gesture.lateral);
     }
     draw();e.preventDefault();return true;
   }
@@ -1225,9 +1245,9 @@ export function createTable3DRenderer({onFatal}={}){
   function finishDrag(e,cancelled=false){
     if(!drag||e.pointerId!==drag.pointerId)return;
     const d=drag;drag=null;host?.classList.remove('is-dragging');dropMarker.material.opacity=.2;
-    if(cancelled){if(d.kind==='card'&&d.canPlay)emitLocalCardGesture('cancel',0,0);if(d.loose)returnManipulatedCard(d,{snap:document.hidden});else{syncCurrent(current);draw()}return}
+    if(cancelled){if(d.kind==='card'&&d.canPlay||d.loose&&d.gestureStarted)emitLocalCardGesture('cancel',0,0);if(d.loose)returnManipulatedCard(d,{snap:document.hidden});else{syncCurrent(current);draw()}return}
     const tap=Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
-    if(d.loose&&!tap){returnManipulatedCard(d);return}
+    if(d.loose&&!tap){if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d);return}
     if(d.loose&&(!d.tapEnabled||!current?.canInteract)){returnManipulatedCard(d,{snap:true});return}
     if(d.kind==='loose-card'){returnManipulatedCard(d,{snap:true});return}
     if(d.kind==='card-select'){current?.interactions?.cardSelect?.(d.cardId);return}
@@ -1279,7 +1299,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function cancelActiveDrag(pointerId=null){
     if(!drag||(pointerId!==null&&drag.pointerId!==pointerId))return;
-    const d=drag,wasCard=d.kind==='card',wasLoose=!!d.loose;if(wasCard&&d.canPlay)emitLocalCardGesture('cancel',0,0);drag=null;host?.classList.remove('is-dragging');if(dropMarker)dropMarker.material.opacity=.2;
+    const d=drag,wasCard=d.kind==='card',wasLoose=!!d.loose;if(wasCard&&d.canPlay||wasLoose&&d.gestureStarted)emitLocalCardGesture('cancel',0,0);drag=null;host?.classList.remove('is-dragging');if(dropMarker)dropMarker.material.opacity=.2;
     if(wasLoose||wasCard){returnManipulatedCard(d,{snap:document.hidden});return}
   }
   function onPointerUp(e){finishDrag(e,false)}
