@@ -80,7 +80,7 @@ export function createTable3DRenderer({onFatal}={}){
   let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='';
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
-  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,remoteCardGestures=new Map();
+  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
 
   function applyCameraFit(){
     if(!camera||!cameraPose)return;
@@ -241,6 +241,61 @@ export function createTable3DRenderer({onFatal}={}){
     else if(phase==='commit'){gesture.target=1;gesture.targetLateral=0;gesture.committed=true;gesture.returning=false}
     else{gesture.returning=false;gesture.committed=false}
     startMotion();
+  }
+  function cardFamilySnapshot(payload,center){
+    const state=payload?.state,game=payload?.viewData?.cardGame||payload?.gameId,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0,players=state?.players||[];
+    const base={game,key:[game,state?.startedAt||'',players.map(p=>p?.name||'').join('|')].join('~'),viewer,handCounts:players.map(p=>p?.hand?.length||0)};
+    if(game==='president')base.centerIds=(center.cards||[]).map(c=>c?.id).filter(Boolean);
+    else if(game==='menteur'){base.backCount=Number(center.backCount)||0;base.centerIds=(center.cards||[]).map(c=>c?.id).filter(Boolean)}
+    else if(game==='suites')base.centerIds=Object.values(center.lanes||{}).flat().map(c=>c?.id).filter(Boolean);
+    else if(game==='plis')base.centerIds=(center.entries||[]).map(e=>e?.card?.id).filter(Boolean);
+    else if(game==='encheres')base.bidIds=(center.bids||[]).map(c=>c?.id||null);
+    return base;
+  }
+  function cardFamilyOrigin(actor,viewer,opponentVisuals){
+    if(actor===viewer)return new THREE.Vector3(0,TABLE_Y+.30,2.45);
+    const seat=opponentVisuals.get(actor);return seat?new THREE.Vector3(seat.x,TABLE_Y+.30,seat.z+.08):new THREE.Vector3(0,TABLE_Y+.30,-2.25);
+  }
+  function animateCardFamilyConfirmed(game,payload,center,previous,currentSnapshot,opponentVisuals,centerVisuals){
+    if(!previous||previous.key!==currentSnapshot.key||!motionAllowed())return;
+    const actors=currentSnapshot.handCounts.map((count,i)=>({i,delta:(previous.handCounts?.[i]??count)-count})).filter(x=>x.delta>0);
+    if(!actors.length)return;
+    const actor=actors[0].i,amount=Math.min(4,actors[0].delta),from=cardFamilyOrigin(actor,currentSnapshot.viewer,opponentVisuals);
+    const oldIds=new Set(previous.centerIds||[]),newIds=(currentSnapshot.centerIds||[]).filter(id=>!oldIds.has(id));
+    const queue=(card,target,index,back=false,finalMesh=null)=>{
+      if(!target)return;const mesh=cardMesh(back?null:card,{back});if(finalMesh)finalMesh.visible=false;
+      queueCardFlight(mesh,from.clone().add(new THREE.Vector3((index-(amount-1)/2)*.10,0,0)),target.clone(),{duration:640+index*45,delay:index*85,lift:.86,fromRot:.03*(index-(amount-1)/2),toRot:0,onDone:()=>{if(finalMesh)finalMesh.visible=true}});
+    };
+    if(game==='menteur'){
+      const diff=Math.max(0,(currentSnapshot.backCount||0)-(previous.backCount||0));
+      for(let i=0;i<Math.min(amount,diff);i++)queue(null,new THREE.Vector3((i-(diff-1)/2)*.05,TABLE_Y+.24,.08-i*.018),i,true,null);
+      return;
+    }
+    if(game==='encheres'){
+      const bids=center.bids||[],prev=previous.bidIds||[];
+      bids.forEach((card,i)=>{if(!card||prev[i]===card.id)return;const visual=centerVisuals.get('bid-'+i);queue(card,visual?.position||new THREE.Vector3((i-(bids.length-1)/2)*1.18,TABLE_Y+.23,.75),0,!!card.hidden,visual?.mesh||null)});
+      return;
+    }
+    newIds.slice(0,amount).forEach((id,i)=>{
+      const visual=centerVisuals.get(id);if(!visual)return;
+      queue(visual.card,visual.position,i,!!visual.card?.hidden,visual.mesh);
+    });
+  }
+  function rummiBoardLayout(groups){
+    const active=(groups||[]).map((group,index)=>({group,index})).filter(x=>x.group?.length),count=Math.max(1,active.length),maxLen=Math.max(1,...active.map(x=>x.group.length));
+    let cols=count<=2?count:maxLen>=10?2:count>=7?3:Math.min(3,Math.ceil(Math.sqrt(count*1.25)));
+    cols=Math.max(1,cols);const rows=Math.max(1,Math.ceil(count/cols)),width=9.35,depth=3.55,cellW=width/cols,cellD=depth/rows;
+    return{active,cols,rows,cellW,cellD,baseZ:-2.05,width,depth};
+  }
+  function rummiGroupSlot(layout,order,length,tileIndex){
+    const col=order%layout.cols,row=Math.floor(order/layout.cols),baseX=(col-(layout.cols-1)/2)*layout.cellW,baseZ=layout.baseZ+row*layout.cellD;
+    const natural=.66,scale=Math.max(.48,Math.min(.96,(layout.cellW-.28)/(Math.max(1,length)*natural))),spacing=natural*scale;
+    return{x:baseX+(tileIndex-(length-1)/2)*spacing,z:baseZ,scale,row,col};
+  }
+  function rummiRackSlot(count,index){
+    const total=Math.max(1,count),rows=total<=10?1:total<=20?2:3,perRow=Math.ceil(total/rows),row=Math.floor(index/perRow),start=row*perRow,rowCount=Math.min(perRow,total-start),local=index-start;
+    const scale=rows===1?.92:rows===2?.82:.72,spacing=.68*scale,t=rowCount<=1?.5:local/(rowCount-1);
+    return{x:(local-(rowCount-1)/2)*spacing,z:2.05+row*.78+Math.abs(t-.5)*.04,scale,row,yOffset:row*.012+local*.001};
   }
   function eightSnapshot(payload,deckCount,top){
     const s=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0;
@@ -528,40 +583,43 @@ export function createTable3DRenderer({onFatal}={}){
       mesh.position.set(slot.x,TABLE_Y+.12+slot.yOffset+(chosen?.26:legal?.09:0),slot.z);mesh.rotation.set(-Math.PI/2,0,slot.fan);mesh.scale.setScalar(slot.scale*(chosen?1.075:legal?1.025:.98));
       mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};objects.add(mesh);
     });
-    const opponents=s.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer);
+    const opponents=s.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer),opponentVisuals=new Map();
     opponents.forEach(({p,i},k)=>{
       const count=p.hand?.length||0,total=Math.min(8,count),seat=eightOpponentSeat(opponents.length,k),span=total<=1?0:Math.min(2.8,(total-1)*.40);
       for(let c=0;c<total;c++){const t=total<=1?.5:c/(total-1),mesh=cardMesh(null,{back:true});placeCard(mesh,seat.x+(t-.5)*span,seat.z+Math.abs(t-.5)*.09,TABLE_Y+.15+c*.006,(t-.5)*-.16,.70)}
       const label=makeLabel((p.name||'Joueur')+' · '+count+' carte'+(count>1?'s':''),i===s.turn?'#dbea9e':'#eef2e8');label.position.set(seat.x,1.12,seat.z-.70);label.scale.set(3.0,.62,1);objects.add(label);
+      opponentVisuals.set(i,{...seat,count});
     });
-    const center=data.cardCenter||{};
+    const center=data.cardCenter||{},centerVisuals=new Map();
     if(game==='president'){
-      (center.cards||[]).forEach((card,i)=>{const mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,(i-(center.cards.length-1)/2)*.72,.05,TABLE_Y+.13+i*.01,(i-(center.cards.length-1)/2)*.05,.82)});
+      (center.cards||[]).forEach((card,i)=>{const mesh=cardMesh(card,{back:!!card.hidden}),x=(i-(center.cards.length-1)/2)*.72,z=.05;placeCard(mesh,x,z,TABLE_Y+.13+i*.01,(i-(center.cards.length-1)/2)*.05,.82);if(card?.id)centerVisuals.set(card.id,{mesh,card,position:new THREE.Vector3(x,TABLE_Y+.23,z)})});
     }else if(game==='menteur'){
       const count=Math.min(7,Number(center.backCount)||0);
       for(let i=0;i<count;i++){const mesh=cardMesh(null,{back:true});placeCard(mesh,(i-count/2)*.045,.08-i*.018,TABLE_Y+.1+i*.025,(i-count/2)*.02,.82)}
-      (center.cards||[]).forEach((card,i)=>{const mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,(i-(center.cards.length-1)/2)*.72,-.65,TABLE_Y+.16+i*.01,(i-(center.cards.length-1)/2)*.04,.72)});
+      (center.cards||[]).forEach((card,i)=>{const x=(i-(center.cards.length-1)/2)*.72,z=-.65,mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,x,z,TABLE_Y+.16+i*.01,(i-(center.cards.length-1)/2)*.04,.72);if(card?.id)centerVisuals.set(card.id,{mesh,card,position:new THREE.Vector3(x,TABLE_Y+.25,z)})});
     }else if(game==='suites'){
       setCameraPose(0,8.9,7.2,0,.18,0);
       const suits=['S','H','D','C'];
       suits.forEach((suit,row)=>{
         const cards=center.lanes?.[suit]||[];
-        cards.forEach(card=>{const x=(Number(card.rank)-7)*.62,z=(row-1.5)*1.25,mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,x,z,TABLE_Y+.12,0,.48)});
+        cards.forEach(card=>{const x=(Number(card.rank)-7)*.62,z=(row-1.5)*1.25,mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,x,z,TABLE_Y+.12,0,.48);if(card?.id)centerVisuals.set(card.id,{mesh,card,position:new THREE.Vector3(x,TABLE_Y+.22,z)})});
         const label=makeLabel((SUIT_NAME[suit]||suit).toUpperCase(),['H','D'].includes(suit)?'#eab3ad':'#dbea9e');label.scale.set(1.6,.42,1);label.position.set(-4.65,.92,(row-1.5)*1.25);objects.add(label);
       });
     }else if(game==='plis'){
       (center.entries||[]).forEach((entry,i)=>{
         const a=(Math.PI*2*i/Math.max(1,center.entries.length))-Math.PI/2,x=Math.cos(a)*1.45,z=Math.sin(a)*1.1,mesh=cardMesh(entry.card,{back:!!entry.card?.hidden});
-        placeCard(mesh,x,z,TABLE_Y+.16,i*.06,.78);
+        placeCard(mesh,x,z,TABLE_Y+.16,i*.06,.78);if(entry.card?.id)centerVisuals.set(entry.card.id,{mesh,card:entry.card,position:new THREE.Vector3(x,TABLE_Y+.26,z)});
       });
     }else if(game==='encheres'){
       if(center.prize){const prize=cardMesh(center.prize,{back:!!center.prize.hidden});placeCard(prize,0,-.55,TABLE_Y+.15,0,.88)}
       const bids=center.bids||[];
       bids.forEach((card,i)=>{
-        if(!card)return;const x=(i-(bids.length-1)/2)*1.18,mesh=cardMesh(card,{back:!!card.hidden});
-        placeCard(mesh,x,.75,TABLE_Y+.13+i*.008,(i-(bids.length-1)/2)*.03,.64);
+        if(!card)return;const x=(i-(bids.length-1)/2)*1.18,z=.75,mesh=cardMesh(card,{back:!!card.hidden});
+        placeCard(mesh,x,z,TABLE_Y+.13+i*.008,(i-(bids.length-1)/2)*.03,.64);centerVisuals.set('bid-'+i,{mesh,card,position:new THREE.Vector3(x,TABLE_Y+.23,z)});
       });
     }
+    const currentSnapshot=cardFamilySnapshot(payload,center),previousSnapshot=lastCardFamilySnapshots.get(game);
+    animateCardFamilyConfirmed(game,payload,center,previousSnapshot,currentSnapshot,opponentVisuals,centerVisuals);lastCardFamilySnapshots.set(game,currentSnapshot);
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     const names={president:'PRÉSIDENT',menteur:'MENTEUR',suites:'QUATRE SUITES',plis:'CHASSE AUX PLIS',encheres:'ENCHÈRES'};
     if(title)title.textContent='VUE 3D · '+(names[game]||'CARTES');
@@ -648,33 +706,41 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function syncRummikub(payload){
     clearObjects();dropMarker.visible=false;
-    setCameraPose(0,8.15,10.2,0,.15,-.15);
     const data=payload.viewData?.rummi;if(!data)return;
-    const selected=new Set(data.selectedIds||[]),oldIds=new Set(data.refTableIds||[]);
-    const groups=data.table||[],cols=4;
-    groups.forEach((group,gi)=>{
-      if(!group?.length)return;
-      const col=gi%cols,row=Math.floor(gi/cols),baseX=(col-(cols-1)/2)*2.45,baseZ=-2.15+row*1.12;
+    const selected=new Set(data.selectedIds||[]),oldIds=new Set(data.refTableIds||[]),groups=data.table||[],layout=rummiBoardLayout(groups);
+    setCameraPose(0,8.65+Math.max(0,layout.rows-2)*.45,10.45+Math.max(0,layout.rows-2)*.35,0,.2,-.18);
+
+    layout.active.forEach(({group,index:gi},order)=>{
       group.forEach((tile,ti)=>{
-        const movable=data.canMove&&(data.canMoveOld||!oldIds.has(tile.id)),mesh=rummiTileMesh(tile,selected.has(tile.id),movable);
-        mesh.position.set(baseX+(ti-(group.length-1)/2)*.54,TABLE_Y+.37,baseZ);mesh.rotation.x=-Math.PI/2;mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};objects.add(mesh);
+        const slot=rummiGroupSlot(layout,order,group.length,ti),movable=data.canMove&&(data.canMoveOld||!oldIds.has(tile.id)),mesh=rummiTileMesh(tile,selected.has(tile.id),movable);
+        mesh.position.set(slot.x,TABLE_Y+.37,slot.z);mesh.rotation.x=-Math.PI/2;mesh.scale.setScalar(slot.scale);
+        mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};objects.add(mesh);
       });
       if(data.canMove&&selected.size){
-        const target=actionSprite('AJOUTER','rummi-dest',{dest:gi},'#dbea9e');target.position.set(baseX,TABLE_Y+.82,baseZ+.62);target.scale.set(1.5,.38,1);objects.add(target);
+        const slot=rummiGroupSlot(layout,order,Math.max(1,group.length),Math.floor(Math.max(0,group.length-1)/2)),target=actionSprite('AJOUTER','rummi-dest',{dest:gi},'#dbea9e');
+        target.position.set(slot.x,TABLE_Y+.84,slot.z+Math.min(.58,layout.cellD*.34));target.scale.set(Math.min(1.45,layout.cellW*.48),.36,1);objects.add(target);
       }
     });
-    const hand=data.hand||[],span=Math.min(8.2,Math.max(2,(hand.length-1)*.52));
-    hand.forEach((tile,i)=>{
-      const t=hand.length<=1?.5:i/(hand.length-1),x=(t-.5)*span,mesh=rummiTileMesh(tile,selected.has(tile.id),!!data.canMove);
-      mesh.position.set(x,TABLE_Y+.42,2.72+Math.abs(t-.5)*.15);mesh.rotation.x=-Math.PI/2;mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};objects.add(mesh);
-    });
-    if(data.canMove&&selected.size){
-      const fresh=actionSprite('NOUVEAU GROUPE','rummi-dest',{dest:'new'},'#dbea9e');fresh.position.set(-2.15,1.02,1.55);objects.add(fresh);
-      const toHand=actionSprite('AU CHEVALET','rummi-dest',{dest:'hand'},'#d8ded9');toHand.position.set(2.15,1.02,1.55);objects.add(toHand);
+
+    if(!layout.active.length){
+      const empty=makeLabel('TABLE COMMUNE · PREMIÈRE COMBINAISON','#dbea9e');empty.position.set(0,1.0,-.65);empty.scale.set(4.9,.8,1);objects.add(empty);
     }
+
+    const hand=data.hand||[];
+    hand.forEach((tile,i)=>{
+      const slot=rummiRackSlot(hand.length,i),mesh=rummiTileMesh(tile,selected.has(tile.id),!!data.canMove);
+      mesh.position.set(slot.x,TABLE_Y+.42+slot.yOffset,slot.z);mesh.rotation.x=-Math.PI/2;mesh.scale.setScalar(slot.scale);
+      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};objects.add(mesh);
+    });
+
+    if(data.canMove&&selected.size){
+      const actionZ=hand.length>10?1.05:1.48,fresh=actionSprite('NOUVEAU GROUPE','rummi-dest',{dest:'new'},'#dbea9e');fresh.position.set(-2.15,1.02,actionZ);objects.add(fresh);
+      const toHand=actionSprite('AU CHEVALET','rummi-dest',{dest:'hand'},'#d8ded9');toHand.position.set(2.15,1.02,actionZ);objects.add(toHand);
+    }
+
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     if(title)title.textContent='VUE 3D · RUMMIKUB';
-    if(status)status.textContent=data.diagnostic?.text||((data.deckCount||0)+' tuiles dans la pioche');
+    if(status)status.textContent=(data.diagnostic?.text||((data.deckCount||0)+' tuiles dans la pioche'))+' · '+layout.active.length+' groupe'+(layout.active.length>1?'s':'');
     if(help)help.textContent=data.canMove?'Sélectionnez des tuiles, puis choisissez un groupe ou le chevalet':'Le chevalet actif reste privé · table commune synchronisée';
   }
   function syncCactus(payload){

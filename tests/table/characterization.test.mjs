@@ -109,6 +109,11 @@ test('Three.js hardening adapts mobile quality, motion and reusable geometry',as
  assert.match(source,/function handCardSlot\(count,index\)/);
  assert.match(source,/function pickCardSlot\(count,index\)/);
  assert.equal((source.match(/handCardSlot\(/g)||[]).length>=6,true);
+ assert.match(source,/function rummiBoardLayout\(groups\)/);
+ assert.match(source,/function rummiGroupSlot\(layout,order,length,tileIndex\)/);
+ assert.match(source,/function rummiRackSlot\(count,index\)/);
+ assert.match(source,/function cardFamilySnapshot\(payload,center\)/);
+ assert.match(source,/function animateCardFamilyConfirmed\(/);
  assert.match(source,/salon:table-3d-window/);
  assert.match(source,/function applyCameraFit\(\)/);
  assert.match(source,/portraitBoost=aspect<\.82\?Math\.min\(1\.95,\.82\/aspect\):1/);
@@ -156,4 +161,15 @@ test('Eight 3D staging keeps opponent motion presentation-only',async()=>{
  assert.match(source,/cardFx\.remove\(a\.mesh\)/);
  assert.doesNotMatch(source,/cardAnimations[^\n]*dispatch\(/);
  assert.doesNotMatch(source,/queueCardFlight[^\n]*onlineAct\(/);
+});
+
+
+test('Rummikub dense 3D layout and shared card motion remain presentation-only',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/maxLen>=10\?2/);
+ assert.match(source,/total<=10\?1:total<=20\?2:3/);
+ assert.match(source,/lastCardFamilySnapshots=new Map\(\)/);
+ assert.match(source,/queueCardFlight\(/);
+ assert.doesNotMatch(source,/animateCardFamilyConfirmed[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/animateCardFamilyConfirmed[^\n]*onlineAct\(/);
 });
