@@ -293,3 +293,18 @@ Pour le 8 américain, le renderer conserve un instantané strictement visuel de 
 Le 8 américain transporte désormais un canal éphémère de présence pour les cartes. Un drag local en 2D ou en 3D émet uniquement un identifiant de geste, une progression normalisée vers la défausse et un décalage latéral ; aucun identifiant de carte, couleur, valeur ou autre information privée n’est envoyé. Ces messages ne modifient jamais la révision ni l’état autoritatif et sont ignorés lorsqu’ils ne correspondent plus au match ou à la révision courante.
 
 Dans la vue 3D distante, un dos de carte sort alors de la main de l’adversaire et suit le geste avec interpolation. Si le joueur abandonne son drag, la carte revient dans sa main. S’il confirme, elle termine sa trajectoire vers la défausse jusqu’à ce que l’état validé prenne le relais et affiche la vraie carte publique. Un timeout ramène automatiquement une carte si le flux de présence s’interrompt, par exemple lors d’une perte réseau.
+
+
+## Audit 3D après stabilisation du 8 américain
+
+La couverture 3D existe sur les 22 jeux, mais le niveau de mise en scène n'est pas encore homogène.
+
+| Famille | Jeux | État 3D actuel | Prochaine amélioration utile |
+| --- | --- | --- | --- |
+| Cartes à main | 8 américain, Président, Menteur, Quatre Suites, Chasse aux plis, Enchères, 99 | mains, adversaires et centre de table rendus en 3D | généraliser les animations de cartes confirmées et la présence réseau du 8 |
+| Cartes spécialisées | Pouilleux, Vingt-et-un, Bataille, Cactus | scènes dédiées et interactions principales disponibles | transitions de distribution/pioche, meilleure mise en scène des phases |
+| Tuiles | Rummikub | chevalet et groupes manipulables | layout de groupes plus adaptatif quand la table devient dense |
+| Dés / plateau | Jeu de l'oie, Yam, Ferme la boîte, Métropole | plateaux, dés et pions synchronisés, plusieurs animations déjà présentes | ajouter davantage d'animations de déplacement et réduire la dépendance aux commandes HTML |
+| Mini-jeux | Echo, Ballon, Anagrammes, Intrus, Code Secret, Mini Golf | scènes 3D interactives et état autoritatif respecté | identité visuelle plus riche et transitions de phase plus cinématiques |
+
+Le 8 américain reste actuellement la référence pour les interactions de cartes : drag tactile, présence distante, pioche et pose animées. Les layouts adaptatifs de main sont maintenant partagés avec les autres jeux de cartes afin d'éviter de reproduire les problèmes de chevauchement. La priorité suivante est Rummikub, puis la généralisation des mouvements de cartes et des transitions de phase aux jeux de cartes spécialisés.
