@@ -200,14 +200,16 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function syncGoose(payload){
     clearObjects();dropMarker.visible=false;
-    const s=payload.state,coords=payload.viewData?.boardCoords||[],geese=new Set(payload.viewData?.gooseCells||[]),choices=new Set(payload.viewData?.choiceTargets||[]),grains=new Set(s?.gooseGrains||[]);
+    const s=payload.state,coords=payload.viewData?.boardCoords||[],geese=new Set(payload.viewData?.gooseCells||[]),choices=new Set(payload.viewData?.choiceTargets||[]),choiceByTarget=new Map((payload.viewData?.gooseChoices||[]).map(x=>[x.target,x.steps])),grains=new Set(s?.gooseGrains||[]);
     const specials=payload.viewData?.specialCells||{};
     camera.position.set(0,8.7,8.25);camera.lookAt(0,.15,0);
 
     for(let n=1;n<=Math.min(63,coords.length);n++){
       const p=worldForCell(n,coords);let kind='normal';
       if(n===specials.goal)kind='goal';else if(n===specials.skull)kind='danger';else if(geese.has(n))kind='goose';else if(Object.values(specials).includes(n))kind='trap';
-      const tile=new THREE.Mesh(tileGeometry,tileMaterial(kind,choices.has(n)));tile.position.set(p.x,TABLE_Y+.08,p.z);tile.castShadow=true;tile.receiveShadow=true;objects.add(tile);
+      const tile=new THREE.Mesh(tileGeometry,tileMaterial(kind,choices.has(n)));tile.position.set(p.x,TABLE_Y+.08,p.z);tile.castShadow=true;tile.receiveShadow=true;
+      if(choices.has(n)&&payload.canInteract){tile.userData={kind:'goose-choice',steps:choiceByTarget.get(n),interactive:true};interactive.push(tile)}
+      objects.add(tile);
       const label=cellLabel(n);label.position.set(p.x,TABLE_Y+.18,p.z);label.rotation.x=-Math.PI/2;objects.add(label);
       if(grains.has(n)){const grain=new THREE.Mesh(new THREE.SphereGeometry(.10,10,8),new THREE.MeshStandardMaterial({color:0xf2cf67,emissive:0x8b6b18,emissiveIntensity:.45}));grain.position.set(p.x+.27,TABLE_Y+.34,p.z-.16);grain.userData.temporaryMaterial=grain.material;objects.add(grain)}
     }
@@ -227,14 +229,16 @@ export function createTable3DRenderer({onFatal}={}){
     const values=Array.isArray(s?.dice)&&s.dice.length===2?s.dice:[1,1],diceKey=values.join('-')+'|'+(s?.turn??0)+'|'+(s?.goosePending?.rerolls??0)+'|'+(s?.players?.[s?.turn]?.gooseRolls??0),animateDice=diceKey!==lastDiceKey;
     if(animateDice)lastDiceKey=diceKey;
     values.forEach((value,i)=>{
-      const die=dieMesh(value);die.position.set(-.52+i*1.04,TABLE_Y+.72,.05);objects.add(die);
+      const die=dieMesh(value);die.position.set(-.52+i*1.04,TABLE_Y+.72,.05);
+      if(payload.canInteract&&!s.goosePending){die.userData={kind:'goose-roll',interactive:true};interactive.push(die)}
+      objects.add(die);
       if(animateDice&&!matchMedia('(prefers-reduced-motion: reduce)').matches){const h=visualHash(diceKey+'|'+i);die.rotation.set(5+h*4,7+h*5,4+h*6);diceAnimations.push({mesh:die,start:performance.now(),duration:620+i*80,rx:die.rotation.x,ry:die.rotation.y,rz:die.rotation.z})}
     });
 
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     if(title)title.textContent='VUE 3D · JEU DE L’OIE';
     if(status)status.textContent=s?.goosePending?'Choisissez '+s.goosePending.dice.join(' ou ')+' · somme '+(s.goosePending.dice[0]+s.goosePending.dice[1]):(s?.players?.[s.turn]?.name||'Joueur')+' joue';
-    if(help)help.textContent='Les règles et choix restent ceux de la partie · les dés 3D reflètent exactement le résultat moteur';
+    if(help)help.textContent=s?.goosePending?'Cliquez une destination éclairée · les boutons 2D restent disponibles dessous':'Cliquez les dés pour lancer · le résultat vient toujours du moteur de jeu';
     if(diceAnimations.length||pawnAnimations.length)startMotion();
   }
 
@@ -309,6 +313,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(!active||!current?.canInteract)return;
     const obj=hit(e);setHover(obj);if(!obj)return;
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,kind:'deck',startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
+    if(obj.userData.kind==='goose-roll'||obj.userData.kind==='goose-choice'){drag={pointerId:e.pointerId,kind:obj.userData.kind,steps:obj.userData.steps,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(obj.userData.kind!=='card'||!obj.userData.playable)return;
     drag={pointerId:e.pointerId,kind:'card',mesh:obj,cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY,moved:false};
     host?.classList.add('is-dragging');canvas.setPointerCapture?.(e.pointerId);e.preventDefault();
@@ -328,6 +333,10 @@ export function createTable3DRenderer({onFatal}={}){
     if(cancelled){syncEight(current);draw();return}
     if(d.kind==='deck'){
       if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8)current?.interactions?.draw?.();
+      return;
+    }
+    if(d.kind==='goose-roll'||d.kind==='goose-choice'){
+      if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8)current?.interactions?.goose?.(d.kind==='goose-roll'?'roll':'choose',d.steps);
       return;
     }
     const near=d.moved&&Math.hypot(d.mesh.position.x-1.25,d.mesh.position.z-.05)<1.45;
