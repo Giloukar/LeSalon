@@ -3260,7 +3260,7 @@ if(window.SalonTableView){
   }
   return window.SalonTableView.render({
    args,
-   state:gate?null:S,
+   state:gate?null:(isOnline()?clone(S):projectGame(S,privateIndex())),
    screen:view,
    gameId:S?.id||null,
    online:!!isOnline(),
