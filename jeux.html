@@ -3378,11 +3378,26 @@ if(window.SalonTableView){
    if(canPlay()&&S.id==='plis'&&S.phase==='play')data.selectableIds=mine.map(c=>c.id);
    if(canPlay()&&S.id==='encheres'&&S.phase==='play')data.selectableIds=mine.map(c=>c.id);
    data.cardPlayableIds=S.id==='suites'?mine.filter(c=>suitesLegal(S,c)).map(c=>c.id):S.id==='plis'?mine.filter(c=>tricksLegal(S,c)).map(c=>c.id):data.selectableIds.slice();
-   if(S.id==='president')data.cardCenter={cards:S.trick?.cards||[],owner:S.trick?.owner??null,revolution:!!S.revolution,passed:[...S.passed]};
-   if(S.id==='menteur')data.cardCenter={cards:[...S.revealed],backCount:S.discard.length,claim:S.claim?{owner:S.claim.owner,rank:S.claim.rank,count:S.claim.cards.length}:null,required:S.required};
-   if(S.id==='suites')data.cardCenter={lanes:Object.fromEntries(SUITS.map(suit=>[suit,[...S.lanes[suit]]])),opening:!!S.opening,lastCard:S.lastCard};
-   if(S.id==='plis')data.cardCenter={entries:[...(S.trickCards.length?S.trickCards:S.lastTrick)].map(e=>({owner:e.owner,card:e.card})),trump:S.trump,phase:S.phase,dealNumber:S.dealNumber,completedTricks:S.completedTricks};
-   if(S.id==='encheres')data.cardCenter={prize:S.prize,bids:[...S.bids],pot:S.pot,bidRound:S.bidRound,revealed:S.phase!=='play',lastAuction:S.lastAuction};
+   if(S.id==='president'){
+    data.cardCenter={cards:S.trick?.cards||[],owner:S.trick?.owner??null,revolution:!!S.revolution,passed:[...S.passed]};
+    const picked=mine.filter(c=>selection.has(c.id));data.cardAction={game:'president',canPlay:!!(canPlay()&&presidentLegal(S,picked)),canPass:!!(canPlay()&&S.trick),count:picked.length};
+   }
+   if(S.id==='menteur'){
+    data.cardCenter={cards:[...S.revealed],backCount:S.discard.length,claim:S.claim?{owner:S.claim.owner,rank:S.claim.rank,count:S.claim.cards.length}:null,required:S.required};
+    data.cardAction=S.phase==='challenge'?{game:'menteur',phase:'challenge',canTrust:!!canPlay(),canChallenge:!!canPlay()}:{game:'menteur',phase:'play',canPlay:!!(canPlay()&&selection.size>=1&&selection.size<=4),count:selection.size,required:S.required};
+   }
+   if(S.id==='suites'){
+    data.cardCenter={lanes:Object.fromEntries(SUITS.map(suit=>[suit,[...S.lanes[suit]]])),opening:!!S.opening,lastCard:S.lastCard};
+    const picked=mine.find(c=>selection.has(c.id));data.cardAction={game:'suites',canPlay:!!(canPlay()&&picked&&suitesLegal(S,picked)),canPass:!!(canPlay()&&!mine.some(c=>suitesLegal(S,c))),count:picked?1:0};
+   }
+   if(S.id==='plis'){
+    data.cardCenter={entries:[...(S.trickCards.length?S.trickCards:S.lastTrick)].map(e=>({owner:e.owner,card:e.card})),trump:S.trump,phase:S.phase,dealNumber:S.dealNumber,completedTricks:S.completedTricks};
+    const picked=mine.find(c=>selection.has(c.id));data.cardAction={game:'plis',phase:S.phase,canPlay:!!(canPlay()&&S.phase==='play'&&picked&&tricksLegal(S,picked)),canCollect:!!(canPlay()&&S.phase==='trickResult'),count:picked?1:0};
+   }
+   if(S.id==='encheres'){
+    data.cardCenter={prize:S.prize,bids:[...S.bids],pot:S.pot,bidRound:S.bidRound,revealed:S.phase!=='play',lastAuction:S.lastAuction};
+    data.cardAction={game:'encheres',canBid:!!(canPlay()&&S.phase==='play'&&selection.size===1),count:selection.size};
+   }
   }
   if(S&&TABLE_3D_SPECIAL_CARD_GAMES.includes(S.id)){
    data.specialCardGame=S.id;
@@ -3464,6 +3479,27 @@ if(window.SalonTableView){
      else if(['president','menteur'].includes(S.id)){if(selection.size>=4){toast('Quatre cartes au maximum.');return false}selection.add(id)}
      else{selection.clear();selection.add(id)}
      renderGame(false);return true;
+    },
+    cardAction(type){
+     if(!S||!TABLE_3D_CARD_GAMES.includes(S.id)||!canPlay())return false;
+     if(S.id==='president'){
+      if(type==='play'){const cards=player(S).hand.filter(c=>selection.has(c.id));if(!presidentLegal(S,cards))return false;dispatch({type:'play',ids:[...selection]});return true}
+      if(type==='pass'&&S.trick){dispatch({type:'pass'});return true}
+     }
+     if(S.id==='menteur'){
+      if(S.phase==='challenge'&&['trust','challenge'].includes(type)){dispatch({type});return true}
+      if(S.phase==='play'&&type==='play'&&selection.size>=1&&selection.size<=4){dispatch({type:'play',ids:[...selection]});return true}
+     }
+     if(S.id==='suites'){
+      if(type==='play'&&selection.size===1){const id=[...selection][0],c=player(S).hand.find(c=>c.id===id);if(!c||!suitesLegal(S,c))return false;dispatch({type:'card',id});return true}
+      if(type==='pass'&&!player(S).hand.some(c=>suitesLegal(S,c))){dispatch({type:'pass'});return true}
+     }
+     if(S.id==='plis'){
+      if(type==='collect'&&S.phase==='trickResult'){dispatch({type:'collect'});return true}
+      if(type==='play'&&S.phase==='play'&&selection.size===1){const id=[...selection][0],c=player(S).hand.find(c=>c.id===id);if(!c||!tricksLegal(S,c))return false;dispatch({type:'card',id});return true}
+     }
+     if(S.id==='encheres'&&type==='bid'&&S.phase==='play'&&selection.size===1){dispatch({type:'bid',id:[...selection][0]});return true}
+     return false;
     },
     echo(type,value){
      if(!S||S.id!=='echo'||!canPlay())return false;
