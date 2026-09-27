@@ -3215,14 +3215,14 @@ if(window.SalonTableView){
   }
   return window.SalonTableView.render({
    args,
-   state:gate?null:S,
+   state:gate||S?.id==='cactus'?null:S,
    screen:view,
    gameId:S?.id||null,
    online:!!isOnline(),
    spectator:!!net.spectator,
    gated:!!gate,
    privateIndex:S?privateIndex():0,
-   canInteract:!!(S&&canPlay()&&(S.id!=='huit'||!showSuit)),
+   canInteract:!!(S&&(S.id==='metropole'||S.id==='cactus'&&(canPlay()||legacyCactusOwnQuickAllowed(privateIndex()))||canPlay()&&(S.id!=='huit'||!showSuit))),
    viewData:data,
    interactions:{
     playCard(id){if(!S||S.id!=='huit'||!canPlay())return false;const c=player(S).hand.find(c=>c.id===id);if(!c)return false;eightPlayCardUI(c);return true},
