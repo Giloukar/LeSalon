@@ -307,6 +307,67 @@ export function createTable3DRenderer({onFatal}={}){
     if(diceAnimations.length)startMotion();
   }
 
+  function syncCardFamily(payload){
+    clearObjects();dropMarker.visible=false;
+    const s=payload.state,data=payload.viewData||{},viewer=Number.isInteger(payload.privateIndex)?payload.privateIndex:0,game=data.cardGame||payload.gameId;
+    if(!s?.players?.length)return;
+    camera.position.set(0,7.4,9.1);camera.lookAt(0,.22,.15);
+    const selected=new Set(data.selectedIds||[]),selectable=new Set(data.selectableIds||[]),playable=new Set(data.cardPlayableIds||[]);
+    const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,span=Math.min(8.2,Math.max(1.5,(n-1)*.58));
+    own.forEach((card,i)=>{
+      const t=n<=1 ? .5 : i/(n-1),x=(t-.5)*span,z=2.75+Math.abs(t-.5)*.28,chosen=selected.has(card.id),canSelect=selectable.has(card.id);
+      const mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:canSelect,playable:canSelect});
+      mesh.userData.kind='card-select';mesh.userData.cardId=card.id;mesh.userData.playable=canSelect;mesh.userData.legal=playable.has(card.id);
+      mesh.position.set(x,TABLE_Y+.12+(chosen ? .26 : playable.has(card.id) ? .09 : 0),z);mesh.rotation.set(-Math.PI/2,0,(t-.5)*-.18);mesh.scale.setScalar(chosen?1.075:playable.has(card.id)?1.025:.98);
+      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};objects.add(mesh);
+    });
+    const opponents=s.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer);
+    opponents.forEach(({p,i},k)=>{
+      const count=p.hand?.length||0,total=Math.min(7,count),x=opponents.length<=1?0:(k/(opponents.length-1)-.5)*7.5,z=-2.75;
+      for(let c=0;c<total;c++){const mesh=cardMesh(null,{back:true});placeCard(mesh,x+(c-(total-1)/2)*.12,z+c*.015,TABLE_Y+.11+c*.015,(c-(total-1)/2)*.024,.64)}
+      const label=makeLabel((p.name||'Joueur')+' · '+count+' carte'+(count>1?'s':''),i===s.turn?'#dbea9e':'#d8ded9');label.position.set(x,1.02,z-.72);objects.add(label);
+    });
+    const center=data.cardCenter||{};
+    if(game==='president'){
+      (center.cards||[]).forEach((card,i)=>{const mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,(i-(center.cards.length-1)/2)*.72,.05,TABLE_Y+.13+i*.01,(i-(center.cards.length-1)/2)*.05,.82)});
+    }else if(game==='menteur'){
+      const count=Math.min(7,Number(center.backCount)||0);
+      for(let i=0;i<count;i++){const mesh=cardMesh(null,{back:true});placeCard(mesh,(i-count/2)*.045,.08-i*.018,TABLE_Y+.1+i*.025,(i-count/2)*.02,.82)}
+      (center.cards||[]).forEach((card,i)=>{const mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,(i-(center.cards.length-1)/2)*.72,-.65,TABLE_Y+.16+i*.01,(i-(center.cards.length-1)/2)*.04,.72)});
+    }else if(game==='suites'){
+      camera.position.set(0,8.9,7.2);camera.lookAt(0,.18,0);
+      const suits=['S','H','D','C'];
+      suits.forEach((suit,row)=>{
+        const cards=center.lanes?.[suit]||[];
+        cards.forEach(card=>{const x=(Number(card.rank)-7)*.62,z=(row-1.5)*1.25,mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,x,z,TABLE_Y+.12,0,.48)});
+        const label=makeLabel((SUIT_NAME[suit]||suit).toUpperCase(),['H','D'].includes(suit)?'#eab3ad':'#dbea9e');label.scale.set(1.6,.42,1);label.position.set(-4.65,.92,(row-1.5)*1.25);objects.add(label);
+      });
+    }else if(game==='plis'){
+      (center.entries||[]).forEach((entry,i)=>{
+        const a=(Math.PI*2*i/Math.max(1,center.entries.length))-Math.PI/2,x=Math.cos(a)*1.45,z=Math.sin(a)*1.1,mesh=cardMesh(entry.card,{back:!!entry.card?.hidden});
+        placeCard(mesh,x,z,TABLE_Y+.16,i*.06,.78);
+      });
+    }else if(game==='encheres'){
+      if(center.prize){const prize=cardMesh(center.prize,{back:!!center.prize.hidden});placeCard(prize,0,-.55,TABLE_Y+.15,0,.88)}
+      const bids=center.bids||[];
+      bids.forEach((card,i)=>{
+        if(!card)return;const x=(i-(bids.length-1)/2)*1.18,mesh=cardMesh(card,{back:!!card.hidden});
+        placeCard(mesh,x,.75,TABLE_Y+.13+i*.008,(i-(bids.length-1)/2)*.03,.64);
+      });
+    }
+    const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
+    const names={president:'PRÉSIDENT',menteur:'MENTEUR',suites:'QUATRE SUITES',plis:'CHASSE AUX PLIS',encheres:'ENCHÈRES'};
+    if(title)title.textContent='VUE 3D · '+(names[game]||'CARTES');
+    if(status){
+      if(game==='president')status.textContent=center.revolution?'Révolution · ordre inversé':center.cards?.length?center.cards.length+' carte'+(center.cards.length>1?'s':'')+' au pli':'Nouveau pli';
+      else if(game==='menteur')status.textContent=center.claim?'Annonce : '+center.claim.count+' × '+(RANK_NAME[center.claim.rank]||center.claim.rank):'Valeur demandée : '+(RANK_NAME[center.required]||center.required);
+      else if(game==='suites')status.textContent=center.opening?'Le 7 de cœur doit ouvrir':'Prolongez les quatre familles';
+      else if(game==='plis')status.textContent='Atout '+(SUIT_SYMBOL[center.trump]||center.trump)+' · pli '+Math.min(6,(center.completedTricks||0)+1)+'/6';
+      else if(game==='encheres')status.textContent='Tour '+(center.bidRound||1)+' · '+(center.pot||0)+' points à remporter';
+    }
+    if(help)help.textContent=payload.canInteract?'Touchez une carte pour la sélectionner · validez ensuite avec les commandes habituelles':'La table 3D suit la partie · les commandes restent synchronisées dessous';
+  }
+
   function syncEight(payload){
     clearObjects();dropMarker.visible=true;
     camera.position.set(0,7.25,9.25);camera.lookAt(0,.25,.2);
@@ -352,6 +413,7 @@ export function createTable3DRenderer({onFatal}={}){
     else if(payload?.gameId==='oie')syncGoose(payload);
     else if(payload?.gameId==='yam')syncYam(payload);
     else if(payload?.gameId==='boite')syncBox(payload);
+    else if(['president','menteur','suites','plis','encheres'].includes(payload?.gameId))syncCardFamily(payload);
   }
   function render(payload){
     current=payload;if(!active)return;
@@ -375,13 +437,14 @@ export function createTable3DRenderer({onFatal}={}){
     if(hovered===mesh)return;
     if(hovered&&!drag){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale);}
     hovered=mesh;
-    if(hovered&&!drag&&hovered.userData.kind==='card'){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
+    if(hovered&&!drag&&['card','card-select'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
     draw();
   }
   function onPointerDown(e){
     if(!active||!current?.canInteract)return;
     const obj=hit(e);setHover(obj);if(!obj)return;
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,kind:'deck',startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
+    if(obj.userData.kind==='card-select'){drag={pointerId:e.pointerId,kind:'card-select',cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
       drag={pointerId:e.pointerId,kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return;
@@ -404,6 +467,7 @@ export function createTable3DRenderer({onFatal}={}){
     const d=drag;drag=null;host?.classList.remove('is-dragging');dropMarker.material.opacity=.2;
     if(cancelled){syncCurrent(current);draw();return}
     const tap=Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
+    if(d.kind==='card-select'){if(tap)current?.interactions?.cardSelect?.(d.cardId);return}
     if(d.kind==='deck'){if(tap)current?.interactions?.draw?.();return}
     if(d.kind==='goose-roll'||d.kind==='goose-choice'){if(tap)current?.interactions?.goose?.(d.kind==='goose-roll'?'roll':'choose',d.steps);return}
     if(d.kind==='yam-roll'||d.kind==='yam-hold'){if(tap)current?.interactions?.yam?.(d.kind==='yam-hold'?'hold':'roll',d.index);return}
