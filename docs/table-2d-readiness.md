@@ -254,3 +254,10 @@ Les 22 jeux exposent maintenant une vue 3D compatible avec la bascule locale 2D/
 - la hauteur de la scène utilise les unités de viewport mobile modernes (`svh`) pour limiter les sauts liés aux barres du navigateur.
 
 Cette étape ne touche ni aux règles ni au protocole réseau. Elle prépare aussi le remplacement progressif des placeholders par des modèles GLB/GLTF Astra : les futures ressources doivent rester purement visuelles et ne jamais devenir une source d’état ou de règles.
+
+
+## Vue exclusive et gestes tactiles
+
+La bascule de rendu est désormais visuellement exclusive : en mode 3D, le plateau et la main 2D restent synchronisés en arrière-plan pour le fallback mais ne sont plus affichés. Les commandes métier nécessaires restent disponibles sous la scène. Le sélecteur 2D/3D n’affiche plus deux boutons simultanés : il ne montre que la destination disponible (3D depuis la vue 2D, 2D depuis la vue 3D).
+
+Le glisser-déposer du 8 américain est renforcé sur mobile, en 2D comme en 3D. La capture de pointeur est tolérante aux navigateurs qui la refusent, les pertes de capture / changements de visibilité annulent proprement le geste, les fantômes de carte sont toujours supprimés, et la zone de dépose 3D est élargie pour les pointeurs tactiles. Un 8 déposé correctement ouvre le choix de couleur sans laisser la carte dans un état visuel intermédiaire.
