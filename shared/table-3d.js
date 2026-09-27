@@ -328,6 +328,18 @@ export function createTable3DRenderer({onFatal}={}){
       if(t<1)running=true;else{a.mesh.position.copy(a.to);a.done=true;cardFx.remove(a.mesh);a.onDone?.()}
     }
     if(cardAnimations.some(a=>a.done))cardAnimations=cardAnimations.filter(a=>!a.done);
+    for(const [actor,g] of remoteCardGestures){
+      const age=now-g.lastAt;if(age>950&&!g.committed){g.target=0;g.targetLateral=0;g.returning=true}
+      g.progress+=(g.target-g.progress)*.24;g.lateral+=(g.targetLateral-g.lateral)*.22;
+      const p=Math.max(0,Math.min(1,g.progress)),ease=p*p*(3-2*p);
+      g.mesh.position.lerpVectors(g.from,g.to,ease);
+      const dx=g.to.x-g.from.x,dz=g.to.z-g.from.z,len=Math.max(.001,Math.hypot(dx,dz)),side=.58*g.lateral*Math.sin(Math.PI*p);
+      g.mesh.position.x+=(-dz/len)*side;g.mesh.position.z+=(dx/len)*side;g.mesh.position.y+=Math.sin(Math.PI*p)*.82;
+      g.mesh.rotation.z=g.lateral*.10+(p-.5)*-.03;
+      if(g.returning&&p<.018&&Math.abs(g.target-g.progress)<.02){cardFx.remove(g.mesh);remoteCardGestures.delete(actor);continue}
+      if(g.committed&&p>.985&&age>420){cardFx.remove(g.mesh);remoteCardGestures.delete(actor);continue}
+      running=true;
+    }
     draw();if(running)animationRaf=requestAnimationFrame(motionFrame);
   }
   function syncGoose(payload){
