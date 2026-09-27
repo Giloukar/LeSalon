@@ -317,3 +317,16 @@ La couche 3D ne limite plus toutes les cartes à un simple clic. Dans les jeux �
 Président, Menteur, Quatre Suites, Chasse aux plis et Enchères exposent également leurs validations principales directement dans la scène 3D. La sélection reste gérée par le moteur existant, puis un contrôle 3D déclenche l'action autoritative correspondante : poser, passer, croire/challenger, ramasser un pli ou confirmer une enchère.
 
 Cette séparation entre **manipulation libre** et **action autoritative** est volontaire. Elle permet de brancher plus tard des modèles de cartes et des mains beaucoup plus riches, avec rotations, lâchers ou gestes libres, sans confondre la physique locale du rendu avec les règles de jeu.
+
+
+## Manipulation libre généralisée des objets de table
+
+La couche de manipulation locale n'est plus limitée aux jeux de cartes à sélection. Elle couvre maintenant les objets que le joueur doit pouvoir « prendre en main » avant l'arrivée des modèles GLB/GLTF définitifs :
+
+- toutes les cartes de la main du 8 américain sont saisissables, y compris lorsqu'elles ne sont pas jouables ; seules les cartes légalement jouables peuvent encore être validées vers la défausse ;
+- Président, Menteur, Quatre Suites, Chasse aux plis, Enchères et 99 conservent le clic de sélection, mais un vrai glisser reste purement visuel ;
+- les cartes propres de Pouilleux et Vingt-et-un peuvent être déplacées librement sans produire d'action ;
+- les cartes du joueur dans Cactus sont manipulables même lorsqu'aucune action métier n'est disponible ; un simple toucher ne déclenche une action que lorsque le moteur l'autorise ;
+- les tuiles du chevalet Rummikub, ainsi que les tuiles communes réellement déplaçables, utilisent la même couche physique locale.
+
+Le mouvement libre est volontairement séparé du moteur : la position, la rotation, la vitesse et le retour inertiel ne sont jamais écrits dans l'état de partie et ne partent pas sur le réseau. Cette frontière prépare le branchement de modèles 3D externes plus riches (mains, cartes, tuiles, animations de lancer) sans transformer la physique de présentation en source de vérité.
