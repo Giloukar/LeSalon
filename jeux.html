@@ -3114,7 +3114,7 @@ playSceneAction=function(ctx){
 
 /* Contrôleur de rendu : la 2D reste la couche de base et le fallback permanent. */
 const TABLE_VIEW_2D_RENDER=renderGame,TABLE_VIEW_SHOW_HOME=showHome;
-function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie'].includes(S.id)}
+function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','cactus'].includes(S.id)}
 function tableViewMountControl(){
  if(!window.SalonTableView)return;
  const supported=tableViewSupports3D();
@@ -3145,6 +3145,21 @@ if(window.SalonTableView){
    data.boardCoords=CELL_COORDS.map(p=>p.slice());data.gooseCells=[...GEESE];data.gooseChoices=steps.map(n=>({steps:n,target:legacyGooseTarget(player(S).pos,n)}));data.choiceTargets=data.gooseChoices.map(x=>x.target);
    data.specialCells={bridge:6,inn:19,well:31,maze:42,prison:52,skull:58,goal:63};data.playerColors=COLORS.slice();
   }
+  if(S?.id==='cactus'){
+   data.cactusSlots=S.players.map((p,i)=>p.hand.map((c,j)=>{
+    if(!c)return{present:false,visible:false,card:null,action:null};
+    const visible=!c.hidden&&(S.phase==='over'||S.phase==='peek'&&i===S.turn&&j>=2||S.phase==='reveal'&&S.reveal&&S.reveal.owner===i&&S.reveal.index===j);
+    let action=null;
+    if(canPlay()&&i===S.turn&&S.phase==='swap')action={type:'swap',index:j};
+    else if(canPlay()&&i===S.turn&&S.phase==='power')action={type:'target',owner:i,index:j};
+    else if(legacyCactusOwnQuickAllowed(i)&&!((i===S.turn)&&['swap','power','reveal','peek'].includes(S.phase)))action={type:'quick',owner:i,index:j};
+    return{present:true,visible,card:visible?clone(c):null,action};
+   }));
+   data.cactusScores=S.players.map(p=>({score:p.cactusScore,count:legacyCactusCount(p)}));
+   data.cactusDrawn=S.drawn&&!S.drawn.hidden&&canPlay()?clone(S.drawn):null;
+   data.cactusPiles={draw:canPlay()&&S.phase==='draw',take:canPlay()&&S.phase==='draw'&&S.discard.length>0};
+   data.playerColors=COLORS.slice();data.hasCactusAction=data.cactusSlots.some(row=>row.some(slot=>!!slot.action))||data.cactusPiles.draw||data.cactusPiles.take;
+  }
   return window.SalonTableView.render({
    args,
    state:gate?null:S,
@@ -3154,12 +3169,13 @@ if(window.SalonTableView){
    spectator:!!net.spectator,
    gated:!!gate,
    privateIndex:S?privateIndex():0,
-   canInteract:!!(S&&canPlay()&&(S.id!=='huit'||!showSuit)),
+   canInteract:!!(S&&(S.id==='cactus'?data.hasCactusAction:canPlay()&&(S.id!=='huit'||!showSuit))),
    viewData:data,
    interactions:{
     playCard(id){if(!S||S.id!=='huit'||!canPlay())return false;const c=player(S).hand.find(c=>c.id===id);if(!c)return false;eightPlayCardUI(c);return true},
     draw(){if(!S||S.id!=='huit'||!canPlay())return false;dispatch({type:'draw'});return true},
-    goose(type,steps){if(!S||S.id!=='oie'||!canPlay())return false;dispatch(type==='choose'?{type:'gooseChoose',steps}: {type});return true}
+    goose(type,steps){if(!S||S.id!=='oie'||!canPlay())return false;dispatch(type==='choose'?{type:'gooseChoose',steps}: {type});return true},
+    cactus(action){if(!S||S.id!=='cactus'||!action)return false;if(action.type==='quick'){legacyCactusQuickUI(action.owner,action.index,null);return true}dispatch(action);return true}
    }
   });
  };
