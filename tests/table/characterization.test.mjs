@@ -34,3 +34,26 @@ test('privacy gate withholds state from an active 3D renderer',async()=>{const t
 
 test('3D interaction payload pauses while Eight waits for a suit choice',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','solo');const r=await t.page.evaluate(async()=>{let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen={canInteract:payload.canInteract,playable:[...payload.viewData.playableIds]}}});await SalonTableView.setMode('3d',{persistPreference:false});showSuit='synthetic-choice';renderGame(false);return seen;});assert.equal(r.canInteract,false);assert.deepEqual(r.playable,[]);}finally{await browser.close();}});
 
+test('3D switch is exposed only for the supported Eight game',async()=>{const t=await table();browser=t.browser;try{
+ await setup(t.page,'huit','solo',true);
+ let r=await t.page.evaluate(()=>({supported:document.documentElement.dataset.table3dSupported,buttons:[...document.querySelectorAll('[data-table-view-mode]')].map(b=>b.dataset.tableViewMode)}));
+ assert.equal(r.supported,'yes');assert.deepEqual(r.buttons,['2d','3d']);
+ await setup(t.page,'cactus','solo',true);
+ r=await t.page.evaluate(()=>({supported:document.documentElement.dataset.table3dSupported,buttons:document.querySelectorAll('[data-table-view-mode]').length}));
+ assert.equal(r.supported,'no');assert.equal(r.buttons,0);
+}finally{await browser.close();}});
+
+test('3D mode request is local and leaves game/network/RNG unchanged when unavailable',async()=>{const t=await table();browser=t.browser;try{
+ await setup(t.page,'huit','online');
+ const before=await clean(t.page);
+ const r=await t.page.evaluate(async()=>{const result=await SalonTableView.setMode('3d',{persistPreference:false});return{ok:result.ok,mode:SalonTableView.getMode(),hasStateView:Object.hasOwn(S,'tableView')||Object.hasOwn(S,'viewMode'),hasNetView:Object.hasOwn(net,'tableView')||Object.hasOwn(net,'viewMode')};});
+ const after=await clean(t.page);
+ assert.equal(r.hasStateView,false);assert.equal(r.hasNetView,false);assert.deepEqual(after,before);
+}finally{await browser.close();}});
+
+test('privacy gate withholds the game state from renderer payloads',async()=>{const t=await table();browser=t.browser;try{
+ await setup(t.page,'huit','local',true);
+ const r=await t.page.evaluate(()=>{gate=true;let seen='unset';const unregister=SalonTableView.register('probe',{render(payload){seen=payload.state}});return SalonTableView.setMode('probe',{persistPreference:false}).then(()=>{renderGame(false);SalonTableView.setMode('2d',{persistPreference:false});unregister();return{seenIsNull:seen===null,gated:gate};});});
+ assert.equal(r.gated,true);assert.equal(r.seenIsNull,true);
+}finally{await browser.close();}});
+
