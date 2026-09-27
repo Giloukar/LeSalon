@@ -419,3 +419,12 @@ Rummikub accepte le dépôt d'une tuile sur une combinaison existante, dans l'es
 Avant le dispatch, la couche de présentation mémorise la position exacte du relâchement. Le snapshot suivant peut ainsi continuer l'animation depuis la main de l'utilisateur plutôt que de faire revenir brièvement l'objet à son emplacement d'origine.
 
 Le ciblage visuel est maintenant explicite : pendant un drag qui peut devenir un vrai coup, un anneau apparaît uniquement sur une zone de dépôt reconnue. Pour Rummikub, les groupes utilisent les cellules réelles du layout, le chevalet possède une zone dédiée et la création d'un nouveau groupe est limitée à l'espace libre de la table. Un lâcher hors zone revient donc visuellement à son origine au lieu d'être interprété trop largement.
+
+
+## Manipulation groupée des sélections
+
+Les sélections multiples ne se comportent plus comme une simple liste logique pendant un drag. Dans Président et Menteur, si la carte saisie appartient à la sélection courante, les autres cartes sélectionnées deviennent des compagnons visuels et se resserrent autour d'elle comme un petit paquet. Rummikub applique le même principe aux tuiles sélectionnées.
+
+Cette cohésion reste strictement locale et visuelle. Un seul geste de présence est émis et aucune information supplémentaire n'est envoyée sur le réseau. Au relâchement, les IDs réellement sélectionnés sont toujours récupérés par les adaptateurs autoritatifs existants ; la couche Three.js ne compose donc jamais elle-même un coup.
+
+Si le drag est annulé ou lâché hors d'une zone valide, chaque compagnon revient avec inertie vers sa propre position et sa propre échelle d'origine. Lors d'un dépôt accepté, les positions exactes de toutes les cartes/tuiles du groupe sont mémorisées dans le snapshot visuel précédent afin que l'animation confirmée reparte du paquet réellement tenu par l'utilisateur plutôt que de leurs anciens emplacements.
