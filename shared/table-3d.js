@@ -531,6 +531,15 @@ export function createTable3DRenderer({onFatal}={}){
       const counter=makeLabel('TOTAL '+Number(ninety.total||0)+' / 99',Number(ninety.total)>=85?'#f0b3a6':'#dbea9e');counter.scale.set(3.1,.72,1);counter.position.set(-.35,1.08,-.05);objects.add(counter);
       const opponents=s.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer&&!x.p.out);
       opponents.forEach(({p,i},k)=>{const label=makeLabel((p.name||'Joueur')+' · '+(p.hand?.length||0)+' cartes',i===s.turn?'#dbea9e':'#d8ded9');label.position.set((k-(opponents.length-1)/2)*2.7,.98,-2.55);label.scale.set(2.5,.52,1);objects.add(label)});
+      if(payload.canInteract){
+        const selectedId=[...selected][0],card=own.find(c=>c.id===selectedId);
+        if(card){
+          if(card.rank===1){
+            const a1=actionSprite('JOUER L’AS · +1','ninety-action',{command:'play',cardId:card.id,ace:1},'#dbea9e');a1.position.set(-1.7,1.05,1.45);objects.add(a1);
+            if(Number(ninety.total||0)+11<=99){const a11=actionSprite('JOUER L’AS · +11','ninety-action',{command:'play',cardId:card.id,ace:11},'#b7d5ee');a11.position.set(1.7,1.05,1.45);objects.add(a11)}
+          }else if(legal.has(card.id)){const play=actionSprite('JOUER LA CARTE','ninety-action',{command:'play',cardId:card.id,ace:1},'#dbea9e');play.position.set(0,1.05,1.45);objects.add(play)}
+        }else if(!own.some(c=>legal.has(c.id))){const bust=actionSprite('JE SUIS BLOQUÉ','ninety-action',{command:'bust'},'#efaaa0');bust.position.set(0,1.05,1.45);objects.add(bust)}
+      }
       if(title)title.textContent='VUE 3D · 99';
       if(status)status.textContent=(ninety.dir===-1?'↺':'↻')+' · '+(ninety.deckCount||0)+' cartes en pioche';
       if(help)help.textContent=ninety.lastEffect||'Sélectionnez une carte puis confirmez son effet dessous';
@@ -543,7 +552,14 @@ export function createTable3DRenderer({onFatal}={}){
       const dn=own.length;
       own.forEach((card,i)=>{const slot=handCardSlot(dn,i),mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.fan,slot.scale*.92)});
       const dealerLabel=makeLabel('BANQUE · '+(dealer.length?(bj.dealerRevealed?bj.dealerValue:bj.dealerValue+' + ?'):'—'),'#e6d7b4');dealerLabel.position.set(0,1.02,-2.1);dealerLabel.scale.set(3,.62,1);objects.add(dealerLabel);
-      if(bj.phase==='bet'){const bet=makeLabel('FAITES VOS JEUX','#dbea9e');bet.position.set(0,1.05,.2);bet.scale.set(3.6,.8,1);objects.add(bet)}
+      if(bj.phase==='bet'){
+        const bet=makeLabel('FAITES VOS JEUX','#dbea9e');bet.position.set(0,1.05,-.05);bet.scale.set(3.6,.8,1);objects.add(bet);
+        if(payload.canInteract){[10,25,50,100].filter(n=>n<=Number(bj.chips||0)).forEach((amount,i,all)=>{const chip=actionSprite(String(amount),'blackjack-action',{command:'bet',amount},'#e6d7b4');chip.position.set((i-(all.length-1)/2)*1.45,1.02,1.55);chip.scale.set(1.18,.52,1);objects.add(chip)})}
+      }else if(bj.phase==='play'&&payload.canInteract){
+        const hit=actionSprite('TIRER','blackjack-action',{command:'hit'},'#dbea9e');hit.position.set(-2.1,1.02,1.45);objects.add(hit);
+        const stand=actionSprite('RESTER','blackjack-action',{command:'stand'},'#b7d5ee');stand.position.set(0,1.02,1.45);objects.add(stand);
+        if(own.length===2&&Number(bj.chips||0)>=Number(bj.bet||0)){const dbl=actionSprite('DOUBLER','blackjack-action',{command:'double'},'#e6d7b4');dbl.position.set(2.1,1.02,1.45);objects.add(dbl)}
+      }
       if(title)title.textContent='VUE 3D · VINGT-ET-UN';
       if(status)status.textContent=bj.phase==='bet'?(bj.chips||0)+' jetons disponibles':own.length?(bj.playerValue||0)+' points · mise '+(bj.bet||0):'La banque distribue';
       if(help)help.textContent=bj.phase==='bet'?'Choisissez votre mise dans le panneau dessous':bj.phase==='play'?'Tirer, rester ou doubler avec les commandes dessous':'Les cartes de la banque restent masquées jusqu’à la révélation';
@@ -773,6 +789,12 @@ export function createTable3DRenderer({onFatal}={}){
     }
     if(data.discard){const mesh=cardMesh(data.discard,{interactiveCard:payload.canInteract&&data.phase==='draw'});mesh.userData.kind=payload.canInteract&&data.phase==='draw'?'cactus-take':'cactus-card';mesh.userData.interactive=payload.canInteract&&data.phase==='draw';placeCard(mesh,0,.1,TABLE_Y+.12,(visualHash(data.discard.id)-.5)*.12,.82);}
     if(data.drawn){const mesh=cardMesh(data.drawn);mesh.userData.kind='cactus-drawn';placeCard(mesh,1.35,.1,TABLE_Y+.14,0,.88);}
+    if(payload.canInteract&&data.turn===viewer){
+      if(data.phase==='peek'||data.phase==='reveal'){const ready=actionSprite('C’EST MÉMORISÉ','cactus-action',{command:'ready'},'#dbea9e');ready.position.set(0,1.04,1.18);objects.add(ready)}
+      if(data.phase==='draw'&&data.caller===null){const call=actionSprite('CACTUS !','cactus-action',{command:'call'},'#e6d7b4');call.position.set(0,1.04,1.30);objects.add(call)}
+      if(data.phase==='swap'&&data.source==='draw'){const discard=actionSprite('JETER LA PIOCHE','cactus-action',{command:'discard'},'#efaaa0');discard.position.set(2.55,1.04,.15);objects.add(discard)}
+      if(data.phase==='power'){const skip=actionSprite('IGNORER LE POUVOIR','cactus-action',{command:'skip'},'#d8ded9');skip.position.set(0,1.04,1.30);objects.add(skip)}
+    }
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     if(title)title.textContent='VUE 3D · CACTUS';
     if(status)status.textContent=data.caller!==null?'Dernier tour · Cactus annoncé':data.phase==='peek'?'Mémorisez vos deux cartes':data.phase==='draw'?'Pioche ou défausse':data.phase==='swap'?'Échangez une carte':data.phase==='power'?'Pouvoir du 8':data.phase==='reveal'?'Mémorisez la carte':'Table synchronisée';
@@ -1053,7 +1075,7 @@ export function createTable3DRenderer({onFatal}={}){
     const obj=hit(e);setHover(obj);if(!obj)return;
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'deck',startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
     if(obj.userData.kind==='card-select'){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card-select',cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
-    if(['maid-pick','special-select','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
+    if(['maid-pick','special-select','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','cactus-action','ninety-action','blackjack-action','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,command:obj.userData.command,amount:obj.userData.amount,ace:obj.userData.ace,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
     if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue','intrus-spot','intrus-continue','code-cycle','code-submit','code-continue','golf-adjust','golf-shoot','golf-continue'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
       drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,control:obj.userData.control,delta:obj.userData.delta,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return;
@@ -1086,6 +1108,9 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='cactus-target'){if(tap)current?.interactions?.cactus?.('target',d.index);return}
     if(d.kind==='cactus-draw'){if(tap)current?.interactions?.cactus?.('draw');return}
     if(d.kind==='cactus-take'){if(tap)current?.interactions?.cactus?.('take');return}
+    if(d.kind==='cactus-action'){if(tap)current?.interactions?.cactus?.(d.command);return}
+    if(d.kind==='ninety-action'){if(tap)current?.interactions?.specialCard?.(d.command,{id:d.cardId,ace:d.ace});return}
+    if(d.kind==='blackjack-action'){if(tap)current?.interactions?.specialCard?.(d.command,d.amount);return}
     if(d.kind==='rummi-tile'){if(tap)current?.interactions?.rummi?.('select',d.tileId);return}
     if(d.kind==='rummi-dest'){if(tap)current?.interactions?.rummi?.('move',d.dest);return}
     if(d.kind==='deck'){if(tap)current?.interactions?.draw?.();return}
