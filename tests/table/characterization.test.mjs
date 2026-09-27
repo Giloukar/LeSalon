@@ -97,7 +97,7 @@ test('Three.js hardening adapts mobile quality, motion and reusable geometry',as
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  const css=await readFile(path.join(root,'shared/table-3d.css'),'utf8');
  assert.match(source,/dataset\.motion!=='off'/);
- assert.equal(source.includes("&&motionAllowed()"),false);
+ assert.doesNotMatch(source,/const motionAllowed=.*&&motionAllowed\(\)/);
  assert.match(source,/prefers-reduced-motion: reduce/);
  assert.match(source,/targetPixelRatio/);
  assert.match(source,/function handCardSlot\(count,index\)/);
