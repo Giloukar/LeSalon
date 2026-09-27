@@ -165,6 +165,23 @@ test('live Eight card gestures are transient and never mutate online state',asyn
 
 test('host relays a remote Eight drag preview without applying a move',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','online');const r=await t.page.evaluate(()=>{net.gameId='huit';net.state.turn=1;S.turn=1;let seen=null;window.addEventListener('salon:remote-card-gesture',e=>seen=clone(e.detail),{once:true});const before={state:clone(net.state),revision:net.revision,random:__test.random},conn=net.seats[1].conn;const handled=receiveSocial({type:'card-gesture',matchId:net.matchId,revision:net.revision,gesture:7,phase:'move',progress:.44,lateral:-.18},1,conn);return{handled,seen,before,after:{state:clone(net.state),revision:net.revision,random:__test.random}};});assert.equal(r.handled,true);assert.deepEqual(r.after,r.before);assert.equal(r.seen.actor,1);assert.equal(r.seen.gesture,7);assert.equal(r.seen.phase,'move');assert.equal(r.seen.progress,.44);assert.equal(r.seen.lateral,-.18);}finally{await browser.close();}});
 
+test('shared card games broadcast privacy-safe transient drag presence',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'president','online');const r=await t.page.evaluate(()=>{net.gameId='president';net.state.turn=0;S.turn=0;__test.packets.length=0;const before={view:clone(S),host:clone(net.state),revision:net.revision,random:__test.random};window.dispatchEvent(new CustomEvent('salon:local-card-gesture',{detail:{gameId:'president',phase:'start',progress:0,lateral:0}}));window.dispatchEvent(new CustomEvent('salon:local-card-gesture',{detail:{gameId:'president',phase:'move',progress:.51,lateral:-.14}}));window.dispatchEvent(new CustomEvent('salon:local-card-gesture',{detail:{gameId:'president',phase:'cancel',progress:0,lateral:0}}));return{before,after:{view:clone(S),host:clone(net.state),revision:net.revision,random:__test.random},packets:clone(__test.packets).filter(p=>p.type==='card-gesture')};});assert.deepEqual(r.after,r.before);assert.equal(r.packets.length>=2,true);for(const p of r.packets){assert.equal(p.gameId,'president');assert.equal(p.actor,0);assert.equal('cardId'in p,false);assert.equal('suit'in p,false);assert.equal('rank'in p,false);}}finally{await browser.close();}});
+
+test('host relays shared card drag presence only for the current game and turn',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'president','online');const r=await t.page.evaluate(()=>{net.gameId='president';net.state.turn=1;S.turn=1;const seen=[];window.addEventListener('salon:remote-card-gesture',e=>seen.push(clone(e.detail)));const before={state:clone(net.state),revision:net.revision,random:__test.random},conn=net.seats[1].conn;const good=receiveSocial({type:'card-gesture',gameId:'president',matchId:net.matchId,revision:net.revision,gesture:11,phase:'move',progress:.47,lateral:.12},1,conn);const wrongGame=receiveSocial({type:'card-gesture',gameId:'huit',matchId:net.matchId,revision:net.revision,gesture:12,phase:'move',progress:.7,lateral:0},1,conn);return{good,wrongGame,seen,before,after:{state:clone(net.state),revision:net.revision,random:__test.random}};});assert.equal(r.good,true);assert.equal(r.wrongGame,true);assert.deepEqual(r.after,r.before);assert.equal(r.seen.length,1);assert.equal(r.seen[0].gameId,'president');assert.equal(r.seen[0].actor,1);assert.equal(r.seen[0].gesture,11);}finally{await browser.close();}});
+
+test('shared live card presence remains presentation-only in renderer and protocol',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ const html=await readFile(path.join(root,'jeux.html'),'utf8');
+ assert.match(source,/const LIVE_CARD_GAMES=new Set/);
+ assert.match(source,/function cardGestureTarget\(game,y=1\.02\)/);
+ assert.match(source,/function cardGestureCoordinates\(/);
+ assert.match(source,/gestureEnabled=!!\(current\?\.canInteract&&LIVE_CARD_GAMES\.has/);
+ assert.match(source,/d\.gestureStarted=true;emitLocalCardGesture\('start'/);
+ assert.match(html,/const CARD_GESTURE_GAMES=new Set/);
+ assert.match(html,/gameId,gesture:cardGestureCurrent/);
+ assert.doesNotMatch(html,/card-gesture[^\n]*(cardId|suit|rank)/);
+});
+
 test('Eight 3D staging keeps opponent motion presentation-only',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/cardFx=new THREE\.Group\(\)/);
