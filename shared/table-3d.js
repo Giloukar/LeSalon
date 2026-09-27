@@ -653,6 +653,26 @@ export function createTable3DRenderer({onFatal}={}){
     }
     const currentSnapshot=cardFamilySnapshot(payload,center),previousSnapshot=lastCardFamilySnapshots.get(game);
     animateCardFamilyConfirmed(game,payload,center,previousSnapshot,currentSnapshot,opponentVisuals,centerVisuals);lastCardFamilySnapshots.set(game,currentSnapshot);
+    const action=data.cardAction||{};
+    if(payload.canInteract){
+      if(game==='president'){
+        if(action.canPlay){const play=actionSprite('POSER'+(action.count?' · '+action.count:''),'card-action',{command:'play'},'#dbea9e');play.position.set(-1.25,1.04,.92);objects.add(play)}
+        if(action.canPass){const pass=actionSprite('PASSER','card-action',{command:'pass'},'#d8ded9');pass.position.set(action.canPlay?1.25:0,1.04,.92);objects.add(pass)}
+      }else if(game==='menteur'){
+        if(action.phase==='challenge'){
+          const trust=actionSprite('JE TE CROIS','card-action',{command:'trust'},'#b7d5ee');trust.position.set(-1.35,1.04,1.02);objects.add(trust);
+          const challenge=actionSprite('MENTEUR !','card-action',{command:'challenge'},'#efaaa0');challenge.position.set(1.35,1.04,1.02);objects.add(challenge);
+        }else if(action.canPlay){const play=actionSprite('ANNONCER '+(action.count||1)+' × '+(RANK_NAME[action.required]||action.required),'card-action',{command:'play'},'#dbea9e');play.position.set(0,1.04,1.02);play.scale.set(3.15,.58,1);objects.add(play)}
+      }else if(game==='suites'){
+        if(action.canPlay){const play=actionSprite('POSER LA CARTE','card-action',{command:'play'},'#dbea9e');play.position.set(0,1.04,.88);objects.add(play)}
+        else if(action.canPass){const pass=actionSprite('PASSER','card-action',{command:'pass'},'#d8ded9');pass.position.set(0,1.04,.88);objects.add(pass)}
+      }else if(game==='plis'){
+        if(action.canCollect){const collect=actionSprite('RAMASSER LE PLI','card-action',{command:'collect'},'#e6d7b4');collect.position.set(0,1.04,1.10);objects.add(collect)}
+        else if(action.canPlay){const play=actionSprite('JOUER LA CARTE','card-action',{command:'play'},'#dbea9e');play.position.set(0,1.04,1.10);objects.add(play)}
+      }else if(game==='encheres'&&action.canBid){
+        const bid=actionSprite('CONFIRMER LA CARTE','card-action',{command:'bid'},'#dbea9e');bid.position.set(0,1.04,1.28);objects.add(bid);
+      }
+    }
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     const names={president:'PRÉSIDENT',menteur:'MENTEUR',suites:'QUATRE SUITES',plis:'CHASSE AUX PLIS',encheres:'ENCHÈRES'};
     if(title)title.textContent='VUE 3D · '+(names[game]||'CARTES');
@@ -663,7 +683,7 @@ export function createTable3DRenderer({onFatal}={}){
       else if(game==='plis')status.textContent='Atout '+(SUIT_SYMBOL[center.trump]||center.trump)+' · pli '+Math.min(6,(center.completedTricks||0)+1)+'/6';
       else if(game==='encheres')status.textContent='Tour '+(center.bidRound||1)+' · '+(center.pot||0)+' points à remporter';
     }
-    if(help)help.textContent=payload.canInteract?'Touchez une carte pour la sélectionner · validez ensuite avec les commandes habituelles':'La table 3D suit la partie · les commandes restent synchronisées dessous';
+    if(help)help.textContent=payload.canInteract?'Touchez pour sélectionner · glissez librement une carte · validez directement sur la table':'La table 3D suit la partie et les mouvements confirmés';
   }
 
   function syncEight(payload){
@@ -1130,7 +1150,7 @@ export function createTable3DRenderer({onFatal}={}){
     const obj=hit(e);setHover(obj);if(!obj)return;
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'deck',startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
     if(obj.userData.kind==='card-select'){beginLooseCardDrag(obj,e,'card-select');return}
-    if(['maid-pick','special-select','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','cactus-action','ninety-action','blackjack-action','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,command:obj.userData.command,amount:obj.userData.amount,ace:obj.userData.ace,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
+    if(['maid-pick','special-select','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','cactus-action','ninety-action','blackjack-action','card-action','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,command:obj.userData.command,amount:obj.userData.amount,ace:obj.userData.ace,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
     if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue','intrus-spot','intrus-continue','code-cycle','code-submit','code-continue','golf-adjust','golf-shoot','golf-continue'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
       drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,control:obj.userData.control,delta:obj.userData.delta,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return;
@@ -1172,6 +1192,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='cactus-action'){if(tap)current?.interactions?.cactus?.(d.command);return}
     if(d.kind==='ninety-action'){if(tap)current?.interactions?.specialCard?.(d.command,{id:d.cardId,ace:d.ace});return}
     if(d.kind==='blackjack-action'){if(tap)current?.interactions?.specialCard?.(d.command,d.amount);return}
+    if(d.kind==='card-action'){if(tap)current?.interactions?.cardAction?.(d.command);return}
     if(d.kind==='rummi-tile'){if(tap)current?.interactions?.rummi?.('select',d.tileId);return}
     if(d.kind==='rummi-dest'){if(tap)current?.interactions?.rummi?.('move',d.dest);return}
     if(d.kind==='deck'){if(tap)current?.interactions?.draw?.();return}
