@@ -283,6 +283,27 @@ test('Rummikub dense 3D layout and shared card motion remain presentation-only',
 
 test('shared card games expose direct authoritative 3D actions',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'president','online');const r=await t.page.evaluate(async()=>{net.gameId='president';net.state.turn=0;net.state.trick=null;net.state.passed=[];S=projectGame(net.state,0);let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const id=net.state.players[0].hand[0].id,before=net.state.players[0].hand.length,selected=seen.interactions.cardSelect(id),played=seen.interactions.cardAction('play');return{selected,played,before,after:net.state.players[0].hand.length,trickId:net.state.trick?.cards?.[0]?.id,owner:net.state.trick?.owner};});assert.equal(r.selected,true);assert.equal(r.played,true);assert.equal(r.after,r.before-1);assert.equal(r.trickId!=null,true);assert.equal(r.owner,0);}finally{await browser.close();}});
 
+test('shared card games accept a legal physical drop without prior button confirmation',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'president','online');const r=await t.page.evaluate(async()=>{net.gameId='president';net.state.turn=0;net.state.trick=null;net.state.passed=[];S=projectGame(net.state,0);let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const id=net.state.players[0].hand[0].id,before=net.state.players[0].hand.length;selection.clear();const dropped=seen.interactions.cardDrop(id);return{dropped,before,after:net.state.players[0].hand.length,trickId:net.state.trick?.cards?.[0]?.id,owner:net.state.trick?.owner};});assert.equal(r.dropped,true);assert.equal(r.after,r.before-1);assert.equal(r.trickId!=null,true);assert.equal(r.owner,0);}finally{await browser.close();}});
+
+test('Rummikub direct drop reuses the existing move action',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'rummikub','online');const r=await t.page.evaluate(async()=>{let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const id=net.state.players[0].hand[0].id,before={hand:net.state.players[0].hand.length,table:net.state.table.flat().length,random:__test.random};selection.clear();const dropped=seen.interactions.rummi('drop',{id,dest:'new'});return{id,dropped,before,after:{hand:net.state.players[0].hand.length,table:net.state.table.flat().length,contains:net.state.table.flat().some(t=>t.id===id),random:__test.random}};});assert.equal(r.dropped,true);assert.equal(r.after.hand,r.before.hand-1);assert.equal(r.after.table,r.before.table+1);assert.equal(r.after.contains,true);assert.equal(r.after.random,r.before.random);}finally{await browser.close();}});
+
+test('99 direct drop uses the authoritative card action when the effect is unambiguous',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'quatrevingtdixneuf','online');const r=await t.page.evaluate(async()=>{net.gameId='quatrevingtdixneuf';net.state.turn=0;net.state.total99=0;S=projectGame(net.state,0);let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const card=net.state.players[0].hand.find(c=>c.rank!==1),before={deck:net.state.deck.length,moves:net.state.moves,random:__test.random};const dropped=card?seen.interactions.specialCard('drop',card.id):false;return{card:card?{id:card.id,rank:card.rank}:null,dropped,before,after:{deck:net.state.deck.length,moves:net.state.moves,last:net.state.discard.at(-1)?.id,random:__test.random}};});assert.ok(r.card);assert.equal(r.dropped,true);assert.equal(r.after.moves,r.before.moves+1);assert.equal(r.after.last,r.card.id);assert.equal(r.after.deck,r.before.deck-1);assert.equal(r.after.random,r.before.random);}finally{await browser.close();}});
+
+test('physical drop routing remembers release coordinates but leaves validation to interactions',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ const html=await readFile(path.join(root,'jeux.html'),'utf8');
+ assert.match(source,/function rememberCardDropOrigin\(game,id,mesh\)/);
+ assert.match(source,/function rememberNinetyDropOrigin\(id,mesh\)/);
+ assert.match(source,/function rememberRummiDropOrigin\(id,mesh\)/);
+ assert.match(source,/function rummiDropDestination\(position\)/);
+ assert.match(source,/current\?\.interactions\?\.cardDrop\?\.\(d\.cardId\)/);
+ assert.match(source,/current\?\.interactions\?\.rummi\?\.\('drop',\{id:d\.tileId,dest\}\)/);
+ assert.match(html,/cardDrop\(id\)\{/);
+ assert.match(html,/if\(type==='drop'&&value&&typeof value==='object'\)/);
+ assert.match(html,/if\(type==='drop'&&typeof value==='string'\)/);
+ assert.doesNotMatch(source,/rummiDropDestination[^\n]*dispatch\(/);
+});
+
 test('free 3D tabletop manipulation stays presentation-only until an explicit valid action',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/manipAnimations=\[\]/);
