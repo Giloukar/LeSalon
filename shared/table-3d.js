@@ -80,7 +80,20 @@ export function createTable3DRenderer({onFatal}={}){
   let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='';
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
-  let objects=new THREE.Group(),dropMarker=null,tableMesh=null;
+  let objects=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null;
+
+  function applyCameraFit(){
+    if(!camera||!cameraPose)return;
+    const aspect=Math.max(.32,Number(camera.aspect)||1),portraitBoost=aspect<.82?Math.min(1.95,.82/aspect):1;
+    const {px,py,pz,lx,ly,lz}=cameraPose,dx=px-lx,dy=py-ly,dz=pz-lz;
+    camera.position.set(lx+dx*portraitBoost,ly+dy*portraitBoost,lz+dz*portraitBoost);
+    camera.lookAt(lx,ly,lz);
+    camera.fov=aspect<.62?42:aspect<.82?40:aspect<.95?39:aspect>1.8?37:39;
+    camera.updateProjectionMatrix();
+  }
+  function setCameraPose(px,py,pz,lx,ly,lz){
+    cameraPose={px,py,pz,lx,ly,lz};applyCameraFit();
+  }
 
   function frontMaterial(card){
     const key=card?.joker?'joker':(card?.suit||'X')+'-'+(card?.rank??0);
@@ -116,7 +129,7 @@ export function createTable3DRenderer({onFatal}={}){
 
     scene=new THREE.Scene();scene.background=new THREE.Color(0x0b110e);
     scene.fog=new THREE.Fog(0x0b110e,12,23);
-    camera=new THREE.PerspectiveCamera(39,1,.1,60);camera.position.set(0,7.25,9.25);camera.lookAt(0,.25,.2);
+    camera=new THREE.PerspectiveCamera(39,1,.1,60);setCameraPose(0,7.25,9.25,0,.25,.2);
 
     const hemi=new THREE.HemisphereLight(0xe9f3e7,0x162019,1.28);scene.add(hemi);
     const key=new THREE.DirectionalLight(0xfff5df,2.15);key.position.set(-3,8,5);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-8;key.shadow.camera.right=8;key.shadow.camera.top=7;key.shadow.camera.bottom=-7;scene.add(key);
@@ -158,9 +171,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(!renderer||!host)return;
     const r=host.getBoundingClientRect(),w=Math.max(1,Math.round(r.width)),h=Math.max(1,Math.round(r.height)),aspect=w/h;
     renderer.setPixelRatio(targetPixelRatio());
-    renderer.setSize(w,h,false);camera.aspect=aspect;
-    camera.fov=aspect<.72?58:aspect<.9?50:aspect>1.8?37:39;
-    camera.updateProjectionMatrix();draw();
+    renderer.setSize(w,h,false);camera.aspect=aspect;applyCameraFit();draw();
   }
   function clearObjects(){
     interactive.length=0;diceAnimations.length=0;pawnAnimations.length=0;
@@ -259,7 +270,7 @@ export function createTable3DRenderer({onFatal}={}){
     clearObjects();dropMarker.visible=false;
     const s=payload.state,coords=payload.viewData?.boardCoords||[],geese=new Set(payload.viewData?.gooseCells||[]),choices=new Set(payload.viewData?.choiceTargets||[]),choiceByTarget=new Map((payload.viewData?.gooseChoices||[]).map(x=>[x.target,x.steps])),grains=new Set(s?.gooseGrains||[]);
     const specials=payload.viewData?.specialCells||{};
-    camera.position.set(0,8.7,8.25);camera.lookAt(0,.15,0);
+    setCameraPose(0,8.7,8.25,0,.15,0);
 
     for(let n=1;n<=Math.min(63,coords.length);n++){
       const p=worldForCell(n,coords);let kind='normal';
@@ -302,7 +313,7 @@ export function createTable3DRenderer({onFatal}={}){
   function syncYam(payload){
     clearObjects();dropMarker.visible=false;
     const s=payload.state,dice=payload.viewData?.yamDice||s?.dice||[1,1,1,1,1],held=payload.viewData?.yamHeld||s?.held||[],rolls=Number(payload.viewData?.yamRolls??s?.rolls??0);
-    camera.position.set(0,6.75,8.6);camera.lookAt(0,.25,.15);
+    setCameraPose(0,6.75,8.6,0,.25,.15);
     const key='yam|'+(s?.turn??0)+'|'+rolls+'|'+dice.join('-'),animate=rolls>0&&key!==lastDiceKey;if(animate)lastDiceKey=key;
     dice.forEach((value,i)=>{
       const die=rolls?dieMesh(value):blankDieMesh(),x=(i-2)*1.35,z=held[i]?.42:0;
@@ -327,7 +338,7 @@ export function createTable3DRenderer({onFatal}={}){
   function syncBox(payload){
     clearObjects();dropMarker.visible=false;
     const s=payload.state,dice=payload.viewData?.boxDice||s?.boxDice||[],open=new Set(payload.viewData?.boxNumbers||s?.boxNumbers||[]),selected=new Set(payload.viewData?.boxSelected||[]),stage=payload.viewData?.boxStage||s?.boxStage||'roll';
-    camera.position.set(0,6.9,8.4);camera.lookAt(0,.28,.05);
+    setCameraPose(0,6.9,8.4,0,.28,.05);
     for(let n=1;n<=9;n++){
       const isOpen=open.has(n),isSelected=selected.has(n),x=(n-5)*1.05;
       const tile=new THREE.Mesh(tileGeometry,boxTileMaterial(!isOpen,isSelected));tile.scale.set(1,.22,1.18);tile.position.set(x,TABLE_Y+(isOpen?.42:.31),-1.15);tile.rotation.x=isOpen?-.34:0;tile.castShadow=true;tile.receiveShadow=true;
@@ -356,7 +367,7 @@ export function createTable3DRenderer({onFatal}={}){
     clearObjects();dropMarker.visible=false;
     const s=payload.state,data=payload.viewData||{},game=data.specialCardGame||payload.gameId,viewer=Number.isInteger(payload.privateIndex)?payload.privateIndex:0;
     if(!s?.players?.length)return;
-    camera.position.set(0,7.35,9.05);camera.lookAt(0,.24,.15);
+    setCameraPose(0,7.35,9.05,0,.24,.15);
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
 
     if(game==='pouilleux'){
@@ -426,7 +437,7 @@ export function createTable3DRenderer({onFatal}={}){
     clearObjects();dropMarker.visible=false;
     const s=payload.state,data=payload.viewData||{},viewer=Number.isInteger(payload.privateIndex)?payload.privateIndex:0,game=data.cardGame||payload.gameId;
     if(!s?.players?.length)return;
-    camera.position.set(0,7.4,9.1);camera.lookAt(0,.22,.15);
+    setCameraPose(0,7.4,9.1,0,.22,.15);
     const selected=new Set(data.selectedIds||[]),selectable=new Set(data.selectableIds||[]),playable=new Set(data.cardPlayableIds||[]);
     const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,span=Math.min(8.2,Math.max(1.5,(n-1)*.58));
     own.forEach((card,i)=>{
@@ -450,7 +461,7 @@ export function createTable3DRenderer({onFatal}={}){
       for(let i=0;i<count;i++){const mesh=cardMesh(null,{back:true});placeCard(mesh,(i-count/2)*.045,.08-i*.018,TABLE_Y+.1+i*.025,(i-count/2)*.02,.82)}
       (center.cards||[]).forEach((card,i)=>{const mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,(i-(center.cards.length-1)/2)*.72,-.65,TABLE_Y+.16+i*.01,(i-(center.cards.length-1)/2)*.04,.72)});
     }else if(game==='suites'){
-      camera.position.set(0,8.9,7.2);camera.lookAt(0,.18,0);
+      setCameraPose(0,8.9,7.2,0,.18,0);
       const suits=['S','H','D','C'];
       suits.forEach((suit,row)=>{
         const cards=center.lanes?.[suit]||[];
@@ -485,7 +496,7 @@ export function createTable3DRenderer({onFatal}={}){
 
   function syncEight(payload){
     clearObjects();dropMarker.visible=true;
-    camera.position.set(0,7.25,9.25);camera.lookAt(0,.25,.2);
+    setCameraPose(0,7.25,9.25,0,.25,.2);
     const s=payload.state,viewer=Number.isInteger(payload.privateIndex)?payload.privateIndex:0;
     if(!s?.players?.length)return;
     const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),playable=new Set(payload.viewData?.playableIds||[]);
@@ -524,7 +535,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function syncRummikub(payload){
     clearObjects();dropMarker.visible=false;
-    camera.position.set(0,8.15,10.2);camera.lookAt(0,.15,-.15);
+    setCameraPose(0,8.15,10.2,0,.15,-.15);
     const data=payload.viewData?.rummi;if(!data)return;
     const selected=new Set(data.selectedIds||[]),oldIds=new Set(data.refTableIds||[]);
     const groups=data.table||[],cols=4;
@@ -555,7 +566,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function syncCactus(payload){
     clearObjects();dropMarker.visible=false;
-    camera.position.set(0,7.7,9.7);camera.lookAt(0,.2,.15);
+    setCameraPose(0,7.7,9.7,0,.2,.15);
     const data=payload.viewData?.cactus,s=payload.state;if(!data||!s)return;
     const viewer=data.viewer,players=data.players||[],count=Math.max(1,players.length);
     players.forEach((p,i)=>{
@@ -591,7 +602,7 @@ export function createTable3DRenderer({onFatal}={}){
   function syncEcho(payload){
     clearObjects();dropMarker.visible=false;
     const s=payload.state,data=payload.viewData?.echo||{},phase=data.phase||s?.phase||'watch',sequence=Array.isArray(data.sequence)?data.sequence:[],input=Array.isArray(data.input)?data.input:[],colors=['#b5e4a4','#aacdf7','#edbe86','#e7aaca'],symbols=['●','◆','▲','■'];
-    camera.position.set(0,6.7,8.3);camera.lookAt(0,.35,.15);
+    setCameraPose(0,6.7,8.3,0,.35,.15);
     const baseGeo=new THREE.BoxGeometry(9,.18,5.4),baseMat=new THREE.MeshStandardMaterial({color:0x203b34,roughness:.92,metalness:.01}),base=new THREE.Mesh(baseGeo,baseMat);base.position.set(0,TABLE_Y-.01,.1);base.receiveShadow=true;base.userData.temporaryGeometry=baseGeo;base.userData.temporaryMaterial=baseMat;objects.add(base);
     for(let i=0;i<4;i++){
       const activePad=phase==='repeat'&&payload.canInteract,mat=new THREE.MeshStandardMaterial({color:new THREE.Color(colors[i]),roughness:.62,metalness:.03,emissive:new THREE.Color(colors[i]),emissiveIntensity:activePad?.34:.12});
@@ -628,7 +639,7 @@ export function createTable3DRenderer({onFatal}={}){
     const s=payload.state,data=payload.viewData?.golf3d||{},phase=data.phase||s?.phase||'play',course=data.course||{hole:{x:330,y:150},obstacles:[]},pos=data.pos||{x:65,y:220},path=Array.isArray(data.path)?data.path:[],stroke=Math.max(0,Number(data.stroke||0)),sunk=!!data.sunk;
     const direct=Math.round(Math.atan2(Number(course.hole?.y||150)-Number(pos.y||0),Number(course.hole?.x||330)-Number(pos.x||0))*180/Math.PI),aimKey=[s?.turn??0,data.stage||1,stroke,phase].join('|');
     if(golfAimKey!==aimKey){golfAimKey=aimKey;golfAim={angle:direct,power:50}}
-    camera.position.set(0,7.45,8.65);camera.lookAt(0,.15,0);
+    setCameraPose(0,7.45,8.65,0,.15,0);
     const courseGeo=new THREE.BoxGeometry(10.15,.18,6.15),courseMat=new THREE.MeshStandardMaterial({color:0x234553,roughness:.93,metalness:.02}),courseMesh=new THREE.Mesh(courseGeo,courseMat);courseMesh.position.set(0,TABLE_Y-.02,0);courseMesh.receiveShadow=true;courseMesh.userData.temporaryGeometry=courseGeo;courseMesh.userData.temporaryMaterial=courseMat;objects.add(courseMesh);
     for(const obstacle of course.obstacles||[]){
       const r=Math.max(.18,Number(obstacle.r||20)/58),geo=new THREE.DodecahedronGeometry(r,1),mat=new THREE.MeshStandardMaterial({color:0x69708c,roughness:.94,metalness:.03}),rock=new THREE.Mesh(geo,mat),p=golfWorld(obstacle,TABLE_Y+.24+r*.45);
@@ -668,7 +679,7 @@ export function createTable3DRenderer({onFatal}={}){
     clearObjects();dropMarker.visible=false;
     const s=payload.state,data=payload.viewData?.code3d||{},phase=data.phase||s?.phase||'play',history=Array.isArray(data.history)?data.history:[],secret=Array.isArray(data.secret)?data.secret:[],symbols=['●','◆','▲','■','✦','☾'],colors=['#f0a6b7','#93d4ec','#e6d58c','#bbaceb','#a8ddb8','#efbc88'];
     const key=[s?.turn??0,data.stage||1,history.length,phase].join('|');if(codeDraftKey!==key){codeDraftKey=key;codeDraft=[0,1,2]}
-    camera.position.set(0,6.65,8.45);camera.lookAt(0,.45,.1);
+    setCameraPose(0,6.65,8.45,0,.45,.1);
     const vaultGeo=new THREE.BoxGeometry(6.8,.28,3.7),vaultMat=new THREE.MeshStandardMaterial({color:phase==='result'?0x3c4b38:0x332c43,roughness:.8,metalness:.1,emissive:phase==='result'?0x26331d:0x171320,emissiveIntensity:.25}),vault=new THREE.Mesh(vaultGeo,vaultMat);
     vault.position.set(0,TABLE_Y+.12,.05);vault.receiveShadow=true;vault.castShadow=true;vault.userData.temporaryGeometry=vaultGeo;vault.userData.temporaryMaterial=vaultMat;objects.add(vault);
     const shown=phase==='result'&&secret.length===3?secret:codeDraft;
@@ -697,7 +708,7 @@ export function createTable3DRenderer({onFatal}={}){
     clearObjects();dropMarker.visible=false;
     const s=payload.state,data=payload.viewData?.intrus||{},phase=data.phase||s?.phase||'play',count=Math.max(0,Number(data.count||0)),tiles=Array.isArray(data.tiles)?data.tiles:[],tried=new Set(Array.isArray(data.tried)?data.tried:[]),stage=Math.max(1,Math.min(5,Number(data.stage||1))),revealed=phase==='result'||phase==='over';
     const cols=count<=9?3:count<=16?4:5,rows=Math.max(1,Math.ceil(count/cols)),xGap=1.42,zGap=1.08;
-    camera.position.set(0,7.1,8.8);camera.lookAt(0,.28,-.15);
+    setCameraPose(0,7.1,8.8,0,.28,-.15);
     const baseGeo=new THREE.BoxGeometry(9.4,.16,5.75),baseMat=new THREE.MeshStandardMaterial({color:0x253a35,roughness:.95}),base=new THREE.Mesh(baseGeo,baseMat);base.position.set(0,TABLE_Y-.015,-.15);base.receiveShadow=true;base.userData.temporaryGeometry=baseGeo;base.userData.temporaryMaterial=baseMat;objects.add(base);
     const symbols=['⊙','◇','◌','✦','⬡'],normalOffsets=[[.22,.15],[-.2,.17],[.18,.14],[0,.2],[-.16,-.16]],oddOffsets=[[.22,-.15],[.2,.17],[.29,.02],[0,.08],[-.16,.16]];
     for(let i=0;i<count;i++){
@@ -723,7 +734,7 @@ export function createTable3DRenderer({onFatal}={}){
     clearObjects();dropMarker.visible=false;
     const s=payload.state,data=payload.viewData?.anagram||{},phase=data.phase||s?.phase||'play',letters=Array.isArray(data.letters)?data.letters:[],attempts=Math.max(0,Number(data.attempts||0));
     const key=[s?.turn??0,data.stage||1,attempts,phase].join('|');if(wordDraftKey!==key){wordDraftKey=key;wordSelection=[]}
-    camera.position.set(0,6.55,8.35);camera.lookAt(0,.35,.05);
+    setCameraPose(0,6.55,8.35,0,.35,.05);
     const clue=makeLabel(data.clue||'Remettez les lettres dans l’ordre','#f2d6b8');clue.scale.set(5.6,.72,1);clue.position.set(0,2.68,-1.95);objects.add(clue);
     const span=Math.min(8.2,Math.max(2.2,(letters.length-1)*.92));
     letters.forEach((letter,i)=>{
@@ -754,7 +765,7 @@ export function createTable3DRenderer({onFatal}={}){
   function syncBalloon(payload){
     clearObjects();dropMarker.visible=false;
     const s=payload.state,data=payload.viewData?.balloon||{},phase=data.phase||s?.phase||'play',pumps=Math.max(0,Number(data.pumps||0)),pot=Math.max(0,Number(data.pot||0)),risk=Math.max(10,Math.min(90,Number(data.risk||10))),burst=!!data.burst;
-    camera.position.set(0,6.35,8.2);camera.lookAt(0,.6,.2);
+    setCameraPose(0,6.35,8.2,0,.6,.2);
     const pedestalMat=new THREE.MeshStandardMaterial({color:0x3e3343,roughness:.9}),pedestal=new THREE.Mesh(tileGeometry,pedestalMat);pedestal.scale.set(3.8,.65,2.5);pedestal.position.set(0,TABLE_Y+.13,.35);pedestal.userData.temporaryMaterial=pedestalMat;objects.add(pedestal);
     if(!burst){
       const mat=new THREE.MeshStandardMaterial({color:0xe9aacb,roughness:.48,metalness:.02,emissive:0x5d2946,emissiveIntensity:.16+.025*pumps}),balloon=new THREE.Mesh(balloonGeometry,mat);
@@ -791,7 +802,7 @@ export function createTable3DRenderer({onFatal}={}){
   function syncMetropole(payload){
     clearObjects();dropMarker.visible=false;
     const s=payload.state,data=payload.viewData?.city||{},board=data.board||[],owners=data.owners||[],houses=data.houses||[],mortgaged=data.mortgaged||[],colors=data.colors||[],playerColors=data.playerColors||[];
-    camera.position.set(0,9.35,9.9);camera.lookAt(0,.1,0);
+    setCameraPose(0,9.35,9.9,0,.1,0);
     const boardGeo=new THREE.BoxGeometry(10.4,.18,7.45),boardBase=new THREE.Mesh(boardGeo,new THREE.MeshStandardMaterial({color:0x243a30,roughness:.94}));boardBase.position.y=TABLE_Y-.02;boardBase.receiveShadow=true;boardBase.userData.temporaryGeometry=boardGeo;boardBase.userData.temporaryMaterial=boardBase.material;objects.add(boardBase);
     board.forEach((cell,i)=>{
       const p=cityWorld(i),owner=owners[i]??-1,mat=cityCellMaterial(cell,owner,!!mortgaged[i],colors),tile=new THREE.Mesh(cityTileGeometry,mat);
