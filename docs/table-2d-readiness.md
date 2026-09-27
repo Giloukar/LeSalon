@@ -175,3 +175,16 @@ Le payload 3D expose uniquement :
 Le paquet d’événements reste supprimé par `projectGame()` en online et n’est jamais reconstruit par le renderer. La seule action directement déclenchée depuis le plateau 3D est `roll`, qui repasse par `dispatch()`. Achat, refus, hypothèque, construction, vente de maison, dette et faillite restent dans les contrôles 2D existants afin de conserver une seule implémentation des règles.
 
 Le plateau 3D matérialise les rues, les couleurs de groupes, les propriétaires, jusqu’à trois maisons, les pions et les dés. Aucun modèle externe n’est requis à ce stade : ces éléments sont procéduraux et pourront être remplacés plus tard par des assets GLB sans changer le protocole de jeu.
+
+
+## Écho néon 3D
+
+Écho néon est le premier jeu d’arcade migré vers la couche Three.js. La scène utilise quatre pads lumineux procéduraux qui pourront être remplacés plus tard par des modèles GLB sans modifier le protocole d’interaction.
+
+La 3D reste une vue du moteur existant :
+- « À moi · cacher » délègue à l’action `memorized` ;
+- toucher un pad délègue à `pad(index)` ;
+- « Continuer » délègue à `continue` ;
+- scores, manche, tour et résultat proviennent exclusivement de l’état du jeu.
+
+La confidentialité est volontairement plus stricte que l’état solo brut : la séquence complète n’est exposée au renderer 3D que pendant la phase `watch` du joueur actif, puis à nouveau pendant `result`. Pendant `repeat`, le renderer ne reçoit que la longueur publique de la séquence et la progression saisie. Il ne peut donc pas lire la réponse correcte pour construire l’animation ou l’interface.
