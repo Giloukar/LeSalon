@@ -1445,7 +1445,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(hovered===mesh)return;
     if(hovered&&!drag){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale);}
     hovered=mesh;
-    if(hovered&&!drag&&['card','card-select','maid-pick','special-select','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-dest','intrus-spot','code-cycle'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
+    if(hovered&&!drag&&['card','card-select','maid-pick','special-select','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-draw','rummi-dest','intrus-spot','code-cycle'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
     draw();
   }
   function capturePointer(id){try{canvas?.setPointerCapture?.(id)}catch(_){}}
@@ -1521,6 +1521,9 @@ export function createTable3DRenderer({onFatal}={}){
     }else if(d.kind==='rummi-tile'&&current?.gameId==='rummikub'){
       d.rummiDrop=rummiDropTarget(d.mesh.position);
       if(d.rummiDrop)showDropMarkerAt(d.rummiDrop.x,d.rummiDrop.z,true);else showDropMarkerAt(0,0,false);
+    }else if(d.kind==='rummi-draw'&&current?.gameId==='rummikub'){
+      d.drawToRack=d.mesh.position.z>=1.65&&Math.abs(d.mesh.position.x)<=4.55;
+      showDropMarkerAt(Math.max(-3.4,Math.min(3.4,d.mesh.position.x)),2.18,d.drawToRack);
     }
     draw();e.preventDefault();return true;
   }
@@ -1559,7 +1562,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(!current?.canInteract&&!obj.userData.looseManip)return;
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'deck',startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
     if(obj.userData.looseManip&&obj.userData.kind!=='card'){beginLooseCardDrag(obj,e,obj.userData.kind);return}
-    if(['maid-pick','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','cactus-action','ninety-action','blackjack-action','card-action','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,command:obj.userData.command,amount:obj.userData.amount,ace:obj.userData.ace,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
+    if(['maid-pick','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','cactus-action','ninety-action','blackjack-action','card-action','rummi-tile','rummi-dest','rummi-action'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,command:obj.userData.command,amount:obj.userData.amount,ace:obj.userData.ace,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
     if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue','intrus-spot','intrus-continue','code-cycle','code-submit','code-continue','golf-adjust','golf-shoot','golf-continue'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
       drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,control:obj.userData.control,delta:obj.userData.delta,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return;
@@ -1604,6 +1607,9 @@ export function createTable3DRenderer({onFatal}={}){
         const dest=d.rummiDrop?.dest??rummiDropDestination(d.mesh.position);
         if(dest!==null){rememberGroupedRummiDropOrigins(d);if(current?.interactions?.rummi?.('drop',{id:d.tileId,dest}))return}
       }
+      if(d.kind==='rummi-draw'&&d.drawToRack){
+        if(current?.interactions?.rummi?.('draw'))return;
+      }
       if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d);return
     }
     if(d.loose&&(!d.tapEnabled||!current?.canInteract)){returnManipulatedCard(d,{snap:true});return}
@@ -1623,7 +1629,9 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='blackjack-action'){if(tap)current?.interactions?.specialCard?.(d.command,d.amount);return}
     if(d.kind==='card-action'){if(tap)current?.interactions?.cardAction?.(d.command);return}
     if(d.kind==='rummi-tile'){if(tap)current?.interactions?.rummi?.('select',d.tileId);return}
+    if(d.kind==='rummi-draw'){if(tap)current?.interactions?.rummi?.('draw');returnManipulatedCard(d,{snap:true});return}
     if(d.kind==='rummi-dest'){if(tap)current?.interactions?.rummi?.('move',d.dest);return}
+    if(d.kind==='rummi-action'){if(tap)current?.interactions?.rummi?.(d.command);return}
     if(d.kind==='deck'){if(tap)current?.interactions?.draw?.();return}
     if(d.kind==='goose-roll'||d.kind==='goose-choice'){if(tap)current?.interactions?.goose?.(d.kind==='goose-roll'?'roll':'choose',d.steps);return}
     if(d.kind==='golf-adjust'){if(tap){if(d.control==='angle')golfAim.angle=Math.max(-180,Math.min(180,golfAim.angle+Number(d.delta||0)));else if(d.control==='power')golfAim.power=Math.max(5,Math.min(100,golfAim.power+Number(d.delta||0)));syncGolf(current);draw()}return}
