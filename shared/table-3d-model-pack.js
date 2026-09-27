@@ -45,11 +45,18 @@ function tintObject(root,color){
  });
 }
 function applyTransform(object,entry,context){
- const scale=vec3(entry.scale,[1,1,1]),rotation=vec3(entry.rotationDeg,[0,0,0]),offset=vec3(entry.offset,[0,0,0]);
- const multiplier=entry.scaleFrom&&Number.isFinite(Number(context?.[entry.scaleFrom]))?Number(context[entry.scaleFrom]):1;
- object.scale?.set?.(scale[0]*multiplier,scale[1]*multiplier,scale[2]*multiplier);
- object.rotation?.set?.(rotation[0]*Math.PI/180,rotation[1]*Math.PI/180,rotation[2]*Math.PI/180);
- object.position?.set?.(offset[0],offset[1],offset[2]);
+ if(entry.scale!==undefined){
+  const scale=vec3(entry.scale,[1,1,1]);object.scale?.set?.(scale[0],scale[1],scale[2]);
+ }
+ if(entry.scaleFrom&&Number.isFinite(Number(context?.[entry.scaleFrom]))){
+  const multiplier=Number(context[entry.scaleFrom]);object.scale?.multiplyScalar?.(multiplier);
+ }
+ if(entry.rotationDeg!==undefined){
+  const rotation=vec3(entry.rotationDeg,[0,0,0]);object.rotation?.set?.(rotation[0]*Math.PI/180,rotation[1]*Math.PI/180,rotation[2]*Math.PI/180);
+ }
+ if(entry.offset!==undefined){
+  const offset=vec3(entry.offset,[0,0,0]);object.position?.set?.(offset[0],offset[1],offset[2]);
+ }
  if(entry.tintFrom)tintObject(object,context?.[entry.tintFrom]);
  if(typeof entry.configure==='function'){
   const configured=entry.configure(object,context);
