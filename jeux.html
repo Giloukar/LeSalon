@@ -727,7 +727,7 @@ function hiddenCards(cards,label){return cards.map((_,i)=>({hidden:true,id:label
 function projectGame(source,viewer){
  const v=clone(source);
  if(source.id==='code'&&!['result','over'].includes(source.phase))delete v.secret;
- if(source.id==='intrus'){v.intrusTiles=Array.from({length:source.intrusCount},(_,i)=>i===source.intrusIndex);if(!['result','over'].includes(source.phase))delete v.intrusIndex;}
+ if(source.id==='intrus'){v.intrusTiles=Array.from({length:source.intrusCount},(_,i)=>i===source.intrusIndex);delete v.intrusIndex;}
  v.deck=hiddenCards(source.deck,'stock');
  if(source.id==='anagrammes'){delete v.usedWords;if(source.phase!=='result'&&source.phase!=='over')delete v.answer;}
  if(source.id==='echo'&&!(source.phase==='watch'&&viewer===source.turn)&&source.phase!=='result'&&source.phase!=='over')v.sequence=[];
@@ -3211,7 +3211,7 @@ if(window.SalonTableView){
     stage:S.stage,
     turn:S.turn,
     count:S.intrusCount,
-    tiles:Array.from({length:S.intrusCount},(_,i)=>i===S.intrusIndex),
+    tiles:Array.isArray(S.intrusTiles)?[...S.intrusTiles]:Array.from({length:S.intrusCount},(_,i)=>i===S.intrusIndex),
     tried:[...S.tried],
     feedback:S.feedback||'',
     players:S.players.map(p=>({name:p.name,score:p.score}))
