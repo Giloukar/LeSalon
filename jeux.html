@@ -3136,7 +3136,12 @@ playSceneAction=function(ctx){
 };
 
 /* Présence cartes : gestes réseau temporaires, sans mutation de l'état autoritatif. */
-const CARD_GESTURE_GAMES=new Set(['huit','president','menteur','suites','plis','encheres','quatrevingtdixneuf']);
+const CARD_GESTURE_GAMES=new Set(['huit','president','menteur','suites','plis','encheres','quatrevingtdixneuf','cactus']);
+function cardGestureActorAllowed(gameId,actor,state){
+ if(!state||!Number.isInteger(actor)||actor<0||actor>=state.players?.length)return false;
+ if(gameId==='cactus')return state.phase!=='over'&&!(actor===state.turn&&['swap','power','reveal','peek'].includes(state.phase));
+ return actor===state.turn;
+}
 let cardGestureCounter=0,cardGestureCurrent=0,cardGestureLastAt=0,cardGestureLastProgress=-1,cardGestureLastLateral=0;
 function cardGestureGameId(){return String((net.role==='host'?net.state?.id:S?.id)||net.gameId||'')}
 function cardGestureClean(data,actor){
@@ -3159,7 +3164,7 @@ function cardGestureBroadcast(packet,exclude=null){
 }
 function cardGestureSend(detail){
  const gameId=S?.id;
- if(!isOnline()||!CARD_GESTURE_GAMES.has(gameId)||!net.active||!net.connected||net.spectator||netPaused()||S.turn!==net.me)return;
+ if(!isOnline()||!CARD_GESTURE_GAMES.has(gameId)||!net.active||!net.connected||net.spectator||netPaused()||!cardGestureActorAllowed(gameId,net.me,S))return;
  const phase=['start','move','cancel','commit'].includes(detail?.phase)?detail.phase:null;if(!phase)return;
  const progress=Math.max(0,Math.min(1,Number(detail.progress)||0)),lateral=Math.max(-1,Math.min(1,Number(detail.lateral)||0)),now=performance.now();
  if(phase==='start'){cardGestureCurrent=++cardGestureCounter;cardGestureLastAt=0;cardGestureLastProgress=-1;cardGestureLastLateral=0}
@@ -3177,7 +3182,7 @@ receiveSocial=function(data,actor,connection){
  if(data?.type==='card-gesture'){
   if(net.role==='host'){
    const seat=Number.isInteger(actor)&&actor>0?net.seats?.[actor]:null,gameId=String(net.state?.id||'');
-   if(!seat?.conn?.open||seat.conn!==connection||!CARD_GESTURE_GAMES.has(gameId)||net.state.turn!==actor||netPaused())return true;
+   if(!seat?.conn?.open||seat.conn!==connection||!CARD_GESTURE_GAMES.has(gameId)||!cardGestureActorAllowed(gameId,actor,net.state)||netPaused())return true;
    const clean=cardGestureClean(data,actor);if(!clean)return true;
    cardGestureDeliver(clean);cardGestureBroadcast(clean,connection);return true;
   }
