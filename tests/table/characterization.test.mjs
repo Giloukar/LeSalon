@@ -200,6 +200,42 @@ test('Eight local confirmed play and draw reuse physical card flights',async()=>
  assert.doesNotMatch(source,/ownDrawnIds[^\n]*dispatch\(/);
 });
 
+test('shared card-family physical cleanup remains snapshot-driven and presentation-only',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/function exactLocalCardOrigin\(previous,id,index=0\)/);
+ assert.match(source,/game==='president'&&\(previous\.centerIds\|\|\[\]\)\.length/);
+ assert.match(source,/game==='plis'&&previous\.phase==='trickResult'&&currentSnapshot\.phase==='play'/);
+ assert.match(source,/game==='encheres'&&previous\.bidRound&&currentSnapshot\.bidRound>previous\.bidRound/);
+ assert.match(source,/previous\.ownIds\|\|\[\]\)\.filter\(id=>!\(currentSnapshot\.ownIds/);
+ assert.doesNotMatch(source,/exactLocalCardOrigin[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/animateCardFamilyConfirmed[^\n]*onlineAct\(/);
+});
+
+test('99 physical flow animates play and replacement draw without changing the engine path',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/function ninetySnapshot\(payload,ninety,own\)/);
+ assert.match(source,/deckPos=new THREE\.Vector3\(-2\.1,TABLE_Y\+\.22,\.05\)/);
+ assert.match(source,/snapshot\.lastId&&snapshot\.lastId!==previous\.lastId/);
+ assert.match(source,/const deckDropped=snapshot\.deckCount<previous\.deckCount/);
+ assert.match(source,/queueCardFlight\(cardMesh\(publicCard/);
+ assert.match(source,/queueCardFlight\(cardMesh\(visual\.card\),deckPos,visual\.position/);
+ assert.doesNotMatch(source,/ninetySnapshot[^\n]*dispatch\(/);
+});
+
+test('Rummikub physical motion preserves tile identity across rack, table and draw pile',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/function rummiHiddenTileMesh\(\)/);
+ assert.match(source,/function rummiMotionSnapshot\(payload,data,visuals\)/);
+ assert.match(source,/currentVisuals\.set\(tile\.id/);
+ assert.match(source,/previous\.positions\?\.get\(id\)/);
+ assert.match(source,/before\.zone===visual\.zone/);
+ assert.match(source,/snapshot\.deckCount<previous\.deckCount/);
+ assert.match(source,/fromScale:before\.scale,toScale:visual\.scale/);
+ assert.match(source,/fromScale,toScale:visual\.scale/);
+ assert.doesNotMatch(source,/rummiMotionSnapshot[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/currentVisuals[^\n]*onlineAct\(/);
+});
+
 test('Cactus 3D pile transitions are inferred from confirmed snapshots only',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/lastCactusSnapshot=null/);

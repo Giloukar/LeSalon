@@ -391,3 +391,16 @@ La scène Cactus conserve désormais un snapshot visuel minimal de l'état préc
 Les transitions couvertes sont : pioche vers carte tirée pour le joueur concerné, prise de la défausse, carte tirée ensuite jetée sur la défausse, jet rapide depuis une main vers la pile, ainsi que des versions masquées destinées aux observateurs lorsqu'une carte adverse ne doit pas être révélée. Une carte déjà publique peut rester face visible pendant son déplacement ; une carte privée adverse reste un dos de carte.
 
 Cette couche n'appelle aucune règle et ne modifie jamais l'état : elle ne démarre qu'après observation d'une transition autoritative entre deux snapshots.
+
+
+## Flux physiques partagés — cartes et tuiles
+
+La couche de présentation commune poursuit la suppression des téléportations visuelles.
+
+Pour Président, Menteur, Quatre Suites, Chasse aux plis et Enchères, le snapshot conserve maintenant aussi les IDs de la main locale. Lorsqu'une carte du joueur est confirmée, son départ est reconstruit depuis son emplacement exact dans la main précédente au lieu d'utiliser un point générique. Président évacue physiquement un pli terminé vers le bord de table. Chasse aux plis ramasse les cartes du pli vers le siège du gagnant après l'action autoritative `collect`. Enchères débarrasse les cartes du tour précédent et déplace symboliquement la carte-prix vers le gagnant lorsque le tour suivant commence.
+
+Le 99 possède désormais une pioche visible en 3D. Après un coup confirmé, la carte jouée rejoint la défausse, puis, si la pioche contient encore des cartes, la carte de remplacement part de la pioche vers la main. La carte tirée est face visible uniquement dans la main privée du joueur concerné ; pour les autres sièges, le trajet reste représenté par un dos de carte.
+
+Rummikub conserve un snapshot des positions et échelles de chaque tuile visible. Une tuile déplacée entre le chevalet et un groupe, entre deux groupes, ou réorganisée par le recalcul du layout glisse depuis sa position précédente vers sa nouvelle position. Le changement d'échelle est interpolé lorsque la densité du groupe évolue. Une pioche physique de tuiles masquées est affichée près du chevalet et une nouvelle tuile arrive depuis cette pile après confirmation du moteur.
+
+Ces animations utilisent uniquement les différences entre états déjà confirmés. Elles ne produisent aucun coup, ne modifient aucune règle et restent désactivables avec les préférences de mouvement.
