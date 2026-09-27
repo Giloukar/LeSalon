@@ -99,7 +99,7 @@ Pour Yam :
 - les dés conservés viennent de `S.held` et sont signalés par un support visuel ;
 - toucher un dé appelle l’action `hold` existante ;
 - « Lancer / Relancer » appelle l’action `roll` existante ;
-- les catégories et leur score restent dans l’interface 2D synchronisée et sont toujours calculés par `yamScore()`.
+- les six catégories sont maintenant directement sélectionnables dans la scène 3D ; leurs valeurs prévisionnelles proviennent toujours de `yamScore()` et la validation finale reste l’action moteur `score`.
 
 Pour Ferme la boîte :
 - les dés viennent de `S.boxDice` ;
@@ -240,3 +240,10 @@ Mini-golf cosmique dispose désormais d’un parcours Three.js complet : surface
 La scène 3D ne contient aucune physique de golf. Lors de « Tirer », elle transmet uniquement `{angle, power}` à l’action `shoot`. La fonction `golfShot()` du moteur reste seule responsable des murs, collisions avec les obstacles, friction, détection du portail et calcul du chemin. Three.js transforme ensuite `golfPath` en trace et en animation de balle.
 
 Le contrat Playwright place la balle à proximité du portail et vérifie qu’un tir 3D produit, via le moteur, un chemin autoritaire, un coup réussi et les 100 points du premier coup, sans consommer de hasard. Parcours, rochers, portail et balle sont des placeholders procéduraux remplaçables par des modèles GLB/Astra.
+
+
+### Autonomie 3D du Yam
+
+Le Yam peut désormais être joué sans repasser par les commandes 2D : lancer, conservation des cinq dés, relance et inscription d’une catégorie sont tous accessibles sur la table Three.js. La projection fournit pour chaque ligne son état rempli, son score inscrit et son aperçu courant. Toucher une catégorie disponible déclenche uniquement `dispatch({type:'score', category})`; le calcul et la validation restent donc dans `playYam()`.
+
+Le contrat Playwright force cinq 6 et vérifie que la scène propose 50 points pour Yam, que la validation inscrit exactement ces 50 points, change de joueur et ne consomme aucun hasard supplémentaire.
