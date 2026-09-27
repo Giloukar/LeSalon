@@ -74,13 +74,13 @@ export function createTable3DRenderer({onFatal}={}){
   const edgeMaterial=new THREE.MeshStandardMaterial({color:0xe9e2d1,roughness:.72,metalness:0});
   const tileMaterials=new Map(),rummiTileMaterials=new Map(),pawnMaterials=new Map(),dieFaceMaterials=new Map(),cellLabelMaterials=new Map(),boxTileMaterials=new Map(),cellLabelTextures=[];
   const neutralDieMaterial=new THREE.MeshStandardMaterial({color:0xd8d3c4,roughness:.82,metalness:0});
-  let animationRaf=0,diceAnimations=[],pawnAnimations=[],lastDiceKey='',lastMoveKey='';
+  let animationRaf=0,diceAnimations=[],pawnAnimations=[],cardAnimations=[],lastDiceKey='',lastMoveKey='';
   let wordSelection=[],wordDraftKey='';
   let codeDraft=[0,1,2],codeDraftKey='';
   let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='';
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
-  let objects=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null;
+  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null;
 
   function applyCameraFit(){
     if(!camera||!cameraPose)return;
@@ -128,18 +128,20 @@ export function createTable3DRenderer({onFatal}={}){
     canvas=renderer.domElement;canvas.setAttribute('aria-label','Table de jeu 3D interactive');canvas.tabIndex=0;
 
     scene=new THREE.Scene();scene.background=new THREE.Color(0x0b110e);
-    scene.fog=new THREE.Fog(0x0b110e,12,23);
+    scene.fog=new THREE.Fog(0x0b110e,16,31);
     camera=new THREE.PerspectiveCamera(39,1,.1,60);setCameraPose(0,7.25,9.25,0,.25,.2);
 
-    const hemi=new THREE.HemisphereLight(0xe9f3e7,0x162019,1.28);scene.add(hemi);
-    const key=new THREE.DirectionalLight(0xfff5df,2.15);key.position.set(-3,8,5);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-8;key.shadow.camera.right=8;key.shadow.camera.top=7;key.shadow.camera.bottom=-7;scene.add(key);
-    const rim=new THREE.DirectionalLight(0xb8d8c5,.85);rim.position.set(6,3,-5);scene.add(rim);
+    const hemi=new THREE.HemisphereLight(0xe9f3e7,0x162019,1.42);scene.add(hemi);
+    const key=new THREE.DirectionalLight(0xfff5df,2.05);key.position.set(-3,8,5);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-8;key.shadow.camera.right=8;key.shadow.camera.top=7;key.shadow.camera.bottom=-7;scene.add(key);
+    const rim=new THREE.DirectionalLight(0xb8d8c5,1.0);rim.position.set(6,3,-5);scene.add(rim);
+    const farFill=new THREE.DirectionalLight(0xe3f0df,1.25);farFill.position.set(0,6,-7);scene.add(farFill);
+    const farGlow=new THREE.PointLight(0xbfd9c8,.62,18);farGlow.position.set(0,4,-4.2);scene.add(farGlow);
 
     const tableMat=new THREE.MeshStandardMaterial({color:0x294335,roughness:.88,metalness:0});
     tableMesh=new THREE.Mesh(new THREE.BoxGeometry(12,.5,8),tableMat);tableMesh.position.y=0;tableMesh.receiveShadow=true;tableMesh.castShadow=true;scene.add(tableMesh);
-    const felt=new THREE.Mesh(new THREE.PlaneGeometry(11.55,7.55),new THREE.MeshStandardMaterial({color:0x365944,roughness:1}));
+    const felt=new THREE.Mesh(new THREE.PlaneGeometry(11.55,7.55),new THREE.MeshStandardMaterial({color:0x3b624b,roughness:1}));
     felt.rotation.x=-Math.PI/2;felt.position.y=TABLE_Y+.005;felt.receiveShadow=true;scene.add(felt);
-    scene.add(objects);
+    scene.add(objects);scene.add(cardFx);
 
     const ring=new THREE.RingGeometry(.86,1.03,56);
     dropMarker=new THREE.Mesh(ring,new THREE.MeshBasicMaterial({color:0xdbea9e,transparent:true,opacity:.2,side:THREE.DoubleSide}));
@@ -174,22 +176,38 @@ export function createTable3DRenderer({onFatal}={}){
     renderer.setSize(w,h,false);camera.aspect=aspect;applyCameraFit();draw();
   }
   function clearObjects(){
-    interactive.length=0;diceAnimations.length=0;pawnAnimations.length=0;
+    interactive.length=0;diceAnimations.length=0;pawnAnimations.length=0;cardAnimations.length=0;
     if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
     for(const child of [...objects.children]){
       objects.remove(child);
       child.traverse?.(o=>{o.userData?.temporaryGeometry?.dispose?.();o.userData?.temporaryMaterial?.dispose?.();o.userData?.temporaryTexture?.dispose?.()});
     }
+    for(const child of [...cardFx.children])cardFx.remove(child);
   }
   function placeCard(mesh,x,z,y=TABLE_Y+.07,rot=0,scale=1){
     mesh.position.set(x,y,z);mesh.rotation.set(-Math.PI/2,0,rot);mesh.scale.setScalar(scale);objects.add(mesh);return mesh;
   }
   function handCardSlot(count,index){
-    const rows=Math.max(1,Math.min(3,Math.ceil(Math.max(1,count)/8))),perRow=Math.ceil(Math.max(1,count)/rows),row=Math.floor(index/perRow),start=row*perRow,rowCount=Math.min(perRow,count-start),local=index-start;
-    const scale=rows===1?1:rows===2?.92:.82,spacing=rowCount<=1?0:Math.min(CARD_W*scale*1.08,8.9/(rowCount-1));
-    const x=(local-(rowCount-1)/2)*spacing,t=rowCount<=1?.5:local/(rowCount-1),fan=(t-.5)*-.12;
-    const z=rows===1?2.62+Math.abs(t-.5)*.12:1.72+row*1.18+Math.abs(t-.5)*.08;
-    return{x,z,fan,scale};
+    const total=Math.max(1,count),rows=total<=8?1:total<=16?2:3,perRow=Math.ceil(total/rows),row=Math.floor(index/perRow),start=row*perRow,rowCount=Math.min(perRow,total-start),local=index-start;
+    const baseScale=rows===1?Math.max(.82,1-Math.max(0,total-6)*.04):rows===2?.88:.64;
+    const fitScale=rowCount<=1?baseScale:Math.min(baseScale,(8.8-(rowCount-1)*.10)/(rowCount*CARD_W));
+    const scale=Math.max(.56,fitScale),spacing=rowCount<=1?0:CARD_W*scale+.10,t=rowCount<=1?.5:local/(rowCount-1);
+    const x=(local-(rowCount-1)/2)*spacing,fan=(t-.5)*-.08;
+    const z=rows===1?2.66+Math.abs(t-.5)*.08:rows===2?1.35+row*1.60:1.0+row*1.10;
+    return{x,z,fan,scale,row,local,yOffset:row*.012+local*.0015};
+  }
+  function eightOpponentSeat(total,index){
+    if(total<=1)return{x:0,z:-2.34};
+    const step=Math.min(3.0,6.0/Math.max(1,total-1));
+    return{x:(index-(total-1)/2)*step,z:-2.34+Math.abs(index-(total-1)/2)*.06};
+  }
+  function eightSnapshot(payload,deckCount,top){
+    const s=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0;
+    return{key:[s?.startedAt||'',viewer,(s?.players||[]).map(p=>p?.name||'').join('|')].join('~'),viewer,deckCount,topId:top?.id||null,top:top?{id:top.id,suit:top.suit,rank:top.rank,joker:!!top.joker}:null,handCounts:(s?.players||[]).map(p=>p?.hand?.length||0)};
+  }
+  function queueCardFlight(mesh,from,to,{duration=620,delay=0,lift=.8,onDone=null,fromRot=0,toRot=0}={}){
+    mesh.position.copy(from);mesh.rotation.set(-Math.PI/2,0,fromRot);cardFx.add(mesh);
+    cardAnimations.push({mesh,from:from.clone(),to:to.clone(),start:performance.now(),duration,delay,lift,onDone,fromRot,toRot,done:false});startMotion();
   }
   function tileMaterial(kind='normal',highlight=false){
     const key=kind+(highlight?'-hot':'');if(tileMaterials.has(key))return tileMaterials.get(key);
