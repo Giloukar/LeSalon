@@ -79,15 +79,15 @@ async function defaultLoadModel(src){
  const gltf=await new Promise((resolve,reject)=>loader.load(src,resolve,undefined,reject));
  const template=gltf?.scene||gltf?.scenes?.[0];
  if(!template?.isObject3D)throw new Error('GLB/GLTF has no scene: '+src);
- return{template,clone:()=>rt.clone(template)};
+ return{template,clone:()=>rt.clone(template),wrap:child=>{const root=new rt.THREE.Group();root.add(child);return root}};
 }
-function normalizeLoaded(value,cloneModel){
+function normalizeLoaded(value,cloneModel,wrapModel){
  if(value?.template){
-  const template=value.template,clone=typeof value.clone==='function'?value.clone:()=>cloneModel?cloneModel(template):template?.clone?.(true);
-  return{template,clone};
+  const template=value.template,clone=typeof value.clone==='function'?value.clone:()=>cloneModel?cloneModel(template):template?.clone?.(true),wrap=typeof value.wrap==='function'?value.wrap:typeof wrapModel==='function'?wrapModel:null;
+  return{template,clone,wrap};
  }
- const template=value,clone=()=>cloneModel?cloneModel(template):template?.clone?.(true);
- return{template,clone};
+ const template=value,clone=()=>cloneModel?cloneModel(template):template?.clone?.(true),wrap=typeof wrapModel==='function'?wrapModel:null;
+ return{template,clone,wrap};
 }
 function unload(id){
  const key=String(id||''),pack=activePacks.get(key);if(!pack)return false;
@@ -103,18 +103,19 @@ async function load(manifest,options={}){
  const pack=normalizeManifest(manifest);
  unload(pack.id);
  const loadModel=typeof options.loadModel==='function'?options.loadModel:defaultLoadModel;
- const cloneModel=typeof options.cloneModel==='function'?options.cloneModel:null;
+ const cloneModel=typeof options.cloneModel==='function'?options.cloneModel:null,wrapModel=typeof options.wrapModel==='function'?options.wrapModel:null;
  const disposers=[],loadedKinds=[],failed=[];
  emit({type:'loading',id:pack.id,total:pack.assets.length,loaded:0,failed:0});
  let completed=0;
  const results=await Promise.all(pack.assets.map(async entry=>{
   try{
-   const value=await loadModel(entry.src,entry),record=normalizeLoaded(value,cloneModel);
+   const value=await loadModel(entry.src,entry),record=normalizeLoaded(value,cloneModel,wrapModel);
    if(!record.template)throw new Error('Model loader returned no template');
    const factory=context=>{
     const instance=record.clone?.();
     if(!instance)return null;
-    return applyTransform(instance,entry,context||{});
+    const visual=applyTransform(instance,entry,context||{});
+    return record.wrap?.(visual,context||{},entry)||visual;
    };
    return{entry,factory};
   }catch(error){return{entry,error}}
