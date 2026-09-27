@@ -3116,7 +3116,7 @@ playSceneAction=function(ctx){
 const TABLE_VIEW_2D_RENDER=renderGame,TABLE_VIEW_SHOW_HOME=showHome;
 const TABLE_3D_CARD_GAMES=['president','menteur','suites','plis','encheres'];
 const TABLE_3D_SPECIAL_CARD_GAMES=['pouilleux','quatrevingtdixneuf','vingtetun','bataille'];
-function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite','cactus','rummikub','metropole',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
+function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite','cactus','rummikub','metropole','echo',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
 function tableViewMountControl(){
  if(!window.SalonTableView)return;
  const supported=tableViewSupports3D();
@@ -3166,6 +3166,18 @@ if(window.SalonTableView){
     source:canPlay()?S.source:null,
     reveal:S.reveal?{owner:S.reveal.owner,index:S.reveal.index}:null,
     players:S.players.map((p,i)=>({name:p.name,score:p.cactusScore,hand:p.hand.map((c,index)=>c?clone(c):null),quick:legacyCactusOwnQuickAllowed(i)&&!((i===S.turn)&&['swap','power','reveal','peek'].includes(S.phase))}))
+   };
+  }
+  if(S?.id==='echo'){
+   const reveal=S.phase==='watch'&&canPlay()||['result','over'].includes(S.phase);
+   data.echo={
+    phase:S.phase,
+    stage:S.stage,
+    turn:S.turn,
+    sequence:reveal?[...S.sequence]:[],
+    input:[...S.input],
+    feedback:S.feedback||'',
+    players:S.players.map(p=>({name:p.name,score:p.score}))
    };
   }
   if(S?.id==='metropole'){
@@ -3295,6 +3307,13 @@ if(window.SalonTableView){
      else if(['president','menteur'].includes(S.id)){if(selection.size>=4){toast('Quatre cartes au maximum.');return false}selection.add(id)}
      else{selection.clear();selection.add(id)}
      renderGame(false);return true;
+    },
+    echo(type,value){
+     if(!S||S.id!=='echo'||!canPlay())return false;
+     if(type==='memorized'&&S.phase==='watch'){dispatch({type:'memorized'});return true}
+     if(type==='pad'&&S.phase==='repeat'&&Number.isInteger(value)&&value>=0&&value<4){dispatch({type:'pad',index:value});return true}
+     if(type==='continue'&&S.phase==='result'){dispatch({type:'continue'});return true}
+     return false;
     },
     city(type){
      if(!S||S.id!=='metropole'||!canPlay())return false;
