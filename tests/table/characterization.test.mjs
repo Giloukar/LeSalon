@@ -214,7 +214,7 @@ test('shared card-family physical cleanup remains snapshot-driven and presentati
 test('99 physical flow animates play and replacement draw without changing the engine path',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/function ninetySnapshot\(payload,ninety,own\)/);
- assert.match(source,/const deckPos=new THREE\.Vector3\(-2\.1,TABLE_Y\+\.22,\.05\)/);
+ assert.match(source,/deckPos=new THREE\.Vector3\(-2\.1,TABLE_Y\+\.22,\.05\)/);
  assert.match(source,/snapshot\.lastId&&snapshot\.lastId!==previous\.lastId/);
  assert.match(source,/const deckDropped=snapshot\.deckCount<previous\.deckCount/);
  assert.match(source,/queueCardFlight\(cardMesh\(publicCard/);
