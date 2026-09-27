@@ -197,3 +197,10 @@ Bulle ou double dispose maintenant d’une scène Three.js jouable avec un ballo
 Le renderer ne tire aucun nombre aléatoire pour décider du résultat d’un souffle. Il affiche uniquement `pumps`, `pot`, `burst` et le risque dérivé de l’état. L’action `pump` repasse par `dispatch()`, donc le seul tirage qui puisse provoquer l’éclatement reste celui de `playArcade()` sur l’état autoritaire de l’hôte.
 
 Le contrat Playwright vérifie également que plusieurs rendus 3D consécutifs ne consomment aucun appel à `Math.random()`, alors qu’un souffle moteur en consomme exactement un.
+
+
+## Projection de confidentialité du payload 3D
+
+La couche 3D ne reçoit désormais plus l’état moteur brut en solo/local. Avant d’être transmis au renderer, `state` passe par `projectGame()` avec l’index privé courant. En online, l’état déjà projeté est simplement cloné.
+
+Cette frontière protège notamment les mains adverses et les réponses internes des jeux d’arcade. Par exemple, pendant la phase `repeat` d’Écho néon, la séquence reste présente dans l’état autoritaire utilisé par le moteur mais elle est absente à la fois de `viewData.echo.sequence` et de `payload.state.sequence`.
