@@ -3116,7 +3116,7 @@ playSceneAction=function(ctx){
 const TABLE_VIEW_2D_RENDER=renderGame,TABLE_VIEW_SHOW_HOME=showHome;
 const TABLE_3D_CARD_GAMES=['president','menteur','suites','plis','encheres'];
 const TABLE_3D_SPECIAL_CARD_GAMES=['pouilleux','quatrevingtdixneuf','vingtetun','bataille'];
-function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite','cactus','rummikub','metropole','echo',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
+function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite','cactus','rummikub','metropole','echo','ballon',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
 function tableViewMountControl(){
  if(!window.SalonTableView)return;
  const supported=tableViewSupports3D();
@@ -3176,6 +3176,19 @@ if(window.SalonTableView){
     turn:S.turn,
     sequence:reveal?[...S.sequence]:[],
     input:[...S.input],
+    feedback:S.feedback||'',
+    players:S.players.map(p=>({name:p.name,score:p.score}))
+   };
+  }
+  if(S?.id==='ballon'){
+   data.balloon={
+    phase:S.phase,
+    stage:S.stage,
+    turn:S.turn,
+    pot:S.pot,
+    pumps:S.pumps,
+    burst:!!S.burst,
+    risk:Math.min(90,10+S.pumps*10),
     feedback:S.feedback||'',
     players:S.players.map(p=>({name:p.name,score:p.score}))
    };
@@ -3312,6 +3325,13 @@ if(window.SalonTableView){
      if(!S||S.id!=='echo'||!canPlay())return false;
      if(type==='memorized'&&S.phase==='watch'){dispatch({type:'memorized'});return true}
      if(type==='pad'&&S.phase==='repeat'&&Number.isInteger(value)&&value>=0&&value<4){dispatch({type:'pad',index:value});return true}
+     if(type==='continue'&&S.phase==='result'){dispatch({type:'continue'});return true}
+     return false;
+    },
+    balloon(type){
+     if(!S||S.id!=='ballon'||!canPlay())return false;
+     if(type==='pump'&&S.phase==='play'){dispatch({type:'pump'});return true}
+     if(type==='bank'&&S.phase==='play'&&S.pot>0){dispatch({type:'bank'});return true}
      if(type==='continue'&&S.phase==='result'){dispatch({type:'continue'});return true}
      return false;
     },

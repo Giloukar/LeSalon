@@ -142,7 +142,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
     for(const child of [...objects.children]){
       objects.remove(child);
-      child.traverse?.(o=>{o.userData?.temporaryMaterial?.dispose?.();o.userData?.temporaryTexture?.dispose?.()});
+      child.traverse?.(o=>{o.userData?.temporaryGeometry?.dispose?.();o.userData?.temporaryMaterial?.dispose?.();o.userData?.temporaryTexture?.dispose?.()});
     }
   }
   function placeCard(mesh,x,z,y=TABLE_Y+.07,rot=0,scale=1){
@@ -587,6 +587,32 @@ export function createTable3DRenderer({onFatal}={}){
     if(help)help.textContent=phase==='watch'?'Mémorisez les lumières dans l’ordre puis cachez la séquence':phase==='repeat'?'Touchez les quatre pads dans le bon ordre':phase==='result'?(data.feedback||'Séquence terminée'):'Scores synchronisés avec le moteur';
   }
 
+  function syncBalloon(payload){
+    clearObjects();dropMarker.visible=false;
+    const s=payload.state,data=payload.viewData?.balloon||{},phase=data.phase||s?.phase||'play',pumps=Math.max(0,Number(data.pumps||0)),pot=Math.max(0,Number(data.pot||0)),risk=Math.max(10,Math.min(90,Number(data.risk||10))),burst=!!data.burst;
+    camera.position.set(0,6.35,8.2);camera.lookAt(0,.6,.2);
+    const pedestalMat=new THREE.MeshStandardMaterial({color:0x3e3343,roughness:.9}),pedestal=new THREE.Mesh(tileGeometry,pedestalMat);pedestal.scale.set(3.8,.65,2.5);pedestal.position.set(0,TABLE_Y+.13,.35);pedestal.userData.temporaryMaterial=pedestalMat;objects.add(pedestal);
+    if(!burst){
+      const geo=new THREE.SphereGeometry(1,40,28),mat=new THREE.MeshStandardMaterial({color:0xe9aacb,roughness:.48,metalness:.02,emissive:0x5d2946,emissiveIntensity:.16+.025*pumps}),balloon=new THREE.Mesh(geo,mat);
+      const grow=1+Math.min(8,pumps)*.075;balloon.scale.set(grow,grow*1.18,grow);balloon.position.set(0,TABLE_Y+1.55,.15);balloon.castShadow=true;balloon.userData.temporaryGeometry=geo;balloon.userData.temporaryMaterial=mat;objects.add(balloon);
+      const knotGeo=new THREE.ConeGeometry(.16,.3,18),knotMat=new THREE.MeshStandardMaterial({color:0xc982aa,roughness:.68}),knot=new THREE.Mesh(knotGeo,knotMat);knot.rotation.z=Math.PI;knot.position.set(0,TABLE_Y+.47+grow*.12,.15);knot.userData.temporaryGeometry=knotGeo;knot.userData.temporaryMaterial=knotMat;objects.add(knot);
+    }else{
+      for(let i=0;i<10;i++){const h=visualHash('balloon-burst|'+(s?.moves||0)+'|'+i),mat=new THREE.MeshStandardMaterial({color:i%2?0xe9aacb:0xf2c6df,roughness:.66,emissive:0x5d2946,emissiveIntensity:.18}),piece=new THREE.Mesh(dieGeometry,mat);const a=h*Math.PI*2,r=.9+visualHash(i+'r')*1.4;piece.scale.set(.18+.12*h,.08+.08*(1-h),.24);piece.position.set(Math.cos(a)*r,TABLE_Y+.9+visualHash(i+'y')*1.7,.15+Math.sin(a)*r*.7);piece.rotation.set(h*4,h*7,h*5);piece.userData.temporaryMaterial=mat;objects.add(piece)}
+    }
+    const potLabel=makeLabel(burst?'POP · 0':pot+' POINT'+(pot>1?'S':''),burst?'#efaaa0':'#f4d5e7');potLabel.scale.set(2.5,.62,1);potLabel.position.set(0,3.05,.15);objects.add(potLabel);
+    const riskLabel=makeLabel('RISQUE '+risk+' %',risk>=70?'#efaaa0':risk>=40?'#edbe86':'#b5e4a4');riskLabel.scale.set(2.2,.52,1);riskLabel.position.set(0,.92,-1.55);objects.add(riskLabel);
+    for(let i=0;i<9;i++){const hot=i<Math.ceil(risk/10),mat=new THREE.MeshStandardMaterial({color:hot?(risk>=70?0xc56f75:risk>=40?0xc99a5f:0x83af82):0x44534b,roughness:.82,emissive:hot?0x352617:0x000000,emissiveIntensity:hot?.25:0}),bar=new THREE.Mesh(tileGeometry,mat);bar.scale.set(.48,.24,.48);bar.position.set((i-4)*.72,TABLE_Y+.36,-1.42);bar.userData.temporaryMaterial=mat;objects.add(bar)}
+    if(phase==='play'&&payload.canInteract){
+      const pump=actionSprite('GONFLER · +10','balloon-pump',{},'#f4d5e7');pump.position.set(-1.55,1.08,2.5);objects.add(pump);
+      if(pot>0){const bank=actionSprite('ENCAISSER '+pot,'balloon-bank',{},'#dbea9e');bank.position.set(1.55,1.08,2.5);objects.add(bank)}
+    }else if(phase==='result'&&payload.canInteract){const next=actionSprite('CONTINUER','balloon-continue');next.position.set(0,1.08,2.5);objects.add(next)}
+    (data.players||[]).forEach((p,i)=>{const tag=makeLabel((p.name||'Joueur')+' · '+Number(p.score||0),i===s?.turn?'#dbea9e':'#d8ded9');tag.scale.set(1.72,.34,1);tag.position.set((i-(data.players.length-1)/2)*2.18,.92,-2.45);objects.add(tag)});
+    const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
+    if(title)title.textContent='VUE 3D · BULLE OU DOUBLE';
+    if(status)status.textContent='Manche '+(data.stage||1)+' / 5 · '+(phase==='play'?'cagnotte '+pot+' · '+pumps+' souffle'+(pumps>1?'s':''):phase==='result'?(data.feedback||'Tour terminé'):'partie terminée');
+    if(help)help.textContent=phase==='play'?'Le moteur décide seul si le prochain souffle éclate · la 3D ne fait qu’afficher le résultat':phase==='result'?'Continuez pour passer au joueur suivant':'Scores synchronisés';
+  }
+
   function cityWorld(index){
     const side=Math.floor(index/6),step=index%6;
     if(side===0)return new THREE.Vector3(-4.35+step*1.45,TABLE_Y+.13,3.05);
@@ -625,7 +651,8 @@ export function createTable3DRenderer({onFatal}={}){
   }
 
   function syncCurrent(payload){
-    if(payload?.gameId==='echo')syncEcho(payload);
+    if(payload?.gameId==='ballon')syncBalloon(payload);
+    else if(payload?.gameId==='echo')syncEcho(payload);
     else if(payload?.gameId==='metropole')syncMetropole(payload);
     else if(payload?.gameId==='rummikub')syncRummikub(payload);
     else if(payload?.gameId==='cactus')syncCactus(payload);
@@ -667,7 +694,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,kind:'deck',startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(obj.userData.kind==='card-select'){drag={pointerId:e.pointerId,kind:'card-select',cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(['maid-pick','special-select','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
-    if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue'].includes(obj.userData.kind)){
+    if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
       drag={pointerId:e.pointerId,kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return;
     }
@@ -702,6 +729,9 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='rummi-dest'){if(tap)current?.interactions?.rummi?.('move',d.dest);return}
     if(d.kind==='deck'){if(tap)current?.interactions?.draw?.();return}
     if(d.kind==='goose-roll'||d.kind==='goose-choice'){if(tap)current?.interactions?.goose?.(d.kind==='goose-roll'?'roll':'choose',d.steps);return}
+    if(d.kind==='balloon-pump'){if(tap)current?.interactions?.balloon?.('pump');return}
+    if(d.kind==='balloon-bank'){if(tap)current?.interactions?.balloon?.('bank');return}
+    if(d.kind==='balloon-continue'){if(tap)current?.interactions?.balloon?.('continue');return}
     if(d.kind==='echo-memorized'){if(tap)current?.interactions?.echo?.('memorized');return}
     if(d.kind==='echo-pad'){if(tap)current?.interactions?.echo?.('pad',d.index);return}
     if(d.kind==='echo-continue'){if(tap)current?.interactions?.echo?.('continue');return}

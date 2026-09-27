@@ -188,3 +188,12 @@ La 3D reste une vue du moteur existant :
 - scores, manche, tour et résultat proviennent exclusivement de l’état du jeu.
 
 La confidentialité est volontairement plus stricte que l’état solo brut : la séquence complète n’est exposée au renderer 3D que pendant la phase `watch` du joueur actif, puis à nouveau pendant `result`. Pendant `repeat`, le renderer ne reçoit que la longueur publique de la séquence et la progression saisie. Il ne peut donc pas lire la réponse correcte pour construire l’animation ou l’interface.
+
+
+## Bulle ou double 3D
+
+Bulle ou double dispose maintenant d’une scène Three.js jouable avec un ballon procédural, une jauge de risque et les commandes Gonfler, Encaisser et Continuer. Le ballon et ses fragments restent des placeholders remplaçables ultérieurement par un asset GLB/Astra sans changer les actions du jeu.
+
+Le renderer ne tire aucun nombre aléatoire pour décider du résultat d’un souffle. Il affiche uniquement `pumps`, `pot`, `burst` et le risque dérivé de l’état. L’action `pump` repasse par `dispatch()`, donc le seul tirage qui puisse provoquer l’éclatement reste celui de `playArcade()` sur l’état autoritaire de l’hôte.
+
+Le contrat Playwright vérifie également que plusieurs rendus 3D consécutifs ne consomment aucun appel à `Math.random()`, alors qu’un souffle moteur en consomme exactement un.
