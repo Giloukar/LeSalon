@@ -1150,7 +1150,8 @@ export function createTable3DRenderer({onFatal}={}){
     const obj=hit(e);setHover(obj);if(!obj)return;
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'deck',startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
     if(obj.userData.kind==='card-select'){beginLooseCardDrag(obj,e,'card-select');return}
-    if(['maid-pick','special-select','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','cactus-action','ninety-action','blackjack-action','card-action','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,command:obj.userData.command,amount:obj.userData.amount,ace:obj.userData.ace,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
+    if(obj.userData.kind==='special-select'){beginLooseCardDrag(obj,e,'special-select');return}
+    if(['maid-pick','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','cactus-action','ninety-action','blackjack-action','card-action','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,command:obj.userData.command,amount:obj.userData.amount,ace:obj.userData.ace,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
     if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue','intrus-spot','intrus-continue','code-cycle','code-submit','code-continue','golf-adjust','golf-shoot','golf-continue'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
       drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,control:obj.userData.control,delta:obj.userData.delta,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return;
@@ -1163,7 +1164,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(!active)return;
     if(!drag){setHover(hit(e));return}
     if(e.pointerId!==drag.pointerId)return;
-    if(drag.kind==='card-select'){moveLooseCardDrag(e);return}
+    if(drag.kind==='card-select'||drag.kind==='special-select'){moveLooseCardDrag(e);return}
     if(drag.kind!=='card')return;
     const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;if(!drag.moved&&Math.hypot(dx,dy)>6)drag.moved=true;
     if(!drag.moved)return;
@@ -1178,6 +1179,11 @@ export function createTable3DRenderer({onFatal}={}){
     const tap=Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
     if(d.kind==='card-select'){
       if(tap)current?.interactions?.cardSelect?.(d.cardId);
+      else returnManipulatedCard(d);
+      return;
+    }
+    if(d.kind==='special-select'){
+      if(tap)current?.interactions?.specialCard?.('select',d.cardId);
       else returnManipulatedCard(d);
       return;
     }
@@ -1228,7 +1234,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function cancelActiveDrag(pointerId=null){
     if(!drag||(pointerId!==null&&drag.pointerId!==pointerId))return;
-    const d=drag,wasCard=d.kind==='card',wasLoose=d.kind==='card-select';if(wasCard)emitLocalCardGesture('cancel',0,0);drag=null;host?.classList.remove('is-dragging');if(dropMarker)dropMarker.material.opacity=.2;
+    const d=drag,wasCard=d.kind==='card',wasLoose=d.kind==='card-select'||d.kind==='special-select';if(wasCard)emitLocalCardGesture('cancel',0,0);drag=null;host?.classList.remove('is-dragging');if(dropMarker)dropMarker.material.opacity=.2;
     if(wasLoose){returnManipulatedCard(d,{snap:document.hidden});return}
     if(wasCard&&current){syncEight(current);draw()}
   }
