@@ -186,13 +186,18 @@ test('Rummikub dense 3D layout and shared card motion remain presentation-only',
 
 test('shared card games expose direct authoritative 3D actions',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'president','online');const r=await t.page.evaluate(async()=>{net.gameId='president';net.state.turn=0;net.state.trick=null;net.state.passed=[];S=projectGame(net.state,0);let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const id=net.state.players[0].hand[0].id,before=net.state.players[0].hand.length,selected=seen.interactions.cardSelect(id),played=seen.interactions.cardAction('play');return{selected,played,before,after:net.state.players[0].hand.length,trickId:net.state.trick?.cards?.[0]?.id,owner:net.state.trick?.owner};});assert.equal(r.selected,true);assert.equal(r.played,true);assert.equal(r.after,r.before-1);assert.equal(r.trickId!=null,true);assert.equal(r.owner,0);}finally{await browser.close();}});
 
-test('free 3D card manipulation is presentation-only until a card action is chosen',async()=>{
+test('free 3D tabletop manipulation stays presentation-only until an explicit valid action',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/manipAnimations=\[\]/);
+ assert.match(source,/function makeLooseManipulable\(/);
  assert.match(source,/function beginLooseCardDrag\(/);
  assert.match(source,/function moveLooseCardDrag\(/);
  assert.match(source,/function returnManipulatedCard\(/);
- assert.match(source,/kind==='card-select'\|\|drag\.kind==='special-select'/);
+ assert.match(source,/if\(!current\?\.canInteract&&!obj\.userData\.looseManip\)return/);
+ assert.match(source,/if\(drag\.loose\)\{moveLooseCardDrag\(e\);return\}/);
+ assert.match(source,/makeLooseManipulable\(mesh,\{kind:'rummi-tile'/);
+ assert.match(source,/if\(mine\)makeLooseManipulable\(mesh,\{kind:mesh\.userData\.kind/);
+ assert.match(source,/interactiveCard:true,playable:playable\.has\(card\.id\)/);
  assert.doesNotMatch(source,/returnManipulatedCard[^\n]*dispatch\(/);
  assert.doesNotMatch(source,/moveLooseCardDrag[^\n]*onlineAct\(/);
  assert.match(source,/card-action/);
