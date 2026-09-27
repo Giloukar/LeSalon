@@ -3143,6 +3143,11 @@ function table3dExitNativeFullscreen(){
  if(!document.fullscreenElement||typeof document.exitFullscreen!=='function')return;
  try{const p=document.exitFullscreen();p?.catch?.(()=>{})}catch{}
 }
+function table3dApplyWindowMode(target){
+ if(target==='full'){table3dSetPresentation('full');table3dRequestNativeFullscreen();return true}
+ if(target==='embedded'){table3dSetPresentation('embedded');table3dExitNativeFullscreen();return true}
+ return false;
+}
 const TABLE_3D_CARD_GAMES=['president','menteur','suites','plis','encheres'];
 const TABLE_3D_SPECIAL_CARD_GAMES=['pouilleux','quatrevingtdixneuf','vingtetun','bataille'];
 function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite','cactus','rummikub','metropole','echo','ballon','anagrammes','intrus','code','golf',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
@@ -3466,12 +3471,10 @@ if(window.SalonTableView){
   document.documentElement.removeAttribute('data-table-3d-game');
   return TABLE_VIEW_SHOW_HOME();
  };
+ window.addEventListener('salon:table-3d-window',e=>table3dApplyWindowMode(e.detail?.mode));
  document.addEventListener('click',e=>{
   const b=e.target.closest?.('[data-table-3d-window]');if(!b)return;
-  e.preventDefault();e.stopImmediatePropagation();
-  const target=b.dataset.table3dWindow;
-  if(target==='full'){table3dSetPresentation('full');table3dRequestNativeFullscreen()}
-  else if(target==='embedded'){table3dSetPresentation('embedded');table3dExitNativeFullscreen()}
+  e.preventDefault();e.stopImmediatePropagation();table3dApplyWindowMode(b.dataset.table3dWindow);
  },true);
  document.addEventListener('click',async e=>{
   const b=e.target.closest?.('[data-table-view-mode]');if(!b)return;
