@@ -355,3 +355,12 @@ Le registre d'assets couvre maintenant aussi les objets propres à plusieurs sc�
 Le renderer s'abonne au registre pendant sa durée de vie. Une factory enregistrée après l'ouverture de la vue 3D provoque une reconstruction purement visuelle de la scène depuis la même projection autoritative ; retirer la factory rétablit le placeholder procédural. Le chargement d'un GLB peut donc être asynchrone sans bloquer la partie : seule la factory finale doit être synchrone une fois le modèle disponible.
 
 Le contrat complet des factories, leurs contextes et leurs dimensions canoniques est décrit dans `docs/table-3d-assets.md`.
+
+
+## Présence gestuelle multijoueur des cartes
+
+Le canal de présence éphémère initialement réservé au 8 américain couvre désormais aussi Président, Menteur, Quatre Suites, Chasse aux plis, Enchères et 99.
+
+Pendant qu'un joueur actif déplace librement une carte, les autres clients peuvent voir un dos de carte interpolé depuis son siège vers la zone logique du jeu. Ce flux ne contient jamais l'identifiant, la famille, la valeur ni le contenu de la carte : uniquement le jeu courant, l'acteur, un identifiant de geste, la phase du geste et deux coordonnées normalisées de progression.
+
+Le serveur hôte relaie le geste uniquement si la connexion correspond au siège authentifié, si le jeu courant accepte ce canal, si la révision correspond et si l'acteur est bien le joueur actif. Le geste ne modifie ni l'état autoritatif, ni le RNG, ni la révision de partie. Le mouvement confirmé continue d'être animé depuis le changement d'état réel.
