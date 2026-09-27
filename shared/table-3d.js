@@ -561,7 +561,7 @@ export function createTable3DRenderer({onFatal}={}){
     active=false;drag=null;hovered=null;diceAnimations.length=0;pawnAnimations.length=0;
     if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
     resizeObserver?.disconnect();resizeObserver=null;host?.remove();host=null;
-    document.documentElement.removeAttribute('data-table-3d-game');
+    document.documentElement.removeAttribute('data-table-3d-game');document.documentElement.removeAttribute('data-table-3d-phase');
   }
   function destroy(){
     deactivate();clearObjects();
