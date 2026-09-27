@@ -213,3 +213,12 @@ Lettres en folie utilise désormais des tuiles 3D procédurales. La composition 
 Aucune lettre sélectionnée individuellement n’est envoyée au moteur. Seule l’action Valider transmet le mot composé à l’action `word` existante. Passer et Continuer délèguent respectivement à `giveup` et `continue`.
 
 Le payload 3D contient l’indice, les lettres mélangées, le nombre d’essais et les scores, mais jamais `answer` pendant la phase de jeu. Le test couvre également Écho néon en solo afin de vérifier que la projection de confidentialité retire réellement la séquence de `payload.state` pendant `repeat`, tout en la laissant intacte dans l’état moteur autoritaire.
+
+
+## L’Intrus 3D
+
+L’Intrus dispose désormais d’une constellation Three.js jouable de 9 à 25 symboles. Chaque manche utilise une famille de symbole procédurale et une petite anomalie géométrique ; les cases déjà essayées sont atténuées et l’anomalie n’est explicitement mise en évidence qu’à la phase de résultat.
+
+La frontière de données ne transmet jamais `intrusIndex` au renderer, y compris après révélation. Le tableau booléen `intrusTiles` / `viewData.intrus.tiles` ne sert qu’à construire la différence visuelle que le joueur doit observer, comme dans la vue 2D. Le renderer ne décide jamais si un clic est correct : chaque case envoie uniquement `spot(index)` au moteur, qui gère les essais, le score et la fin du tour.
+
+Les symboles actuels sont procéduraux et pourront être remplacés par des objets GLB/Astra sans modifier l’action `spot` ni le protocole de projection.
