@@ -261,3 +261,12 @@ Cette étape ne touche ni aux règles ni au protocole réseau. Elle prépare aus
 La bascule de rendu est désormais visuellement exclusive : en mode 3D, le plateau et la main 2D restent synchronisés en arrière-plan pour le fallback mais ne sont plus affichés. Les commandes métier nécessaires restent disponibles sous la scène. Le sélecteur 2D/3D n’affiche plus deux boutons simultanés : il ne montre que la destination disponible (3D depuis la vue 2D, 2D depuis la vue 3D).
 
 Le glisser-déposer du 8 américain est renforcé sur mobile, en 2D comme en 3D. La capture de pointeur est tolérante aux navigateurs qui la refusent, les pertes de capture / changements de visibilité annulent proprement le geste, les fantômes de carte sont toujours supprimés, et la zone de dépose 3D est élargie pour les pointeurs tactiles. Un 8 déposé correctement ouvre le choix de couleur sans laisser la carte dans un état visuel intermédiaire.
+
+
+## Coquille 3D plein écran
+
+L’ouverture de la vue 3D privilégie désormais un affichage plein écran. Le navigateur tente d’utiliser l’API Fullscreen lorsqu’elle est disponible, avec repli automatique vers une couche CSS couvrant tout le viewport. La scène expose une croix de retour 2D et un contrôle de réduction vers une vue 3D intégrée à la page ; cette vue intégrée permet ensuite de repasser en plein écran sans recréer la partie.
+
+Les contrôles HTML encore nécessaires au moteur (par exemple le choix de couleur après un 8 ou un Joker) sont transformés en tiroir flottant au-dessus de la scène plutôt que laissés hors écran. Les widgets globaux et effets 2D sont masqués pendant le plein écran pour éviter les chevauchements. Sur mobile, la navigation globale est remise dans le flux en 2D et le dock musical est compacté.
+
+Le placement de la main du 8 américain utilise maintenant des lignes équilibrées avec un espacement basé sur la largeur réelle des cartes. Jusqu’à huit cartes, la main reste sur une seule ligne sans chevauchement important ; au-delà, elle se répartit automatiquement sur deux puis trois lignes. Cette logique est indépendante des futurs modèles GLB/GLTF et pourra donc être réutilisée avec les assets Astra.
