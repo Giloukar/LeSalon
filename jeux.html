@@ -3114,7 +3114,7 @@ playSceneAction=function(ctx){
 
 /* Contrôleur de rendu : la 2D reste la couche de base et le fallback permanent. */
 const TABLE_VIEW_2D_RENDER=renderGame,TABLE_VIEW_SHOW_HOME=showHome;
-function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie'].includes(S.id)}
+function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite'].includes(S.id)}
 function tableViewMountControl(){
  if(!window.SalonTableView)return;
  const supported=tableViewSupports3D();
@@ -3145,6 +3145,12 @@ if(window.SalonTableView){
    data.boardCoords=CELL_COORDS.map(p=>p.slice());data.gooseCells=[...GEESE];data.gooseChoices=steps.map(n=>({steps:n,target:legacyGooseTarget(player(S).pos,n)}));data.choiceTargets=data.gooseChoices.map(x=>x.target);
    data.specialCells={bridge:6,inn:19,well:31,maze:42,prison:52,skull:58,goal:63};data.playerColors=COLORS.slice();
   }
+  if(S?.id==='yam'){
+   data.yamDice=[...S.dice];data.yamHeld=[...S.held];data.yamRolls=S.rolls;data.yamTurn=S.yamTurn;
+  }
+  if(S?.id==='boite'){
+   data.boxDice=[...S.boxDice];data.boxNumbers=[...S.boxNumbers];data.boxStage=S.boxStage;data.boxSelected=[...selection].map(Number);data.boxCanOne=S.boxNumbers.every(n=>n<7);
+  }
   return window.SalonTableView.render({
    args,
    state:gate?null:S,
@@ -3159,7 +3165,22 @@ if(window.SalonTableView){
    interactions:{
     playCard(id){if(!S||S.id!=='huit'||!canPlay())return false;const c=player(S).hand.find(c=>c.id===id);if(!c)return false;eightPlayCardUI(c);return true},
     draw(){if(!S||S.id!=='huit'||!canPlay())return false;dispatch({type:'draw'});return true},
-    goose(type,steps){if(!S||S.id!=='oie'||!canPlay())return false;dispatch(type==='choose'?{type:'gooseChoose',steps}: {type});return true}
+    goose(type,steps){if(!S||S.id!=='oie'||!canPlay())return false;dispatch(type==='choose'?{type:'gooseChoose',steps}: {type});return true},
+    yam(type,index){if(!S||S.id!=='yam'||!canPlay())return false;dispatch(type==='hold'?{type:'hold',index}:{type:'roll'});return true},
+    box(type,value){
+     if(!S||S.id!=='boite'||!canPlay())return false;
+     if(type==='roll'){dispatch({type:'roll',count:value});return true}
+     if(type==='toggle'){
+      const key=String(value);if(!S.boxNumbers.includes(value)||S.boxStage!=='choose')return false;
+      if(selection.has(key))selection.delete(key);else selection.add(key);renderGame(false);return true;
+     }
+     if(type==='close'){
+      const numbers=[...selection].map(Number),total=S.boxDice.reduce((a,b)=>a+b,0);
+      if(!numbers.length||numbers.reduce((a,b)=>a+b,0)!==total)return false;
+      dispatch({type:'close',numbers});return true;
+     }
+     return false;
+    }
    }
   });
  };

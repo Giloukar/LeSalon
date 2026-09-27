@@ -12,7 +12,10 @@
 .table-3d-fallback{display:grid;place-items:center;min-height:240px;padding:28px;text-align:center;color:var(--muted)}
 html[data-table-view="3d"][data-table-3d-game="huit"] .table-column .felt,
 html[data-table-view="3d"][data-table-3d-game="huit"] .table-column .hand-panel,
-html[data-table-view="3d"][data-table-3d-game="oie"] .table-column .felt{display:none!important}
+html[data-table-view="3d"][data-table-3d-game="oie"] .table-column .felt,
+html[data-table-view="3d"][data-table-3d-game="boite"] .table-column .felt{display:none!important}
+html[data-table-view="3d"][data-table-3d-game="yam"] .table-column .yam-dice,
+html[data-table-view="3d"][data-table-3d-game="yam"] .table-column .yam-instruction{display:none!important}
 html[data-table-view="3d"][data-table-3d-game="huit"] .table-column{min-width:0}
 @media(max-width:700px){.table-view-switch{order:-1}.table-view-switch button{min-width:34px;height:30px;padding:0 6px}.table-3d-host{height:clamp(380px,58vh,560px);border-radius:18px;margin-top:8px}.table-3d-hud{left:9px;right:9px;top:9px}.table-3d-help{bottom:8px;font-size:9px;max-width:90%;white-space:normal;text-align:center}}
 @media(prefers-reduced-motion:reduce){.table-view-switch button{transition:none}}
