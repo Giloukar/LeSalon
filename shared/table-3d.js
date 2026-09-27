@@ -5,7 +5,7 @@ const SUIT_NAME={S:'pique',H:'cœur',D:'carreau',C:'trèfle',X:'joker'};
 const RANK_NAME={1:'A',11:'V',12:'D',13:'R'};
 const CARD_W=1.22,CARD_H=1.78,CARD_D=.045;
 const TABLE_Y=.28;
-const LIVE_CARD_GAMES=new Set(['huit','president','menteur','suites','plis','encheres','quatrevingtdixneuf']);
+const LIVE_CARD_GAMES=new Set(['huit','president','menteur','suites','plis','encheres','quatrevingtdixneuf','cactus']);
 const visualHash=str=>{
   let h=2166136261;
   for(const ch of String(str)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}
@@ -236,7 +236,8 @@ export function createTable3DRenderer({onFatal}={}){
       suites:[0,0],
       plis:[0,0],
       encheres:[0,.75],
-      quatrevingtdixneuf:[1.5,.05]
+      quatrevingtdixneuf:[1.5,.05],
+      cactus:[0,.1]
     }[game]||[0,.05];
     return new THREE.Vector3(target[0],y,target[1]);
   }
@@ -255,6 +256,10 @@ export function createTable3DRenderer({onFatal}={}){
   function currentCardOpponentSeat(actor){
     const state=current?.state,viewer=Number.isInteger(current?.privateIndex)?current.privateIndex:0,game=current?.gameId;
     if(!state?.players?.length||!Number.isInteger(actor)||actor===viewer)return null;
+    if(game==='cactus'){
+      const players=current?.viewData?.cactus?.players||state.players,count=Math.max(1,players.length),angle=(actor/(count-1||1))*Math.PI-Math.PI/2;
+      return{x:Math.sin(angle)*4.2,z:-2.15+Math.cos(angle)*.72};
+    }
     const opponents=state.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer&&!(game==='quatrevingtdixneuf'&&x.p?.out)),index=opponents.findIndex(x=>x.i===actor);
     if(index<0)return null;return eightOpponentSeat(opponents.length,index);
   }
@@ -333,12 +338,12 @@ export function createTable3DRenderer({onFatal}={}){
     return{x:(local-(rowCount-1)/2)*spacing,z:2.05+row*.78+Math.abs(t-.5)*.04,scale,row,yOffset:row*.012+local*.001};
   }
   function eightSnapshot(payload,deckCount,top){
-    const s=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0;
-    return{key:[s?.startedAt||'',viewer,(s?.players||[]).map(p=>p?.name||'').join('|')].join('~'),viewer,deckCount,topId:top?.id||null,top:top?{id:top.id,suit:top.suit,rank:top.rank,joker:!!top.joker}:null,handCounts:(s?.players||[]).map(p=>p?.hand?.length||0)};
+    const s=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0,own=s?.players?.[viewer]?.hand||[];
+    return{key:[s?.startedAt||'',viewer,(s?.players||[]).map(p=>p?.name||'').join('|')].join('~'),viewer,deckCount,topId:top?.id||null,top:top?{id:top.id,suit:top.suit,rank:top.rank,joker:!!top.joker}:null,ownIds:own.map(c=>c?.id).filter(Boolean),handCounts:(s?.players||[]).map(p=>p?.hand?.length||0)};
   }
-  function queueCardFlight(mesh,from,to,{duration=620,delay=0,lift=.8,onDone=null,fromRot=0,toRot=0}={}){
+  function queueCardFlight(mesh,from,to,{duration=620,delay=0,lift=.8,onDone=null,fromRot=0,toRot=0,bank=.10,roll=.08}={}){
     mesh.position.copy(from);mesh.rotation.set(-Math.PI/2,0,fromRot);cardFx.add(mesh);
-    cardAnimations.push({mesh,from:from.clone(),to:to.clone(),start:performance.now(),duration,delay,lift,onDone,fromRot,toRot,done:false});startMotion();
+    cardAnimations.push({mesh,from:from.clone(),to:to.clone(),start:performance.now(),duration,delay,lift,onDone,fromRot,toRot,bank,roll,done:false});startMotion();
   }
   function tileMaterial(kind='normal',highlight=false){
     const key=kind+(highlight?'-hot':'');if(tileMaterials.has(key))return tileMaterials.get(key);
@@ -429,8 +434,11 @@ export function createTable3DRenderer({onFatal}={}){
       if(elapsed<0){running=true;continue}
       const t=Math.min(1,Math.max(0,elapsed/a.duration)),ease=1-Math.pow(1-t,3);
       a.mesh.position.lerpVectors(a.from,a.to,ease);a.mesh.position.y+=Math.sin(t*Math.PI)*(a.lift??.8);
+      const arc=Math.sin(t*Math.PI);
+      a.mesh.rotation.x=-Math.PI/2+arc*(a.bank??.10);
+      a.mesh.rotation.y=arc*(a.roll??.08);
       a.mesh.rotation.z=THREE.MathUtils.lerp(a.fromRot||0,a.toRot||0,ease);
-      if(t<1)running=true;else{a.mesh.position.copy(a.to);a.done=true;cardFx.remove(a.mesh);a.onDone?.()}
+      if(t<1)running=true;else{a.mesh.position.copy(a.to);a.mesh.rotation.set(-Math.PI/2,0,a.toRot||0);a.done=true;cardFx.remove(a.mesh);a.onDone?.()}
     }
     if(cardAnimations.some(a=>a.done))cardAnimations=cardAnimations.filter(a=>!a.done);
     for(const a of manipAnimations){
@@ -738,12 +746,13 @@ export function createTable3DRenderer({onFatal}={}){
     if(!s?.players?.length){lastEightSnapshot=null;return}
     const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),playable=new Set(payload.viewData?.playableIds||[]),previous=lastEightSnapshot;
 
-    const n=own.length;
+    const n=own.length,ownVisuals=new Map();
     own.forEach((card,i)=>{
       const slot=handCardSlot(n,i),mesh=cardMesh(card,{id:card.id,interactiveCard:true,playable:playable.has(card.id)});
       const lift=playable.has(card.id)?.14:0,scale=slot.scale*(playable.has(card.id)?1.025:1);
       placeCard(mesh,slot.x,slot.z,TABLE_Y+.12+slot.yOffset+lift,slot.fan,scale);
       mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};mesh.userData.looseManip=true;
+      ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale});
     });
 
     const deckCount=Array.isArray(s.deck)?s.deck.length:Number(s.deckCount||0);
@@ -773,23 +782,37 @@ export function createTable3DRenderer({onFatal}={}){
     if(previous&&previous.key===snapshot.key&&motionAllowed()){
       const opponentIndices=snapshot.handCounts.map((_,i)=>i).filter(i=>i!==viewer);
       const discardChanged=!!top&&snapshot.topId!==previous.topId;
-      const played=discardChanged?opponentIndices.find(i=>snapshot.handCounts[i]===previous.handCounts[i]-1):undefined;
-      if(Number.isInteger(played)){
+      const ownPlayed=discardChanged&&snapshot.handCounts[viewer]===previous.handCounts[viewer]-1&&previous.ownIds?.includes(top.id);
+      const ownDrawnIds=snapshot.deckCount<previous.deckCount&&snapshot.handCounts[viewer]>previous.handCounts[viewer]?(snapshot.ownIds||[]).filter(id=>!(previous.ownIds||[]).includes(id)):[];
+      if(ownPlayed){
+        const previousIndex=previous.ownIds.indexOf(top.id),slot=handCardSlot(previous.ownIds.length,Math.max(0,previousIndex)),from=new THREE.Vector3(slot.x,TABLE_Y+.28+slot.yOffset,slot.z),to=new THREE.Vector3(1.25,TABLE_Y+.23,.05),flight=cardMesh(top);
+        if(discardMesh)discardMesh.visible=false;
+        queueCardFlight(flight,from,to,{duration:560,lift:.72,fromRot:slot.fan,toRot:(visualHash(top.id)-.5)*.18,bank:.14,roll:(visualHash(top.id+'roll')-.5)*.22,onDone:()=>{if(discardMesh)discardMesh.visible=true}});
+      }else if(ownDrawnIds.length){
+        ownDrawnIds.slice(0,4).forEach((id,q)=>{
+          const visual=ownVisuals.get(id);if(!visual)return;visual.mesh.visible=false;
+          const flight=cardMesh(visual.card),from=new THREE.Vector3(-1.25,TABLE_Y+.28,.05);
+          queueCardFlight(flight,from,visual.position,{duration:520+q*35,delay:q*80,lift:.68,fromRot:-.03,toRot:visual.rotation,bank:.12,roll:(q%2?-.10:.10),onDone:()=>{visual.mesh.visible=true}});
+        });
+      }else{
+        const played=discardChanged?opponentIndices.find(i=>snapshot.handCounts[i]===previous.handCounts[i]-1):undefined;
+        if(Number.isInteger(played)){
         const visual=opponentVisuals.get(played);
         if(visual){
           const from=new THREE.Vector3(visual.x,TABLE_Y+.34,visual.z+.12),to=new THREE.Vector3(1.25,TABLE_Y+.23,.05),flight=cardMesh(top);
           if(discardMesh)discardMesh.visible=false;
           queueCardFlight(flight,from,to,{duration:700,lift:1.0,fromRot:.04,toRot:(visualHash(top.id)-.5)*.18,onDone:()=>{if(discardMesh)discardMesh.visible=true}});
-        }
-      }else if(snapshot.deckCount<previous.deckCount){
-        const drawn=opponentIndices.find(i=>snapshot.handCounts[i]>previous.handCounts[i]);
-        if(Number.isInteger(drawn)){
-          const visual=opponentVisuals.get(drawn),amount=Math.min(3,Math.max(1,snapshot.handCounts[drawn]-previous.handCounts[drawn]));
-          if(visual){
-            const arrivals=visual.meshes.slice(-Math.min(amount,visual.meshes.length));arrivals.forEach(mesh=>mesh.visible=false);
-            for(let q=0;q<amount;q++){
-              const flight=cardMesh(null,{back:true}),from=new THREE.Vector3(-1.25,TABLE_Y+.28,.05),to=new THREE.Vector3(visual.x+(q-(amount-1)/2)*.18,TABLE_Y+.25,visual.z+.08);
-              queueCardFlight(flight,from,to,{duration:610,delay:q*115,lift:.82,fromRot:-.02,toRot:(q-(amount-1)/2)*.05,onDone:()=>{if(arrivals[q])arrivals[q].visible=true}});
+          }
+        }else if(snapshot.deckCount<previous.deckCount){
+          const drawn=opponentIndices.find(i=>snapshot.handCounts[i]>previous.handCounts[i]);
+          if(Number.isInteger(drawn)){
+            const visual=opponentVisuals.get(drawn),amount=Math.min(3,Math.max(1,snapshot.handCounts[drawn]-previous.handCounts[drawn]));
+            if(visual){
+              const arrivals=visual.meshes.slice(-Math.min(amount,visual.meshes.length));arrivals.forEach(mesh=>mesh.visible=false);
+              for(let q=0;q<amount;q++){
+                const flight=cardMesh(null,{back:true}),from=new THREE.Vector3(-1.25,TABLE_Y+.28,.05),to=new THREE.Vector3(visual.x+(q-(amount-1)/2)*.18,TABLE_Y+.25,visual.z+.08);
+                queueCardFlight(flight,from,to,{duration:610,delay:q*115,lift:.82,fromRot:-.02,toRot:(q-(amount-1)/2)*.05,bank:.11,roll:(q%2?-.09:.09),onDone:()=>{if(arrivals[q])arrivals[q].visible=true}});
+              }
             }
           }
         }
@@ -1191,7 +1214,7 @@ export function createTable3DRenderer({onFatal}={}){
     startMotion();
   }
   function beginLooseCardDrag(obj,e,kind){
-    const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()},gestureEnabled=!!(current?.canInteract&&LIVE_CARD_GAMES.has(current?.gameId)&&['card-select','special-select'].includes(kind));
+    const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()},gestureEnabled=!!(current?.canInteract&&LIVE_CARD_GAMES.has(current?.gameId)&&(['card-select','special-select'].includes(kind)||kind==='cactus-quick'));
     drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind,loose:true,mesh:obj,cardId:obj.userData.cardId,tileId:obj.userData.tileId,index:obj.userData.index,owner:obj.userData.owner,tapEnabled:!!obj.userData.tapEnabled,gestureEnabled,gestureStarted:false,gestureHome:home.position.clone(),startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,moved:false,home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
     host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
   }
@@ -1247,7 +1270,13 @@ export function createTable3DRenderer({onFatal}={}){
     const d=drag;drag=null;host?.classList.remove('is-dragging');dropMarker.material.opacity=.2;
     if(cancelled){if(d.kind==='card'&&d.canPlay||d.loose&&d.gestureStarted)emitLocalCardGesture('cancel',0,0);if(d.loose)returnManipulatedCard(d,{snap:document.hidden});else{syncCurrent(current);draw()}return}
     const tap=Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
-    if(d.loose&&!tap){if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d);return}
+    if(d.loose&&!tap){
+      if(d.kind==='cactus-quick'&&d.gestureStarted){
+        const target=cardGestureTarget('cactus'),near=Math.hypot(d.mesh.position.x-target.x,d.mesh.position.z-target.z)<cardDropRadius(d);
+        if(near){emitLocalCardGesture('commit',1,0);current?.interactions?.cactus?.('quick',d.index);return}
+      }
+      if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d);return
+    }
     if(d.loose&&(!d.tapEnabled||!current?.canInteract)){returnManipulatedCard(d,{snap:true});return}
     if(d.kind==='loose-card'){returnManipulatedCard(d,{snap:true});return}
     if(d.kind==='card-select'){current?.interactions?.cardSelect?.(d.cardId);return}
