@@ -52,7 +52,7 @@ function cardBackTexture(){
 }
 
 export function createTable3DRenderer({onFatal}={}){
-  let renderer=null,scene=null,camera=null,host=null,canvas=null,resizeObserver=null;
+  let renderer=null,scene=null,camera=null,host=null,canvas=null,resizeObserver=null,assetUnsubscribe=null;
   let active=false,current=null,drag=null,hovered=null;
   const externalAssets=window.SalonTable3DAssets||null;
   const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2(),dragPlane=new THREE.Plane(new THREE.Vector3(0,1,0),-1.02);
@@ -175,6 +175,7 @@ export function createTable3DRenderer({onFatal}={}){
     window.addEventListener('blur',onWindowBlur);
     window.addEventListener('salon:remote-card-gesture',onRemoteCardGesture);
     document.addEventListener('visibilitychange',onVisibilityChange);
+    assetUnsubscribe??=externalAssets?.subscribe?.(()=>{if(active&&current){syncCurrent(current);draw()}})||null;
   }
   function ensureHost(){
     const column=document.querySelector('.table-column');if(!column)return null;
@@ -909,17 +910,23 @@ export function createTable3DRenderer({onFatal}={}){
     setCameraPose(0,7.45,8.65,0,.15,0);
     const courseGeo=new THREE.BoxGeometry(10.15,.18,6.15),courseMat=new THREE.MeshStandardMaterial({color:0x234553,roughness:.93,metalness:.02}),courseMesh=new THREE.Mesh(courseGeo,courseMat);courseMesh.position.set(0,TABLE_Y-.02,0);courseMesh.receiveShadow=true;courseMesh.userData.temporaryGeometry=courseGeo;courseMesh.userData.temporaryMaterial=courseMat;objects.add(courseMesh);
     for(const obstacle of course.obstacles||[]){
-      const r=Math.max(.18,Number(obstacle.r||20)/58),geo=new THREE.DodecahedronGeometry(r,1),mat=new THREE.MeshStandardMaterial({color:0x69708c,roughness:.94,metalness:.03}),rock=new THREE.Mesh(geo,mat),p=golfWorld(obstacle,TABLE_Y+.24+r*.45);
-      rock.position.copy(p);rock.scale.y=.62;rock.castShadow=true;rock.receiveShadow=true;rock.userData.temporaryGeometry=geo;rock.userData.temporaryMaterial=mat;objects.add(rock);
+      const r=Math.max(.18,Number(obstacle.r||20)/58),p=golfWorld(obstacle,TABLE_Y+.24+r*.45),rockExternal=externalAsset('golf-obstacle',{radius:r,source:Object.freeze({x:Number(obstacle.x)||0,y:Number(obstacle.y)||0,r:Number(obstacle.r)||0}),canonicalSize:{radius:r}});
+      let rock=rockExternal;
+      if(!rock){const geo=new THREE.DodecahedronGeometry(r,1),mat=new THREE.MeshStandardMaterial({color:0x69708c,roughness:.94,metalness:.03});rock=new THREE.Mesh(geo,mat);rock.scale.y=.62;rock.castShadow=true;rock.receiveShadow=true;rock.userData.temporaryGeometry=geo;rock.userData.temporaryMaterial=mat}
+      rock.position.copy(p);objects.add(rock);
     }
-    const hole=golfWorld(course.hole,TABLE_Y+.31),portalGeo=new THREE.TorusGeometry(.31,.065,12,36),portalMat=new THREE.MeshStandardMaterial({color:0xbdebdc,roughness:.35,metalness:.08,emissive:0x3d8a7d,emissiveIntensity:sunk?.8:.45}),portal=new THREE.Mesh(portalGeo,portalMat);
-    portal.rotation.x=Math.PI/2;portal.position.copy(hole);portal.userData.temporaryGeometry=portalGeo;portal.userData.temporaryMaterial=portalMat;objects.add(portal);
+    const hole=golfWorld(course.hole,TABLE_Y+.31),portalExternal=externalAsset('golf-portal',{sunk,canonicalSize:{radius:.31,tube:.065}});
+    let portal=portalExternal;
+    if(!portal){const portalGeo=new THREE.TorusGeometry(.31,.065,12,36),portalMat=new THREE.MeshStandardMaterial({color:0xbdebdc,roughness:.35,metalness:.08,emissive:0x3d8a7d,emissiveIntensity:sunk?.8:.45});portal=new THREE.Mesh(portalGeo,portalMat);portal.rotation.x=Math.PI/2;portal.userData.temporaryGeometry=portalGeo;portal.userData.temporaryMaterial=portalMat}
+    portal.position.copy(hole);objects.add(portal);
     const innerGeo=new THREE.CylinderGeometry(.18,.18,.035,30),innerMat=new THREE.MeshStandardMaterial({color:0x102a34,roughness:.72,emissive:0x285a58,emissiveIntensity:.22}),inner=new THREE.Mesh(innerGeo,innerMat);inner.position.copy(hole);inner.position.y-=.04;inner.userData.temporaryGeometry=innerGeo;inner.userData.temporaryMaterial=innerMat;objects.add(inner);
     if(path.length>1){
       const pts=path.map(p=>golfWorld(p,TABLE_Y+.34)),geo=new THREE.BufferGeometry().setFromPoints(pts),mat=new THREE.LineBasicMaterial({color:0xe7d88f,transparent:true,opacity:.72}),trail=new THREE.Line(geo,mat);trail.userData.temporaryGeometry=geo;trail.userData.temporaryMaterial=mat;objects.add(trail);
     }
-    const ballMat=new THREE.MeshStandardMaterial({color:0xfff2ca,roughness:.5,metalness:.02}),ball=new THREE.Mesh(golfBallGeometry,ballMat),ballTarget=golfWorld(pos,TABLE_Y+.47);
-    ball.position.copy(ballTarget);ball.castShadow=true;ball.userData.temporaryMaterial=ballMat;objects.add(ball);
+    const ballTarget=golfWorld(pos,TABLE_Y+.47),ballExternal=externalAsset('golf-ball',{sunk,stroke,canonicalSize:{radius:.13}});
+    let ball=ballExternal;
+    if(!ball){const ballMat=new THREE.MeshStandardMaterial({color:0xfff2ca,roughness:.5,metalness:.02});ball=new THREE.Mesh(golfBallGeometry,ballMat);ball.castShadow=true;ball.userData.temporaryMaterial=ballMat}
+    ball.position.copy(ballTarget);objects.add(ball);
     const shotKey=[s?.turn??0,data.stage||1,stroke,path.length,path.at(-1)?.join(',')||''].join('|');
     if(stroke>0&&path.length>1&&shotKey!==lastGolfKey&&motionAllowed()){lastGolfKey=shotKey;const pts=path.map(p=>golfWorld(p,TABLE_Y+.47));ball.position.copy(pts[0]);pawnAnimations.push({mesh:ball,points:pts,start:performance.now(),duration:Math.min(1500,Math.max(650,pts.length*34)),lift:.025})}
     if(phase==='play'&&payload.canInteract){
@@ -951,8 +958,10 @@ export function createTable3DRenderer({onFatal}={}){
     vault.position.set(0,TABLE_Y+.12,.05);vault.receiveShadow=true;vault.castShadow=true;vault.userData.temporaryGeometry=vaultGeo;vault.userData.temporaryMaterial=vaultMat;objects.add(vault);
     const shown=phase==='result'&&secret.length===3?secret:codeDraft;
     for(let i=0;i<3;i++){
-      const value=Math.max(0,Math.min(5,Number(shown[i]??i))),mat=new THREE.MeshStandardMaterial({color:new THREE.Color(colors[value]),roughness:.38,metalness:.12,emissive:new THREE.Color(colors[value]),emissiveIntensity:phase==='result'?.38:.18}),gem=new THREE.Mesh(codeGemGeometry,mat);
-      gem.position.set((i-1)*1.72,TABLE_Y+1.15,.15);gem.scale.set(1,1.12,.72);gem.castShadow=true;gem.userData.temporaryMaterial=mat;
+      const value=Math.max(0,Math.min(5,Number(shown[i]??i))),gemExternal=externalAsset('code-gem',{value,symbol:symbols[value],color:colors[value],revealed:phase==='result',index:i,canonicalSize:{radius:.5}});
+      let gem=gemExternal;
+      if(!gem){const mat=new THREE.MeshStandardMaterial({color:new THREE.Color(colors[value]),roughness:.38,metalness:.12,emissive:new THREE.Color(colors[value]),emissiveIntensity:phase==='result'?.38:.18});gem=new THREE.Mesh(codeGemGeometry,mat);gem.scale.set(1,1.12,.72);gem.castShadow=true;gem.userData.temporaryMaterial=mat}
+      gem.position.set((i-1)*1.72,TABLE_Y+1.15,.15);
       if(phase==='play'&&payload.canInteract){gem.userData={...gem.userData,kind:'code-cycle',index:i,interactive:true,home:{scale:gem.scale.clone()}};interactive.push(gem)}
       objects.add(gem);
       const label=makeLabel((i+1)+' · '+symbols[value],colors[value]);label.scale.set(1.2,.42,1);label.position.set(gem.position.x,TABLE_Y+1.83,.15);objects.add(label);
@@ -1035,8 +1044,10 @@ export function createTable3DRenderer({onFatal}={}){
     setCameraPose(0,6.35,8.2,0,.6,.2);
     const pedestalMat=new THREE.MeshStandardMaterial({color:0x3e3343,roughness:.9}),pedestal=new THREE.Mesh(tileGeometry,pedestalMat);pedestal.scale.set(3.8,.65,2.5);pedestal.position.set(0,TABLE_Y+.13,.35);pedestal.userData.temporaryMaterial=pedestalMat;objects.add(pedestal);
     if(!burst){
-      const mat=new THREE.MeshStandardMaterial({color:0xe9aacb,roughness:.48,metalness:.02,emissive:0x5d2946,emissiveIntensity:.16+.025*pumps}),balloon=new THREE.Mesh(balloonGeometry,mat);
-      const grow=1+Math.min(8,pumps)*.075;balloon.scale.set(grow,grow*1.18,grow);balloon.position.set(0,TABLE_Y+1.55,.15);balloon.castShadow=true;balloon.userData.temporaryMaterial=mat;objects.add(balloon);
+      const grow=1+Math.min(8,pumps)*.075,balloonExternal=externalAsset('balloon',{pumps,pot,risk,scale:grow,canonicalSize:{radius:1}});
+      let balloon=balloonExternal;
+      if(!balloon){const mat=new THREE.MeshStandardMaterial({color:0xe9aacb,roughness:.48,metalness:.02,emissive:0x5d2946,emissiveIntensity:.16+.025*pumps});balloon=new THREE.Mesh(balloonGeometry,mat);balloon.scale.set(grow,grow*1.18,grow);balloon.castShadow=true;balloon.userData.temporaryMaterial=mat}
+      balloon.position.set(0,TABLE_Y+1.55,.15);objects.add(balloon);
       const knotGeo=new THREE.ConeGeometry(.16,.3,18),knotMat=new THREE.MeshStandardMaterial({color:0xc982aa,roughness:.68}),knot=new THREE.Mesh(knotGeo,knotMat);knot.rotation.z=Math.PI;knot.position.set(0,TABLE_Y+.47+grow*.12,.15);knot.userData.temporaryGeometry=knotGeo;knot.userData.temporaryMaterial=knotMat;objects.add(knot);
     }else{
       for(let i=0;i<10;i++){const h=visualHash('balloon-burst|'+(s?.moves||0)+'|'+i),mat=new THREE.MeshStandardMaterial({color:i%2?0xe9aacb:0xf2c6df,roughness:.66,emissive:0x5d2946,emissiveIntensity:.18}),piece=new THREE.Mesh(dieGeometry,mat);const a=h*Math.PI*2,r=.9+visualHash(i+'r')*1.4;piece.scale.set(.18+.12*h,.08+.08*(1-h),.24);piece.position.set(Math.cos(a)*r,TABLE_Y+.9+visualHash(i+'y')*1.7,.15+Math.sin(a)*r*.7);piece.rotation.set(h*4,h*7,h*5);piece.userData.temporaryMaterial=mat;objects.add(piece)}
@@ -1075,8 +1086,16 @@ export function createTable3DRenderer({onFatal}={}){
       const p=cityWorld(i),owner=owners[i]??-1,mat=cityCellMaterial(cell,owner,!!mortgaged[i],colors),tile=new THREE.Mesh(cityTileGeometry,mat);
       tile.position.copy(p);tile.castShadow=true;tile.receiveShadow=true;tile.userData.temporaryMaterial=mat;objects.add(tile);
       const label=makeLabel((i===0?'DÉPART · ':'')+(cell.name||('Case '+i)),mortgaged[i]?'#d69b96':owner>=0?(playerColors[owner]||'#dbea9e'):'#e5e9e3');label.scale.set(1.2,.26,1);label.position.set(p.x,TABLE_Y+.34,p.z);objects.add(label);
-      const count=Math.min(3,Number(houses[i]||0));for(let h=0;h<count;h++){const houseMat=new THREE.MeshStandardMaterial({color:0xdbea9e,roughness:.72}),house=new THREE.Mesh(cityHouseGeometry,houseMat);house.position.set(p.x+(h-1)*.24,TABLE_Y+.34,p.z-.27);house.userData.temporaryMaterial=houseMat;objects.add(house)}
-      if(owner>=0){const ownMat=new THREE.MeshStandardMaterial({color:new THREE.Color(playerColors[owner]||'#dbea9e'),roughness:.72}),peg=new THREE.Mesh(cityPegGeometry,ownMat);peg.position.set(p.x+.47,TABLE_Y+.34,p.z+.25);peg.userData.temporaryMaterial=ownMat;objects.add(peg)}
+      const count=Math.min(3,Number(houses[i]||0));for(let h=0;h<count;h++){
+        let house=externalAsset('metropole-house',{cellIndex:i,houseIndex:h,count,owner,canonicalSize:{width:.19,height:.25,depth:.19}});
+        if(!house){const houseMat=new THREE.MeshStandardMaterial({color:0xdbea9e,roughness:.72});house=new THREE.Mesh(cityHouseGeometry,houseMat);house.userData.temporaryMaterial=houseMat}
+        house.position.set(p.x+(h-1)*.24,TABLE_Y+.34,p.z-.27);objects.add(house)
+      }
+      if(owner>=0){
+        const ownerColor=playerColors[owner]||'#dbea9e';let peg=externalAsset('metropole-owner-marker',{cellIndex:i,owner,color:ownerColor,canonicalSize:{radius:.09,height:.22}});
+        if(!peg){const ownMat=new THREE.MeshStandardMaterial({color:new THREE.Color(ownerColor),roughness:.72});peg=new THREE.Mesh(cityPegGeometry,ownMat);peg.userData.temporaryMaterial=ownMat}
+        peg.position.set(p.x+.47,TABLE_Y+.34,p.z+.25);objects.add(peg)
+      }
     });
     (data.players||[]).forEach((pl,i)=>{
       if(pl.out)return;const p=cityWorld(Number(pl.pos)||0),pawn=pawnMesh(playerColors[i]||['#dbea9e','#aacdf7','#e4ad91','#c9afe7'][i%4]);pawn.position.set(p.x+((i%2)? .17:-.17),TABLE_Y+.48,p.z+(i>1?.17:-.17));objects.add(pawn);
@@ -1278,7 +1297,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function destroy(){
     deactivate();clearObjects();
-    canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);canvas?.removeEventListener('lostpointercapture',onLostPointerCapture);window.removeEventListener('blur',onWindowBlur);window.removeEventListener('salon:remote-card-gesture',onRemoteCardGesture);document.removeEventListener('visibilitychange',onVisibilityChange);
+    canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);canvas?.removeEventListener('lostpointercapture',onLostPointerCapture);window.removeEventListener('blur',onWindowBlur);window.removeEventListener('salon:remote-card-gesture',onRemoteCardGesture);document.removeEventListener('visibilitychange',onVisibilityChange);assetUnsubscribe?.();assetUnsubscribe=null;
     cardGeometry.dispose();tileGeometry.dispose();pawnGeometry.dispose();dieGeometry.dispose();rummiTileGeometry.dispose();grainGeometry.dispose();heldPadGeometry.dispose();codeGemGeometry.dispose();intrusDotGeometry.dispose();balloonGeometry.dispose();golfBallGeometry.dispose();cityTileGeometry.dispose();cityHouseGeometry.dispose();cityPegGeometry.dispose();edgeMaterial.dispose();backMaterial.dispose();for(const m of frontMaterials.values())m.dispose();for(const m of tileMaterials.values())m.dispose();for(const m of rummiTileMaterials.values())m.dispose();for(const m of pawnMaterials.values())m.dispose();for(const m of dieFaceMaterials.values())m.dispose();for(const m of cellLabelMaterials.values())m.dispose();for(const m of boxTileMaterials.values())m.dispose();neutralDieMaterial.dispose();for(const t of disposableTextures)t.dispose();for(const t of cellLabelTextures)t.dispose();
     tableMesh?.geometry?.dispose();tableMesh?.material?.dispose();dropMarker?.geometry?.dispose();dropMarker?.material?.dispose();renderer?.dispose();
     renderer=scene=camera=canvas=null;current=null;
