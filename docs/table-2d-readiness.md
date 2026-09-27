@@ -286,3 +286,10 @@ Le 8 américain utilise maintenant un layout de main qui évite de compter sur l
 La moitié opposée de la table reçoit davantage de lumière de remplissage et le brouillard commence plus loin, afin que les adversaires et leurs cartes restent lisibles même sur mobile portrait. Les adversaires sont également rapprochés vers le centre et leurs étiquettes sont agrandies pour que plusieurs joueurs restent visibles dans le champ.
 
 Pour le 8 américain, le renderer conserve un instantané strictement visuel de l’état précédent. Quand un adversaire joue une carte confirmée, la carte publique se déplace de sa zone vers la défausse. Quand un adversaire pioche, un ou plusieurs dos de cartes se déplacent de la pioche vers sa main. Ces animations ne produisent aucune action de jeu et n’altèrent ni l’état ni le réseau ; elles ne font qu’interpoler entre deux états déjà validés par le moteur.
+
+
+## Présence gestuelle en ligne
+
+Le 8 américain transporte désormais un canal éphémère de présence pour les cartes. Un drag local en 2D ou en 3D émet uniquement un identifiant de geste, une progression normalisée vers la défausse et un décalage latéral ; aucun identifiant de carte, couleur, valeur ou autre information privée n’est envoyé. Ces messages ne modifient jamais la révision ni l’état autoritatif et sont ignorés lorsqu’ils ne correspondent plus au match ou à la révision courante.
+
+Dans la vue 3D distante, un dos de carte sort alors de la main de l’adversaire et suit le geste avec interpolation. Si le joueur abandonne son drag, la carte revient dans sa main. S’il confirme, elle termine sa trajectoire vers la défausse jusqu’à ce que l’état validé prenne le relais et affiche la vraie carte publique. Un timeout ramène automatiquement une carte si le flux de présence s’interrompt, par exemple lors d’une perte réseau.

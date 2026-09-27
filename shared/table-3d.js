@@ -80,7 +80,7 @@ export function createTable3DRenderer({onFatal}={}){
   let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='';
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
-  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null;
+  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,remoteCardGestures=new Map();
 
   function applyCameraFit(){
     if(!camera||!cameraPose)return;
@@ -155,6 +155,7 @@ export function createTable3DRenderer({onFatal}={}){
     canvas.addEventListener('pointerleave',()=>setHover(null));
     canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();onFatal?.(new Error('Contexte WebGL perdu'));});
     window.addEventListener('blur',onWindowBlur);
+    window.addEventListener('salon:remote-card-gesture',onRemoteCardGesture);
     document.addEventListener('visibilitychange',onVisibilityChange);
   }
   function ensureHost(){
@@ -183,6 +184,7 @@ export function createTable3DRenderer({onFatal}={}){
       child.traverse?.(o=>{o.userData?.temporaryGeometry?.dispose?.();o.userData?.temporaryMaterial?.dispose?.();o.userData?.temporaryTexture?.dispose?.()});
     }
     for(const child of [...cardFx.children])cardFx.remove(child);
+    remoteCardGestures.clear();
   }
   function placeCard(mesh,x,z,y=TABLE_Y+.07,rot=0,scale=1){
     mesh.position.set(x,y,z);mesh.rotation.set(-Math.PI/2,0,rot);mesh.scale.setScalar(scale);objects.add(mesh);return mesh;
@@ -200,6 +202,40 @@ export function createTable3DRenderer({onFatal}={}){
     if(total<=1)return{x:0,z:-2.34};
     const step=Math.min(3.0,6.0/Math.max(1,total-1));
     return{x:(index-(total-1)/2)*step,z:-2.34+Math.abs(index-(total-1)/2)*.06};
+  }
+  function emitLocalCardGesture(phase,progress=0,lateral=0){
+    if(current?.gameId!=='huit')return;
+    const detail={phase,progress:Math.max(0,Math.min(1,Number(progress)||0)),lateral:Math.max(-1,Math.min(1,Number(lateral)||0))};
+    window.dispatchEvent(new CustomEvent('salon:local-card-gesture',{detail}));
+  }
+  function eightGestureCoordinates(mesh,home){
+    const target=new THREE.Vector3(1.25,1.02,.05),origin=home||mesh?.userData?.home?.position;if(!origin||!mesh)return{progress:0,lateral:0};
+    const vx=target.x-origin.x,vz=target.z-origin.z,wx=mesh.position.x-origin.x,wz=mesh.position.z-origin.z,den=Math.max(.0001,vx*vx+vz*vz),len=Math.sqrt(den);
+    const progress=Math.max(0,Math.min(1,(wx*vx+wz*vz)/den)),lateral=Math.max(-1,Math.min(1,(wx*vz-wz*vx)/(len*1.7)));
+    return{progress,lateral};
+  }
+  function currentEightOpponentSeat(actor){
+    const state=current?.state,viewer=Number.isInteger(current?.privateIndex)?current.privateIndex:0;
+    if(!state?.players?.length||!Number.isInteger(actor)||actor===viewer)return null;
+    const opponents=state.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer),index=opponents.findIndex(x=>x.i===actor);
+    if(index<0)return null;return eightOpponentSeat(opponents.length,index);
+  }
+  function onRemoteCardGesture(event){
+    if(!active||!motionAllowed()||current?.gameId!=='huit')return;
+    const d=event?.detail||{},actor=Number(d.actor),seat=currentEightOpponentSeat(actor);if(!seat)return;
+    const phase=['start','move','cancel','commit'].includes(d.phase)?d.phase:null;if(!phase)return;
+    let gesture=remoteCardGestures.get(actor);
+    if(!gesture||phase==='start'){
+      if(gesture?.mesh)cardFx.remove(gesture.mesh);
+      const mesh=cardMesh(null,{back:true});mesh.scale.setScalar(.74);mesh.rotation.set(-Math.PI/2,0,0);cardFx.add(mesh);
+      gesture={mesh,actor,from:new THREE.Vector3(seat.x,TABLE_Y+.28,seat.z+.10),to:new THREE.Vector3(1.25,TABLE_Y+.26,.05),progress:0,target:0,lateral:0,targetLateral:0,lastAt:performance.now(),returning:false,committed:false};
+      mesh.position.copy(gesture.from);remoteCardGestures.set(actor,gesture);
+    }
+    gesture.target=Math.max(0,Math.min(1,Number(d.progress)||0));gesture.targetLateral=Math.max(-1,Math.min(1,Number(d.lateral)||0));gesture.lastAt=performance.now();
+    if(phase==='cancel'){gesture.target=0;gesture.targetLateral=0;gesture.returning=true;gesture.committed=false}
+    else if(phase==='commit'){gesture.target=1;gesture.targetLateral=0;gesture.committed=true;gesture.returning=false}
+    else{gesture.returning=false;gesture.committed=false}
+    startMotion();
   }
   function eightSnapshot(payload,deckCount,top){
     const s=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0;
@@ -292,6 +328,18 @@ export function createTable3DRenderer({onFatal}={}){
       if(t<1)running=true;else{a.mesh.position.copy(a.to);a.done=true;cardFx.remove(a.mesh);a.onDone?.()}
     }
     if(cardAnimations.some(a=>a.done))cardAnimations=cardAnimations.filter(a=>!a.done);
+    for(const [actor,g] of remoteCardGestures){
+      const age=now-g.lastAt;if(age>950&&!g.committed){g.target=0;g.targetLateral=0;g.returning=true}
+      g.progress+=(g.target-g.progress)*.24;g.lateral+=(g.targetLateral-g.lateral)*.22;
+      const p=Math.max(0,Math.min(1,g.progress)),ease=p*p*(3-2*p);
+      g.mesh.position.lerpVectors(g.from,g.to,ease);
+      const dx=g.to.x-g.from.x,dz=g.to.z-g.from.z,len=Math.max(.001,Math.hypot(dx,dz)),side=.58*g.lateral*Math.sin(Math.PI*p);
+      g.mesh.position.x+=(-dz/len)*side;g.mesh.position.z+=(dx/len)*side;g.mesh.position.y+=Math.sin(Math.PI*p)*.82;
+      g.mesh.rotation.z=g.lateral*.10+(p-.5)*-.03;
+      if(g.returning&&p<.018&&Math.abs(g.target-g.progress)<.02){cardFx.remove(g.mesh);remoteCardGestures.delete(actor);continue}
+      if(g.committed&&p>.985&&age>420){cardFx.remove(g.mesh);remoteCardGestures.delete(actor);continue}
+      running=true;
+    }
     draw();if(running)animationRaf=requestAnimationFrame(motionFrame);
   }
   function syncGoose(payload){
@@ -940,8 +988,8 @@ export function createTable3DRenderer({onFatal}={}){
       drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,control:obj.userData.control,delta:obj.userData.delta,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return;
     }
     if(obj.userData.kind!=='card'||!obj.userData.playable)return;
-    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card',mesh:obj,cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY,moved:false,overDrop:false};
-    host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
+    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card',mesh:obj,cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY,moved:false,overDrop:false,gestureHome:obj.userData.home?.position?.clone?.()||obj.position.clone()};
+    emitLocalCardGesture('start',0,0);host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
   }
   function onPointerMove(e){
     if(!active)return;
@@ -950,12 +998,13 @@ export function createTable3DRenderer({onFatal}={}){
     const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;if(!drag.moved&&Math.hypot(dx,dy)>6)drag.moved=true;
     if(!drag.moved)return;
     updatePointer(e);const p=new THREE.Vector3();if(raycaster.ray.intersectPlane(dragPlane,p)){drag.mesh.position.set(p.x,1.02,p.z);drag.mesh.rotation.set(-Math.PI/2,0,(dx*.0025));}
-    const near=Math.hypot(drag.mesh.position.x-1.25,drag.mesh.position.z-.05)<cardDropRadius(drag);drag.overDrop=near;dropMarker.material.opacity=near ? .82 : .2;draw();e.preventDefault();
+    const near=Math.hypot(drag.mesh.position.x-1.25,drag.mesh.position.z-.05)<cardDropRadius(drag);drag.overDrop=near;dropMarker.material.opacity=near ? .82 : .2;
+    const gesture=eightGestureCoordinates(drag.mesh,drag.gestureHome);emitLocalCardGesture('move',gesture.progress,gesture.lateral);draw();e.preventDefault();
   }
   function finishDrag(e,cancelled=false){
     if(!drag||e.pointerId!==drag.pointerId)return;
     const d=drag;drag=null;host?.classList.remove('is-dragging');dropMarker.material.opacity=.2;
-    if(cancelled){syncCurrent(current);draw();return}
+    if(cancelled){if(d.kind==='card')emitLocalCardGesture('cancel',0,0);syncCurrent(current);draw();return}
     const tap=Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
     if(d.kind==='card-select'){if(tap)current?.interactions?.cardSelect?.(d.cardId);return}
     if(d.kind==='maid-pick'){if(tap)current?.interactions?.specialCard?.('pick',d.index);return}
@@ -996,12 +1045,12 @@ export function createTable3DRenderer({onFatal}={}){
       if(tap)current?.interactions?.box?.(d.kind==='box-roll'?'roll':d.kind==='box-toggle'?'toggle':'close',d.kind==='box-roll'?d.count:d.number);return;
     }
     const near=d.moved&&(d.overDrop||Math.hypot(d.mesh.position.x-1.25,d.mesh.position.z-.05)<cardDropRadius(d));
-    if(!d.moved||near){current?.interactions?.playCard?.(d.cardId);return}
-    syncEight(current);draw();
+    if(!d.moved||near){emitLocalCardGesture('commit',1,0);current?.interactions?.playCard?.(d.cardId);return}
+    emitLocalCardGesture('cancel',0,0);syncEight(current);draw();
   }
   function cancelActiveDrag(pointerId=null){
     if(!drag||(pointerId!==null&&drag.pointerId!==pointerId))return;
-    const wasCard=drag.kind==='card';drag=null;host?.classList.remove('is-dragging');if(dropMarker)dropMarker.material.opacity=.2;
+    const wasCard=drag.kind==='card';if(wasCard)emitLocalCardGesture('cancel',0,0);drag=null;host?.classList.remove('is-dragging');if(dropMarker)dropMarker.material.opacity=.2;
     if(wasCard&&current){syncEight(current);draw()}
   }
   function onPointerUp(e){finishDrag(e,false)}
@@ -1019,7 +1068,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function destroy(){
     deactivate();clearObjects();
-    canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);canvas?.removeEventListener('lostpointercapture',onLostPointerCapture);window.removeEventListener('blur',onWindowBlur);document.removeEventListener('visibilitychange',onVisibilityChange);
+    canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);canvas?.removeEventListener('lostpointercapture',onLostPointerCapture);window.removeEventListener('blur',onWindowBlur);window.removeEventListener('salon:remote-card-gesture',onRemoteCardGesture);document.removeEventListener('visibilitychange',onVisibilityChange);
     cardGeometry.dispose();tileGeometry.dispose();pawnGeometry.dispose();dieGeometry.dispose();rummiTileGeometry.dispose();grainGeometry.dispose();heldPadGeometry.dispose();codeGemGeometry.dispose();intrusDotGeometry.dispose();balloonGeometry.dispose();golfBallGeometry.dispose();cityTileGeometry.dispose();cityHouseGeometry.dispose();cityPegGeometry.dispose();edgeMaterial.dispose();backMaterial.dispose();for(const m of frontMaterials.values())m.dispose();for(const m of tileMaterials.values())m.dispose();for(const m of rummiTileMaterials.values())m.dispose();for(const m of pawnMaterials.values())m.dispose();for(const m of dieFaceMaterials.values())m.dispose();for(const m of cellLabelMaterials.values())m.dispose();for(const m of boxTileMaterials.values())m.dispose();neutralDieMaterial.dispose();for(const t of disposableTextures)t.dispose();for(const t of cellLabelTextures)t.dispose();
     tableMesh?.geometry?.dispose();tableMesh?.material?.dispose();dropMarker?.geometry?.dispose();dropMarker?.material?.dispose();renderer?.dispose();
     renderer=scene=camera=canvas=null;current=null;
