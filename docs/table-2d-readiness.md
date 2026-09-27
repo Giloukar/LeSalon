@@ -240,3 +240,17 @@ Mini-golf cosmique dispose désormais d’un parcours Three.js complet : surface
 La scène 3D ne contient aucune physique de golf. Lors de « Tirer », elle transmet uniquement `{angle, power}` à l’action `shoot`. La fonction `golfShot()` du moteur reste seule responsable des murs, collisions avec les obstacles, friction, détection du portail et calcul du chemin. Three.js transforme ensuite `golfPath` en trace et en animation de balle.
 
 Le contrat Playwright place la balle à proximité du portail et vérifie qu’un tir 3D produit, via le moteur, un chemin autoritaire, un coup réussi et les 100 points du premier coup, sans consommer de hasard. Parcours, rochers, portail et balle sont des placeholders procéduraux remplaçables par des modèles GLB/Astra.
+
+
+## Passe de durcissement 3D
+
+Les 22 jeux exposent maintenant une vue 3D compatible avec la bascule locale 2D/3D. La passe finale de robustesse traite les points transverses qui deviennent visibles quand on enchaîne plusieurs parties ou quand on joue sur téléphone :
+
+- la caméra adapte son champ de vision aux écrans étroits afin d’éviter de couper les bords des plateaux et des mains ;
+- le renderer plafonne automatiquement le pixel ratio sur les appareils tactiles ou à mémoire plus limitée, tout en conservant une qualité supérieure sur desktop ;
+- les animations Three.js respectent à la fois `prefers-reduced-motion` et le réglage global `data-motion="off"` du site ;
+- les géométries très réutilisées (tuiles Rummikub, pions de propriété, gemmes, ballon, balle de golf, etc.) sont partagées au lieu d’être recréées à chaque rendu ;
+- les géométries réellement temporaires sont explicitement libérées lors du prochain rendu ;
+- la hauteur de la scène utilise les unités de viewport mobile modernes (`svh`) pour limiter les sauts liés aux barres du navigateur.
+
+Cette étape ne touche ni aux règles ni au protocole réseau. Elle prépare aussi le remplacement progressif des placeholders par des modèles GLB/GLTF Astra : les futures ressources doivent rester purement visuelles et ne jamais devenir une source d’état ou de règles.
