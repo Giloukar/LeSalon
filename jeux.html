@@ -3114,7 +3114,8 @@ playSceneAction=function(ctx){
 
 /* Contrôleur de rendu : la 2D reste la couche de base et le fallback permanent. */
 const TABLE_VIEW_2D_RENDER=renderGame,TABLE_VIEW_SHOW_HOME=showHome;
-function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite'].includes(S.id)}
+const TABLE_3D_CARD_GAMES=['president','menteur','suites','plis','encheres'];
+function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite',...TABLE_3D_CARD_GAMES].includes(S.id)}
 function tableViewMountControl(){
  if(!window.SalonTableView)return;
  const supported=tableViewSupports3D();
@@ -3151,6 +3152,21 @@ if(window.SalonTableView){
   if(S?.id==='boite'){
    data.boxDice=[...S.boxDice];data.boxNumbers=[...S.boxNumbers];data.boxStage=S.boxStage;data.boxSelected=[...selection].map(Number);data.boxCanOne=S.boxNumbers.every(n=>n<7);
   }
+  if(S&&TABLE_3D_CARD_GAMES.includes(S.id)){
+   const hand=!gate&&!net.spectator?player(S).hand:[],mine=canPlay()?hand:[];
+   data.cardGame=S.id;data.selectedIds=[...selection];data.selectableIds=[];
+   if(canPlay()&&S.id==='president')data.selectableIds=mine.map(c=>c.id);
+   if(canPlay()&&S.id==='menteur'&&S.phase==='play')data.selectableIds=mine.map(c=>c.id);
+   if(canPlay()&&S.id==='suites')data.selectableIds=mine.map(c=>c.id);
+   if(canPlay()&&S.id==='plis'&&S.phase==='play')data.selectableIds=mine.map(c=>c.id);
+   if(canPlay()&&S.id==='encheres'&&S.phase==='play')data.selectableIds=mine.map(c=>c.id);
+   data.cardPlayableIds=S.id==='suites'?mine.filter(c=>suitesLegal(S,c)).map(c=>c.id):S.id==='plis'?mine.filter(c=>tricksLegal(S,c)).map(c=>c.id):data.selectableIds.slice();
+   if(S.id==='president')data.cardCenter={cards:S.trick?.cards||[],owner:S.trick?.owner??null,revolution:!!S.revolution,passed:[...S.passed]};
+   if(S.id==='menteur')data.cardCenter={cards:[...S.revealed],backCount:S.discard.length,claim:S.claim?{owner:S.claim.owner,rank:S.claim.rank,count:S.claim.cards.length}:null,required:S.required};
+   if(S.id==='suites')data.cardCenter={lanes:Object.fromEntries(SUITS.map(suit=>[suit,[...S.lanes[suit]]])),opening:!!S.opening,lastCard:S.lastCard};
+   if(S.id==='plis')data.cardCenter={entries:[...(S.trickCards.length?S.trickCards:S.lastTrick)].map(e=>({owner:e.owner,card:e.card})),trump:S.trump,phase:S.phase,dealNumber:S.dealNumber,completedTricks:S.completedTricks};
+   if(S.id==='encheres')data.cardCenter={prize:S.prize,bids:[...S.bids],pot:S.pot,bidRound:S.bidRound,revealed:S.phase!=='play',lastAuction:S.lastAuction};
+  }
   return window.SalonTableView.render({
    args,
    state:gate?null:S,
@@ -3180,6 +3196,14 @@ if(window.SalonTableView){
       dispatch({type:'close',numbers});return true;
      }
      return false;
+    },
+    cardSelect(id){
+     if(!S||!TABLE_3D_CARD_GAMES.includes(S.id)||!canPlay()||typeof id!=='string')return false;
+     const c=player(S).hand.find(c=>c.id===id);if(!c)return false;
+     if(selection.has(id))selection.delete(id);
+     else if(['president','menteur'].includes(S.id)){if(selection.size>=4){toast('Quatre cartes au maximum.');return false}selection.add(id)}
+     else{selection.clear();selection.add(id)}
+     renderGame(false);return true;
     }
    }
   });
