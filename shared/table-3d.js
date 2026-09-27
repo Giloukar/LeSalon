@@ -288,10 +288,16 @@ export function createTable3DRenderer({onFatal}={}){
     if(payload.canInteract&&rolls<3&&held.filter(Boolean).length<5){
       const roll=actionSprite(rolls?'RELANCER':'LANCER','yam-roll');roll.position.set(0,1.05,2.25);objects.add(roll);
     }
-    const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
+    const categories=Array.isArray(payload.viewData?.yamCategories)?payload.viewData.yamCategories:[];
+    categories.forEach((cat,i)=>{
+      const row=Math.floor(i/3),col=i%3,x=(col-1)*2.75,z=-1.2-row*.78,value=cat.filled?cat.score:(rolls?cat.preview:'—'),text=(cat.filled?'✓ ':'')+cat.name+' · '+value;
+      const item=!cat.filled&&rolls>0&&payload.canInteract?actionSprite(text,'yam-score',{category:cat.id},Number(cat.preview)>0?'#dbea9e':'#c8ccc7'):makeLabel(text,cat.filled?'#9fb5a6':'#e7e1ce');
+      item.scale.set(2.25,.4,1);item.position.set(x,.82,z);objects.add(item);
+    });
+    const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]'),yp=payload.viewData?.yamPlayer;
     if(title)title.textContent='VUE 3D · YAM';
-    if(status)status.textContent=rolls?'Lancer '+rolls+' / 3 · '+held.filter(Boolean).length+' dé'+(held.filter(Boolean).length>1?'s':'')+' conservé'+(held.filter(Boolean).length>1?'s':''):'Cinq dés prêts';
-    if(help)help.textContent=rolls&&rolls<3?'Touchez un dé pour le conserver · catégories et score restent synchronisés dessous':rolls>=3?'Trois lancers joués · choisissez une catégorie dessous':'Lancez les cinq dés';
+    if(status)status.textContent='Tour '+(payload.viewData?.yamTurn||1)+' / 6 · '+(yp?.name||'Joueur')+' · '+Number(yp?.score||0)+' pts · '+(rolls?'lancer '+rolls+' / 3':'prêt à lancer');
+    if(help)help.textContent=!rolls?'Lancez les cinq dés':rolls<3?'Touchez les dés à conserver, relancez ou inscrivez directement une catégorie':'Trois lancers joués · choisissez une catégorie sur la table';
     if(diceAnimations.length)startMotion();
   }
 
@@ -834,9 +840,9 @@ export function createTable3DRenderer({onFatal}={}){
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,kind:'deck',startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(obj.userData.kind==='card-select'){drag={pointerId:e.pointerId,kind:'card-select',cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(['maid-pick','special-select','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
-    if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue','intrus-spot','intrus-continue','code-cycle','code-submit','code-continue','golf-adjust','golf-shoot','golf-continue'].includes(obj.userData.kind)){
+    if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue','intrus-spot','intrus-continue','code-cycle','code-submit','code-continue','golf-adjust','golf-shoot','golf-continue','yam-score'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
-      drag={pointerId:e.pointerId,kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,control:obj.userData.control,delta:obj.userData.delta,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return;
+      drag={pointerId:e.pointerId,kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,control:obj.userData.control,delta:obj.userData.delta,category:obj.userData.category,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return;
     }
     if(obj.userData.kind!=='card'||!obj.userData.playable)return;
     drag={pointerId:e.pointerId,kind:'card',mesh:obj,cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY,moved:false};
@@ -890,6 +896,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='echo-pad'){if(tap)current?.interactions?.echo?.('pad',d.index);return}
     if(d.kind==='echo-continue'){if(tap)current?.interactions?.echo?.('continue');return}
     if(d.kind==='city-roll'){if(tap)current?.interactions?.city?.('roll');return}
+    if(d.kind==='yam-score'){if(tap)current?.interactions?.yam?.('score',d.category);return}
     if(d.kind==='yam-roll'||d.kind==='yam-hold'){if(tap)current?.interactions?.yam?.(d.kind==='yam-hold'?'hold':'roll',d.index);return}
     if(d.kind==='box-roll'||d.kind==='box-toggle'||d.kind==='box-close'){
       if(tap)current?.interactions?.box?.(d.kind==='box-roll'?'roll':d.kind==='box-toggle'?'toggle':'close',d.kind==='box-roll'?d.count:d.number);return;
