@@ -583,40 +583,43 @@ export function createTable3DRenderer({onFatal}={}){
       mesh.position.set(slot.x,TABLE_Y+.12+slot.yOffset+(chosen?.26:legal?.09:0),slot.z);mesh.rotation.set(-Math.PI/2,0,slot.fan);mesh.scale.setScalar(slot.scale*(chosen?1.075:legal?1.025:.98));
       mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};objects.add(mesh);
     });
-    const opponents=s.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer);
+    const opponents=s.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer),opponentVisuals=new Map();
     opponents.forEach(({p,i},k)=>{
       const count=p.hand?.length||0,total=Math.min(8,count),seat=eightOpponentSeat(opponents.length,k),span=total<=1?0:Math.min(2.8,(total-1)*.40);
       for(let c=0;c<total;c++){const t=total<=1?.5:c/(total-1),mesh=cardMesh(null,{back:true});placeCard(mesh,seat.x+(t-.5)*span,seat.z+Math.abs(t-.5)*.09,TABLE_Y+.15+c*.006,(t-.5)*-.16,.70)}
       const label=makeLabel((p.name||'Joueur')+' · '+count+' carte'+(count>1?'s':''),i===s.turn?'#dbea9e':'#eef2e8');label.position.set(seat.x,1.12,seat.z-.70);label.scale.set(3.0,.62,1);objects.add(label);
+      opponentVisuals.set(i,{...seat,count});
     });
-    const center=data.cardCenter||{};
+    const center=data.cardCenter||{},centerVisuals=new Map();
     if(game==='president'){
-      (center.cards||[]).forEach((card,i)=>{const mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,(i-(center.cards.length-1)/2)*.72,.05,TABLE_Y+.13+i*.01,(i-(center.cards.length-1)/2)*.05,.82)});
+      (center.cards||[]).forEach((card,i)=>{const mesh=cardMesh(card,{back:!!card.hidden}),x=(i-(center.cards.length-1)/2)*.72,z=.05;placeCard(mesh,x,z,TABLE_Y+.13+i*.01,(i-(center.cards.length-1)/2)*.05,.82);if(card?.id)centerVisuals.set(card.id,{mesh,card,position:new THREE.Vector3(x,TABLE_Y+.23,z)})});
     }else if(game==='menteur'){
       const count=Math.min(7,Number(center.backCount)||0);
       for(let i=0;i<count;i++){const mesh=cardMesh(null,{back:true});placeCard(mesh,(i-count/2)*.045,.08-i*.018,TABLE_Y+.1+i*.025,(i-count/2)*.02,.82)}
-      (center.cards||[]).forEach((card,i)=>{const mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,(i-(center.cards.length-1)/2)*.72,-.65,TABLE_Y+.16+i*.01,(i-(center.cards.length-1)/2)*.04,.72)});
+      (center.cards||[]).forEach((card,i)=>{const x=(i-(center.cards.length-1)/2)*.72,z=-.65,mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,x,z,TABLE_Y+.16+i*.01,(i-(center.cards.length-1)/2)*.04,.72);if(card?.id)centerVisuals.set(card.id,{mesh,card,position:new THREE.Vector3(x,TABLE_Y+.25,z)})});
     }else if(game==='suites'){
       setCameraPose(0,8.9,7.2,0,.18,0);
       const suits=['S','H','D','C'];
       suits.forEach((suit,row)=>{
         const cards=center.lanes?.[suit]||[];
-        cards.forEach(card=>{const x=(Number(card.rank)-7)*.62,z=(row-1.5)*1.25,mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,x,z,TABLE_Y+.12,0,.48)});
+        cards.forEach(card=>{const x=(Number(card.rank)-7)*.62,z=(row-1.5)*1.25,mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,x,z,TABLE_Y+.12,0,.48);if(card?.id)centerVisuals.set(card.id,{mesh,card,position:new THREE.Vector3(x,TABLE_Y+.22,z)})});
         const label=makeLabel((SUIT_NAME[suit]||suit).toUpperCase(),['H','D'].includes(suit)?'#eab3ad':'#dbea9e');label.scale.set(1.6,.42,1);label.position.set(-4.65,.92,(row-1.5)*1.25);objects.add(label);
       });
     }else if(game==='plis'){
       (center.entries||[]).forEach((entry,i)=>{
         const a=(Math.PI*2*i/Math.max(1,center.entries.length))-Math.PI/2,x=Math.cos(a)*1.45,z=Math.sin(a)*1.1,mesh=cardMesh(entry.card,{back:!!entry.card?.hidden});
-        placeCard(mesh,x,z,TABLE_Y+.16,i*.06,.78);
+        placeCard(mesh,x,z,TABLE_Y+.16,i*.06,.78);if(entry.card?.id)centerVisuals.set(entry.card.id,{mesh,card:entry.card,position:new THREE.Vector3(x,TABLE_Y+.26,z)});
       });
     }else if(game==='encheres'){
       if(center.prize){const prize=cardMesh(center.prize,{back:!!center.prize.hidden});placeCard(prize,0,-.55,TABLE_Y+.15,0,.88)}
       const bids=center.bids||[];
       bids.forEach((card,i)=>{
-        if(!card)return;const x=(i-(bids.length-1)/2)*1.18,mesh=cardMesh(card,{back:!!card.hidden});
-        placeCard(mesh,x,.75,TABLE_Y+.13+i*.008,(i-(bids.length-1)/2)*.03,.64);
+        if(!card)return;const x=(i-(bids.length-1)/2)*1.18,z=.75,mesh=cardMesh(card,{back:!!card.hidden});
+        placeCard(mesh,x,z,TABLE_Y+.13+i*.008,(i-(bids.length-1)/2)*.03,.64);centerVisuals.set('bid-'+i,{mesh,card,position:new THREE.Vector3(x,TABLE_Y+.23,z)});
       });
     }
+    const currentSnapshot=cardFamilySnapshot(payload,center),previousSnapshot=lastCardFamilySnapshots.get(game);
+    animateCardFamilyConfirmed(game,payload,center,previousSnapshot,currentSnapshot,opponentVisuals,centerVisuals);lastCardFamilySnapshots.set(game,currentSnapshot);
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     const names={president:'PRÉSIDENT',menteur:'MENTEUR',suites:'QUATRE SUITES',plis:'CHASSE AUX PLIS',encheres:'ENCHÈRES'};
     if(title)title.textContent='VUE 3D · '+(names[game]||'CARTES');
