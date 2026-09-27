@@ -3136,13 +3136,17 @@ playSceneAction=function(ctx){
 };
 
 /* Présence cartes : gestes réseau temporaires, sans mutation de l'état autoritatif. */
+const CARD_GESTURE_GAMES=new Set(['huit','president','menteur','suites','plis','encheres','quatrevingtdixneuf']);
 let cardGestureCounter=0,cardGestureCurrent=0,cardGestureLastAt=0,cardGestureLastProgress=-1,cardGestureLastLateral=0;
+function cardGestureGameId(){return String((net.role==='host'?net.state?.id:S?.id)||net.gameId||'')}
 function cardGestureClean(data,actor){
- if(!data||data.type!=='card-gesture'||data.matchId!==net.matchId||data.revision!==net.revision||net.gameId!=='huit')return null;
+ const gameId=cardGestureGameId();
+ if(!data||data.type!=='card-gesture'||data.matchId!==net.matchId||data.revision!==net.revision||!CARD_GESTURE_GAMES.has(gameId))return null;
+ if(data.gameId&&data.gameId!==gameId)return null;
  if(!Number.isInteger(actor)||actor<0||actor>7||!Number.isInteger(data.gesture)||data.gesture<1)return null;
  const phase=['start','move','cancel','commit'].includes(data.phase)?data.phase:null;if(!phase)return null;
  const progress=Math.max(0,Math.min(1,Number(data.progress)||0)),lateral=Math.max(-1,Math.min(1,Number(data.lateral)||0));
- return{type:'card-gesture',matchId:net.matchId,revision:net.revision,actor,gesture:data.gesture,phase,progress,lateral};
+ return{type:'card-gesture',matchId:net.matchId,revision:net.revision,gameId,actor,gesture:data.gesture,phase,progress,lateral};
 }
 function cardGestureDeliver(packet){
  if(!packet||packet.actor===net.me)return;
@@ -3154,13 +3158,14 @@ function cardGestureBroadcast(packet,exclude=null){
  for(const c of net.spectators?.keys?.()||[]){if(c?.open&&c!==exclude)netSend(packet,c)}
 }
 function cardGestureSend(detail){
- if(!isOnline()||S?.id!=='huit'||!net.active||!net.connected||net.spectator||netPaused()||S.turn!==net.me)return;
+ const gameId=S?.id;
+ if(!isOnline()||!CARD_GESTURE_GAMES.has(gameId)||!net.active||!net.connected||net.spectator||netPaused()||S.turn!==net.me)return;
  const phase=['start','move','cancel','commit'].includes(detail?.phase)?detail.phase:null;if(!phase)return;
  const progress=Math.max(0,Math.min(1,Number(detail.progress)||0)),lateral=Math.max(-1,Math.min(1,Number(detail.lateral)||0)),now=performance.now();
  if(phase==='start'){cardGestureCurrent=++cardGestureCounter;cardGestureLastAt=0;cardGestureLastProgress=-1;cardGestureLastLateral=0}
  if(!cardGestureCurrent)return;
  if(phase==='move'&&now-cardGestureLastAt<70&&Math.abs(progress-cardGestureLastProgress)<.035&&Math.abs(lateral-cardGestureLastLateral)<.05)return;
- const packet={type:'card-gesture',matchId:net.matchId,revision:net.revision,gesture:cardGestureCurrent,phase,progress,lateral};
+ const packet={type:'card-gesture',matchId:net.matchId,revision:net.revision,gameId,gesture:cardGestureCurrent,phase,progress,lateral};
  cardGestureLastAt=now;cardGestureLastProgress=progress;cardGestureLastLateral=lateral;
  if(net.role==='host'){const clean=cardGestureClean(packet,net.me);if(clean)cardGestureBroadcast(clean)}
  else netSend(packet);
@@ -3171,8 +3176,8 @@ const CARD_GESTURE_RECEIVE_SOCIAL=receiveSocial;
 receiveSocial=function(data,actor,connection){
  if(data?.type==='card-gesture'){
   if(net.role==='host'){
-   const seat=Number.isInteger(actor)&&actor>0?net.seats?.[actor]:null;
-   if(!seat?.conn?.open||seat.conn!==connection||net.state?.id!=='huit'||net.state.turn!==actor||netPaused())return true;
+   const seat=Number.isInteger(actor)&&actor>0?net.seats?.[actor]:null,gameId=String(net.state?.id||'');
+   if(!seat?.conn?.open||seat.conn!==connection||!CARD_GESTURE_GAMES.has(gameId)||net.state.turn!==actor||netPaused())return true;
    const clean=cardGestureClean(data,actor);if(!clean)return true;
    cardGestureDeliver(clean);cardGestureBroadcast(clean,connection);return true;
   }
