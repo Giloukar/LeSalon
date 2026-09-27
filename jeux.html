@@ -3467,7 +3467,7 @@ if(window.SalonTableView){
   return TABLE_VIEW_SHOW_HOME();
  };
  document.addEventListener('click',e=>{
-  const b=e.target.closest?.('[data-table-3d-window]');if(!b||window.SalonTableView?.getMode()!=='3d')return;
+  const b=e.target.closest?.('[data-table-3d-window]');if(!b)return;
   e.preventDefault();e.stopImmediatePropagation();
   const target=b.dataset.table3dWindow;
   if(target==='full'){table3dSetPresentation('full');table3dRequestNativeFullscreen()}
