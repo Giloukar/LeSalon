@@ -557,6 +557,36 @@ export function createTable3DRenderer({onFatal}={}){
     if(status)status.textContent=data.caller!==null?'Dernier tour · Cactus annoncé':data.phase==='peek'?'Mémorisez vos deux cartes':data.phase==='draw'?'Pioche ou défausse':data.phase==='swap'?'Échangez une carte':data.phase==='power'?'Pouvoir du 8':data.phase==='reveal'?'Mémorisez la carte':'Table synchronisée';
     if(help)help.textContent=data.phase==='peek'||data.phase==='reveal'?'Utilisez « C’est mémorisé » sous la table':data.phase==='draw'?'Cliquez la pioche ou la défausse · vos cartes permettent aussi le jet rapide':data.phase==='swap'?'Cliquez une de vos cartes pour l’échanger':data.phase==='power'?'Cliquez une de vos cartes pour la regarder':'Les cartes restent cachées comme dans la vue 2D';
   }
+  function syncEcho(payload){
+    clearObjects();dropMarker.visible=false;
+    const s=payload.state,data=payload.viewData?.echo||{},phase=data.phase||s?.phase||'watch',sequence=Array.isArray(data.sequence)?data.sequence:[],input=Array.isArray(data.input)?data.input:[],colors=['#b5e4a4','#aacdf7','#edbe86','#e7aaca'],symbols=['●','◆','▲','■'];
+    camera.position.set(0,6.7,8.3);camera.lookAt(0,.35,.15);
+    const baseMat=new THREE.MeshStandardMaterial({color:0x203b34,roughness:.92,metalness:.01}),base=new THREE.Mesh(new THREE.BoxGeometry(9,.18,5.4),baseMat);base.position.set(0,TABLE_Y-.01,.1);base.receiveShadow=true;base.userData.temporaryMaterial=baseMat;objects.add(base);
+    for(let i=0;i<4;i++){
+      const activePad=phase==='repeat'&&payload.canInteract,mat=new THREE.MeshStandardMaterial({color:new THREE.Color(colors[i]),roughness:.62,metalness:.03,emissive:new THREE.Color(colors[i]),emissiveIntensity:activePad?.34:.12});
+      const pad=new THREE.Mesh(tileGeometry,mat);pad.scale.set(1.62,.72,1.65);pad.position.set((i-1.5)*2.05,TABLE_Y+.43,.75);pad.castShadow=true;pad.receiveShadow=true;pad.userData.temporaryMaterial=mat;
+      if(activePad){pad.userData={...pad.userData,kind:'echo-pad',index:i,interactive:true};interactive.push(pad)}
+      objects.add(pad);
+      const label=makeLabel((i+1)+' '+symbols[i],colors[i]);label.scale.set(1.3,.4,1);label.position.set(pad.position.x,TABLE_Y+.72,.73);objects.add(label);
+    }
+    const expected=Math.max(0,Number(data.stage||s?.stage||1)+2);
+    for(let i=0;i<expected;i++){
+      const value=sequence[i],known=Number.isInteger(value)&&value>=0&&value<4,answered=i<input.length;
+      const mat=new THREE.MeshStandardMaterial({color:known?new THREE.Color(colors[value]):answered?0x88a896:0x56685e,roughness:.7,emissive:known?new THREE.Color(colors[value]):0x000000,emissiveIntensity:known?.42:0});
+      const lamp=new THREE.Mesh(dieGeometry,mat);lamp.scale.set(.42,.18,.42);lamp.position.set((i-(expected-1)/2)*.92,TABLE_Y+.63,-1.12);lamp.userData.temporaryMaterial=mat;objects.add(lamp);
+      if(phase==='result'&&known&&answered){
+        const ok=input[i]===value,mark=makeLabel(ok?'✓':'×',ok?'#b5e4a4':'#efaaa0');mark.scale.set(.58,.28,1);mark.position.set(lamp.position.x,TABLE_Y+.9,-1.12);objects.add(mark);
+      }
+    }
+    if(phase==='watch'&&payload.canInteract){const go=actionSprite('À MOI · CACHER','echo-memorized');go.position.set(0,1.12,2.35);objects.add(go)}
+    if(phase==='result'&&payload.canInteract){const next=actionSprite('CONTINUER','echo-continue');next.position.set(0,1.12,2.35);objects.add(next)}
+    (data.players||[]).forEach((p,i)=>{const tag=makeLabel((p.name||'Joueur')+' · '+Number(p.score||0),i===s?.turn?'#dbea9e':'#d8ded9');tag.scale.set(1.7,.34,1);tag.position.set((i-(data.players.length-1)/2)*2.15,.93,-2.32);objects.add(tag)});
+    const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
+    if(title)title.textContent='VUE 3D · ÉCHO NÉON';
+    if(status)status.textContent='Manche '+(data.stage||1)+' / 5 · '+(phase==='watch'?'mémorisation':phase==='repeat'?'reproduction '+input.length+' / '+expected:phase==='result'?'résultat':'partie terminée');
+    if(help)help.textContent=phase==='watch'?'Mémorisez les lumières dans l’ordre puis cachez la séquence':phase==='repeat'?'Touchez les quatre pads dans le bon ordre':phase==='result'?(data.feedback||'Séquence terminée'):'Scores synchronisés avec le moteur';
+  }
+
   function cityWorld(index){
     const side=Math.floor(index/6),step=index%6;
     if(side===0)return new THREE.Vector3(-4.35+step*1.45,TABLE_Y+.13,3.05);
@@ -595,7 +625,8 @@ export function createTable3DRenderer({onFatal}={}){
   }
 
   function syncCurrent(payload){
-    if(payload?.gameId==='metropole')syncMetropole(payload);
+    if(payload?.gameId==='echo')syncEcho(payload);
+    else if(payload?.gameId==='metropole')syncMetropole(payload);
     else if(payload?.gameId==='rummikub')syncRummikub(payload);
     else if(payload?.gameId==='cactus')syncCactus(payload);
     else if(payload?.gameId==='huit')syncEight(payload);
@@ -636,7 +667,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,kind:'deck',startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(obj.userData.kind==='card-select'){drag={pointerId:e.pointerId,kind:'card-select',cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(['maid-pick','special-select','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
-    if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll'].includes(obj.userData.kind)){
+    if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
       drag={pointerId:e.pointerId,kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return;
     }
@@ -671,6 +702,9 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='rummi-dest'){if(tap)current?.interactions?.rummi?.('move',d.dest);return}
     if(d.kind==='deck'){if(tap)current?.interactions?.draw?.();return}
     if(d.kind==='goose-roll'||d.kind==='goose-choice'){if(tap)current?.interactions?.goose?.(d.kind==='goose-roll'?'roll':'choose',d.steps);return}
+    if(d.kind==='echo-memorized'){if(tap)current?.interactions?.echo?.('memorized');return}
+    if(d.kind==='echo-pad'){if(tap)current?.interactions?.echo?.('pad',d.index);return}
+    if(d.kind==='echo-continue'){if(tap)current?.interactions?.echo?.('continue');return}
     if(d.kind==='city-roll'){if(tap)current?.interactions?.city?.('roll');return}
     if(d.kind==='yam-roll'||d.kind==='yam-hold'){if(tap)current?.interactions?.yam?.(d.kind==='yam-hold'?'hold':'roll',d.index);return}
     if(d.kind==='box-roll'||d.kind==='box-toggle'||d.kind==='box-close'){
