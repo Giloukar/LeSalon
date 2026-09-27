@@ -160,3 +160,18 @@ Bataille :
 - l’action `battle` reste le seul déclencheur du moteur.
 
 Cette PR renforce donc la confidentialité réseau de Bataille indépendamment de la 3D.
+
+## Métropole 3D
+
+Métropole réutilise désormais les primitives de plateau, pion et dés sans recopier son moteur économique.
+
+Le payload 3D expose uniquement :
+- les 24 cases et leurs métadonnées publiques ;
+- propriétaires, maisons et hypothèques ;
+- positions, soldes et statut de détention des joueurs ;
+- les deux dés déjà décidés par le moteur ;
+- la phase, le tour de table et les informations publiques d’achat/dette.
+
+Le paquet d’événements reste supprimé par `projectGame()` en online et n’est jamais reconstruit par le renderer. La seule action directement déclenchée depuis le plateau 3D est `roll`, qui repasse par `dispatch()`. Achat, refus, hypothèque, construction, vente de maison, dette et faillite restent dans les contrôles 2D existants afin de conserver une seule implémentation des règles.
+
+Le plateau 3D matérialise les rues, les couleurs de groupes, les propriétaires, jusqu’à trois maisons, les pions et les dés. Aucun modèle externe n’est requis à ce stade : ces éléments sont procéduraux et pourront être remplacés plus tard par des assets GLB sans changer le protocole de jeu.
