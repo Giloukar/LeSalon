@@ -200,6 +200,19 @@ test('Eight local confirmed play and draw reuse physical card flights',async()=>
  assert.doesNotMatch(source,/ownDrawnIds[^\n]*dispatch\(/);
 });
 
+test('Cactus 3D pile transitions are inferred from confirmed snapshots only',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/lastCactusSnapshot=null/);
+ assert.match(source,/function cactusSnapshot\(payload,data\)/);
+ assert.match(source,/const drawnAppeared=!!snapshot\.drawnId/);
+ assert.match(source,/previous\.drawnId&&snapshot\.discardId===previous\.drawnId/);
+ assert.match(source,/const actorLoss=snapshot\.handCounts/);
+ assert.match(source,/previous\.phase==='draw'&&snapshot\.phase==='swap'/);
+ assert.match(source,/flight=cardMesh\(previous\.discard\)/);
+ assert.doesNotMatch(source,/cactusSnapshot[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/drawnAppeared[^\n]*onlineAct\(/);
+});
+
 test('Cactus physical quick throw commits only through the existing engine interaction',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  const html=await readFile(path.join(root,'jeux.html'),'utf8');
