@@ -3116,7 +3116,7 @@ playSceneAction=function(ctx){
 const TABLE_VIEW_2D_RENDER=renderGame,TABLE_VIEW_SHOW_HOME=showHome;
 const TABLE_3D_CARD_GAMES=['president','menteur','suites','plis','encheres'];
 const TABLE_3D_SPECIAL_CARD_GAMES=['pouilleux','quatrevingtdixneuf','vingtetun','bataille'];
-function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
+function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite','cactus',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
 function tableViewMountControl(){
  if(!window.SalonTableView)return;
  const supported=tableViewSupports3D();
@@ -3152,6 +3152,21 @@ if(window.SalonTableView){
   }
   if(S?.id==='boite'){
    data.boxDice=[...S.boxDice];data.boxNumbers=[...S.boxNumbers];data.boxStage=S.boxStage;data.boxSelected=[...selection].map(Number);data.boxCanOne=S.boxNumbers.every(n=>n<7);
+  }
+  if(S?.id==='cactus'){
+   const viewer=privateIndex();
+   data.cactus={
+    viewer,
+    phase:S.phase,
+    turn:S.turn,
+    caller:S.caller,
+    deckCount:S.deck.length,
+    discard:S.discard.at(-1)||null,
+    drawn:canPlay()&&S.drawn?S.drawn:null,
+    source:canPlay()?S.source:null,
+    reveal:S.reveal?{owner:S.reveal.owner,index:S.reveal.index}:null,
+    players:S.players.map((p,i)=>({name:p.name,score:p.cactusScore,hand:p.hand.map((c,index)=>c?clone(c):null),quick:legacyCactusOwnQuickAllowed(i)&&!((i===S.turn)&&['swap','power','reveal','peek'].includes(S.phase))}))
+   };
   }
   if(S&&TABLE_3D_CARD_GAMES.includes(S.id)){
    const hand=!gate&&!net.spectator?player(S).hand:[],mine=canPlay()?hand:[];
@@ -3195,13 +3210,25 @@ if(window.SalonTableView){
    spectator:!!net.spectator,
    gated:!!gate,
    privateIndex:S?privateIndex():0,
-   canInteract:!!(S&&canPlay()&&(S.id!=='huit'||!showSuit)),
+   canInteract:!!(S&&((S.id==='cactus'&&!net.spectator)||(canPlay()&&(S.id!=='huit'||!showSuit)))),
    viewData:data,
    interactions:{
     playCard(id){if(!S||S.id!=='huit'||!canPlay())return false;const c=player(S).hand.find(c=>c.id===id);if(!c)return false;eightPlayCardUI(c);return true},
     draw(){if(!S||S.id!=='huit'||!canPlay())return false;dispatch({type:'draw'});return true},
     goose(type,steps){if(!S||S.id!=='oie'||!canPlay())return false;dispatch(type==='choose'?{type:'gooseChoose',steps}: {type});return true},
     yam(type,index){if(!S||S.id!=='yam'||!canPlay())return false;dispatch(type==='hold'?{type:'hold',index}:{type:'roll'});return true},
+    cactus(type,value){
+     if(!S||S.id!=='cactus')return false;
+     if(type==='quick'){
+      const owner=privateIndex(),index=Number(value);if(!legacyCactusOwnQuickAllowed(owner)||!Number.isInteger(index))return false;
+      legacyCactusQuickUI(owner,index,null);return true;
+     }
+     if(!canPlay())return false;
+     if(type==='swap'&&Number.isInteger(value)){dispatch({type:'swap',index:Number(value)});return true}
+     if(type==='target'&&Number.isInteger(value)){dispatch({type:'target',owner:S.turn,index:Number(value)});return true}
+     if(['draw','take','discard','skip','ready','call'].includes(type)){dispatch({type});return true}
+     return false;
+    },
     box(type,value){
      if(!S||S.id!=='boite'||!canPlay())return false;
      if(type==='roll'){dispatch({type:'roll',count:value});return true}

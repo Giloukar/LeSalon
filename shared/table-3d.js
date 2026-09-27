@@ -478,8 +478,44 @@ export function createTable3DRenderer({onFatal}={}){
     if(status){const requested=SUIT_NAME[s.suit]||'',attack=s.pendingDraw>0?' · attaque +'+s.pendingDraw:'';status.textContent=(requested?requested+' demandé':'')+attack}
     if(help)help.textContent='Cliquez ou glissez une carte vers la défausse · cliquez la pioche pour piocher';
   }
+  function syncCactus(payload){
+    clearObjects();dropMarker.visible=false;
+    camera.position.set(0,7.7,9.7);camera.lookAt(0,.2,.15);
+    const data=payload.viewData?.cactus,s=payload.state;if(!data||!s)return;
+    const viewer=data.viewer,players=data.players||[],count=Math.max(1,players.length);
+    players.forEach((p,i)=>{
+      const mine=i===viewer,angle=mine?Math.PI/2:(i/(count-1||1))*Math.PI-Math.PI/2;
+      const cx=mine?0:Math.sin(angle)*4.2,cz=mine?2.45:-2.15+Math.cos(angle)*.72;
+      (p.hand||[]).forEach((card,index)=>{
+        if(!card)return;
+        const col=index%2,row=Math.floor(index/2),x=cx+(col-.5)*1.02,z=cz+(row-.5)*.78;
+        const visible=!card.hidden,quick=!!p.quick&&mine,turnAction=mine&&i===data.turn&&payload.canInteract&&(['swap','power'].includes(data.phase));
+        const interactiveCard=quick||turnAction;
+        const mesh=cardMesh(visible?card:null,{back:!visible,id:card.id,interactiveCard,playable:false});
+        mesh.userData.kind=quick?'cactus-quick':turnAction?(data.phase==='swap'?'cactus-swap':'cactus-target'):'cactus-card';
+        mesh.userData.index=index;mesh.userData.owner=i;mesh.userData.interactive=interactiveCard;
+        placeCard(mesh,x,z,TABLE_Y+.11,(col-.5)*.035,mine?0.76:0.62);
+        mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};
+      });
+      const label=makeLabel((p.name||'Joueur')+' · '+p.score+' pts'+(data.caller===i?' · CACTUS !':''),i===data.turn?'#dbea9e':'#d8ded9');
+      label.position.set(cx,1.08,cz+(mine?.95:-.88));label.scale.set(mine?3.4:2.65,mine?.72:.58,1);objects.add(label);
+    });
+    const deck=Math.max(0,Number(data.deckCount)||0);
+    for(let i=0;i<Math.min(5,Math.max(1,deck));i++){
+      const top=i===Math.min(5,Math.max(1,deck))-1,mesh=cardMesh(null,{back:true,interactiveCard:top&&payload.canInteract&&data.phase==='draw'});
+      mesh.userData.kind=top&&payload.canInteract&&data.phase==='draw'?'cactus-draw':'cactus-card';mesh.userData.interactive=top&&payload.canInteract&&data.phase==='draw';
+      placeCard(mesh,-1.35,.1,TABLE_Y+.07+i*.035,-.02+i*.01,.82);
+    }
+    if(data.discard){const mesh=cardMesh(data.discard,{interactiveCard:payload.canInteract&&data.phase==='draw'});mesh.userData.kind=payload.canInteract&&data.phase==='draw'?'cactus-take':'cactus-card';mesh.userData.interactive=payload.canInteract&&data.phase==='draw';placeCard(mesh,0,.1,TABLE_Y+.12,(visualHash(data.discard.id)-.5)*.12,.82);}
+    if(data.drawn){const mesh=cardMesh(data.drawn);mesh.userData.kind='cactus-drawn';placeCard(mesh,1.35,.1,TABLE_Y+.14,0,.88);}
+    const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
+    if(title)title.textContent='VUE 3D · CACTUS';
+    if(status)status.textContent=data.caller!==null?'Dernier tour · Cactus annoncé':data.phase==='peek'?'Mémorisez vos deux cartes':data.phase==='draw'?'Pioche ou défausse':data.phase==='swap'?'Échangez une carte':data.phase==='power'?'Pouvoir du 8':data.phase==='reveal'?'Mémorisez la carte':'Table synchronisée';
+    if(help)help.textContent=data.phase==='peek'||data.phase==='reveal'?'Utilisez « C’est mémorisé » sous la table':data.phase==='draw'?'Cliquez la pioche ou la défausse · vos cartes permettent aussi le jet rapide':data.phase==='swap'?'Cliquez une de vos cartes pour l’échanger':data.phase==='power'?'Cliquez une de vos cartes pour la regarder':'Les cartes restent cachées comme dans la vue 2D';
+  }
   function syncCurrent(payload){
-    if(payload?.gameId==='huit')syncEight(payload);
+    if(payload?.gameId==='cactus')syncCactus(payload);
+    else if(payload?.gameId==='huit')syncEight(payload);
     else if(payload?.gameId==='oie')syncGoose(payload);
     else if(payload?.gameId==='yam')syncYam(payload);
     else if(payload?.gameId==='boite')syncBox(payload);
@@ -508,7 +544,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(hovered===mesh)return;
     if(hovered&&!drag){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale);}
     hovered=mesh;
-    if(hovered&&!drag&&['card','card-select','maid-pick','special-select'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
+    if(hovered&&!drag&&['card','card-select','maid-pick','special-select','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
     draw();
   }
   function onPointerDown(e){
@@ -516,7 +552,7 @@ export function createTable3DRenderer({onFatal}={}){
     const obj=hit(e);setHover(obj);if(!obj)return;
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,kind:'deck',startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(obj.userData.kind==='card-select'){drag={pointerId:e.pointerId,kind:'card-select',cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
-    if(['maid-pick','special-select','battle-action'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,kind:obj.userData.kind,index:obj.userData.index,cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
+    if(['maid-pick','special-select','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
       drag={pointerId:e.pointerId,kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return;
@@ -543,6 +579,11 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='maid-pick'){if(tap)current?.interactions?.specialCard?.('pick',d.index);return}
     if(d.kind==='special-select'){if(tap)current?.interactions?.specialCard?.('select',d.cardId);return}
     if(d.kind==='battle-action'){if(tap)current?.interactions?.specialCard?.('battle');return}
+    if(d.kind==='cactus-quick'){if(tap)current?.interactions?.cactus?.('quick',d.index);return}
+    if(d.kind==='cactus-swap'){if(tap)current?.interactions?.cactus?.('swap',d.index);return}
+    if(d.kind==='cactus-target'){if(tap)current?.interactions?.cactus?.('target',d.index);return}
+    if(d.kind==='cactus-draw'){if(tap)current?.interactions?.cactus?.('draw');return}
+    if(d.kind==='cactus-take'){if(tap)current?.interactions?.cactus?.('take');return}
     if(d.kind==='deck'){if(tap)current?.interactions?.draw?.();return}
     if(d.kind==='goose-roll'||d.kind==='goose-choice'){if(tap)current?.interactions?.goose?.(d.kind==='goose-roll'?'roll':'choose',d.steps);return}
     if(d.kind==='yam-roll'||d.kind==='yam-hold'){if(tap)current?.interactions?.yam?.(d.kind==='yam-hold'?'hold':'roll',d.index);return}
