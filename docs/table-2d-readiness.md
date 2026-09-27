@@ -419,3 +419,12 @@ Rummikub accepte le dépôt d'une tuile sur une combinaison existante, dans l'es
 Avant le dispatch, la couche de présentation mémorise la position exacte du relâchement. Le snapshot suivant peut ainsi continuer l'animation depuis la main de l'utilisateur plutôt que de faire revenir brièvement l'objet à son emplacement d'origine.
 
 Le ciblage visuel est maintenant explicite : pendant un drag qui peut devenir un vrai coup, un anneau apparaît uniquement sur une zone de dépôt reconnue. Pour Rummikub, les groupes utilisent les cellules réelles du layout, le chevalet possède une zone dédiée et la création d'un nouveau groupe est limitée à l'espace libre de la table. Un lâcher hors zone revient donc visuellement à son origine au lieu d'être interprété trop largement.
+
+
+## Rummikub — tour complet depuis la table 3D
+
+Le chantier Rummikub peut désormais être piloté sans revenir aux commandes 2D pour les opérations courantes. La tuile supérieure de la pioche est interactive : un toucher déclenche la pioche existante et un glissement jusqu'à la zone du chevalet exprime la même intention. Le moteur reste responsable d'annuler le chantier courant, de piocher réellement la tuile et de terminer le tour.
+
+La scène expose également les commandes autoritatives déjà existantes : **Valider le tour** lorsque le diagnostic du moteur est valide, **Annuler le dernier** lorsqu'un historique de déplacement existe, **Recommencer le tour** pour revenir au snapshot de début de tour, et **Passer** lorsque la pioche est vide.
+
+La projection 3D ne reçoit que deux informations supplémentaires du joueur actif : le nombre d'annulations disponibles et le booléen `canCommit`. Aucune information privée adverse n'est ajoutée. Tous les contrôles appellent `rummi('draw'|'commit'|'undoStep'|'undo')` ; aucune règle de combinaison, d'ouverture à 30 points ou de pendule n'est dupliquée dans Three.js.
