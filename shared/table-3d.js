@@ -203,6 +203,11 @@ export function createTable3DRenderer({onFatal}={}){
     const step=Math.min(3.0,6.0/Math.max(1,total-1));
     return{x:(index-(total-1)/2)*step,z:-2.34+Math.abs(index-(total-1)/2)*.06};
   }
+  function pickCardSlot(count,index){
+    const total=Math.max(1,count),rows=Math.max(1,Math.min(3,Math.ceil(total/8))),perRow=Math.ceil(total/rows),row=Math.floor(index/perRow),start=row*perRow,rowCount=Math.min(perRow,total-start),local=index-start;
+    const scale=rows===1?.76:rows===2?.70:.64,spacing=CARD_W*scale+.12,t=rowCount<=1?.5:local/(rowCount-1);
+    return{x:(local-(rowCount-1)/2)*spacing,z:-.82+row*.82,rot:(t-.5)*.10,scale,yOffset:row*.01+local*.002};
+  }
   function emitLocalCardGesture(phase,progress=0,lateral=0){
     if(current?.gameId!=='huit')return;
     const detail={phase,progress:Math.max(0,Math.min(1,Number(progress)||0)),lateral:Math.max(-1,Math.min(1,Number(lateral)||0))};
@@ -447,11 +452,11 @@ export function createTable3DRenderer({onFatal}={}){
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
 
     if(game==='pouilleux'){
-      const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,span=Math.min(7.4,Math.max(1.5,(n-1)*.55));
-      own.forEach((card,i)=>{const t=n<=1 ? .5 : i/(n-1),mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,(t-.5)*span,2.75,TABLE_Y+.11,(t-.5)*-.16,.92)});
-      const maid=data.maid||{},count=Number(maid.targetCount)||0,visible=Math.min(24,count),spanTarget=Math.min(8.3,Math.max(1.2,(visible-1)*.42));
+      const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length;
+      own.forEach((card,i)=>{const slot=handCardSlot(n,i),mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,slot.x,slot.z,TABLE_Y+.11+slot.yOffset,slot.fan,slot.scale)});
+      const maid=data.maid||{},count=Number(maid.targetCount)||0,visible=Math.min(24,count);
       for(let i=0;i<visible;i++){
-        const t=visible<=1 ? .5 : i/(visible-1),mesh=cardMesh(null,{back:true});placeCard(mesh,(t-.5)*spanTarget,-.15+Math.abs(t-.5)*.22,TABLE_Y+.13,(t-.5)*.16,.72);
+        const slot=pickCardSlot(visible,i),mesh=cardMesh(null,{back:true});placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.rot,slot.scale);
         if(payload.canInteract){mesh.userData={kind:'maid-pick',index:i,interactive:true};mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};interactive.push(mesh)}
       }
       if(title)title.textContent='VUE 3D · POUILLEUX';
@@ -463,8 +468,8 @@ export function createTable3DRenderer({onFatal}={}){
     if(game==='quatrevingtdixneuf'){
       const ninety=data.ninety||{},selected=new Set(ninety.selectedIds||[]),selectable=new Set(ninety.selectableIds||[]),legal=new Set(ninety.legalIds||[]),own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length;
       own.forEach((card,i)=>{
-        const t=n<=1 ? .5 : i/(n-1),chosen=selected.has(card.id),mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:selectable.has(card.id),playable:selectable.has(card.id)});
-        mesh.userData.kind='special-select';mesh.userData.cardId=card.id;mesh.userData.home={position:new THREE.Vector3((t-.5)*Math.min(5.2,(n-1)*1.22),TABLE_Y+.12+(chosen ? .25 : legal.has(card.id) ? .08 : 0),2.72),rotation:new THREE.Euler(-Math.PI/2,0,(t-.5)*-.12),scale:new THREE.Vector3(1,1,1).multiplyScalar(chosen?1.07:legal.has(card.id)?1.025:.98)};
+        const slot=handCardSlot(n,i),chosen=selected.has(card.id),isLegal=legal.has(card.id),mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:selectable.has(card.id),playable:selectable.has(card.id)});
+        mesh.userData.kind='special-select';mesh.userData.cardId=card.id;mesh.userData.home={position:new THREE.Vector3(slot.x,TABLE_Y+.12+slot.yOffset+(chosen?.25:isLegal?.08:0),slot.z),rotation:new THREE.Euler(-Math.PI/2,0,slot.fan),scale:new THREE.Vector3(1,1,1).multiplyScalar(slot.scale*(chosen?1.07:isLegal?1.025:.98))};
         mesh.position.copy(mesh.userData.home.position);mesh.rotation.copy(mesh.userData.home.rotation);mesh.scale.copy(mesh.userData.home.scale);objects.add(mesh);
       });
       if(ninety.last){const top=cardMesh(ninety.last,{back:!!ninety.last.hidden});placeCard(top,1.5,.05,TABLE_Y+.13,0,.9)}
@@ -480,8 +485,8 @@ export function createTable3DRenderer({onFatal}={}){
     if(game==='vingtetun'){
       const bj=data.blackjack||{},dealer=bj.dealer||[],own=bj.hand||[];
       dealer.forEach((card,i)=>{const mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,(i-(dealer.length-1)/2)*.82,-.9,TABLE_Y+.13+i*.012,(i-(dealer.length-1)/2)*.04,.78)});
-      const dn=own.length,span=Math.min(6.8,Math.max(1.3,(dn-1)*.88));
-      own.forEach((card,i)=>{const t=dn<=1 ? .5 : i/(dn-1),mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,(t-.5)*span,2.25,TABLE_Y+.13,(t-.5)*-.12,.88)});
+      const dn=own.length;
+      own.forEach((card,i)=>{const slot=handCardSlot(dn,i),mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.fan,slot.scale*.92)});
       const dealerLabel=makeLabel('BANQUE · '+(dealer.length?(bj.dealerRevealed?bj.dealerValue:bj.dealerValue+' + ?'):'—'),'#e6d7b4');dealerLabel.position.set(0,1.02,-2.1);dealerLabel.scale.set(3,.62,1);objects.add(dealerLabel);
       if(bj.phase==='bet'){const bet=makeLabel('FAITES VOS JEUX','#dbea9e');bet.position.set(0,1.05,.2);bet.scale.set(3.6,.8,1);objects.add(bet)}
       if(title)title.textContent='VUE 3D · VINGT-ET-UN';
@@ -515,19 +520,19 @@ export function createTable3DRenderer({onFatal}={}){
     if(!s?.players?.length)return;
     setCameraPose(0,7.4,9.1,0,.22,.15);
     const selected=new Set(data.selectedIds||[]),selectable=new Set(data.selectableIds||[]),playable=new Set(data.cardPlayableIds||[]);
-    const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,span=Math.min(8.2,Math.max(1.5,(n-1)*.58));
+    const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length;
     own.forEach((card,i)=>{
-      const t=n<=1 ? .5 : i/(n-1),x=(t-.5)*span,z=2.75+Math.abs(t-.5)*.28,chosen=selected.has(card.id),canSelect=selectable.has(card.id);
+      const slot=handCardSlot(n,i),chosen=selected.has(card.id),canSelect=selectable.has(card.id),legal=playable.has(card.id);
       const mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:canSelect,playable:canSelect});
-      mesh.userData.kind='card-select';mesh.userData.cardId=card.id;mesh.userData.playable=canSelect;mesh.userData.legal=playable.has(card.id);
-      mesh.position.set(x,TABLE_Y+.12+(chosen ? .26 : playable.has(card.id) ? .09 : 0),z);mesh.rotation.set(-Math.PI/2,0,(t-.5)*-.18);mesh.scale.setScalar(chosen?1.075:playable.has(card.id)?1.025:.98);
+      mesh.userData.kind='card-select';mesh.userData.cardId=card.id;mesh.userData.playable=canSelect;mesh.userData.legal=legal;
+      mesh.position.set(slot.x,TABLE_Y+.12+slot.yOffset+(chosen?.26:legal?.09:0),slot.z);mesh.rotation.set(-Math.PI/2,0,slot.fan);mesh.scale.setScalar(slot.scale*(chosen?1.075:legal?1.025:.98));
       mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};objects.add(mesh);
     });
     const opponents=s.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer);
     opponents.forEach(({p,i},k)=>{
-      const count=p.hand?.length||0,total=Math.min(7,count),x=opponents.length<=1?0:(k/(opponents.length-1)-.5)*7.5,z=-2.75;
-      for(let c=0;c<total;c++){const mesh=cardMesh(null,{back:true});placeCard(mesh,x+(c-(total-1)/2)*.12,z+c*.015,TABLE_Y+.11+c*.015,(c-(total-1)/2)*.024,.64)}
-      const label=makeLabel((p.name||'Joueur')+' · '+count+' carte'+(count>1?'s':''),i===s.turn?'#dbea9e':'#d8ded9');label.position.set(x,1.02,z-.72);objects.add(label);
+      const count=p.hand?.length||0,total=Math.min(8,count),seat=eightOpponentSeat(opponents.length,k),span=total<=1?0:Math.min(2.8,(total-1)*.40);
+      for(let c=0;c<total;c++){const t=total<=1?.5:c/(total-1),mesh=cardMesh(null,{back:true});placeCard(mesh,seat.x+(t-.5)*span,seat.z+Math.abs(t-.5)*.09,TABLE_Y+.15+c*.006,(t-.5)*-.16,.70)}
+      const label=makeLabel((p.name||'Joueur')+' · '+count+' carte'+(count>1?'s':''),i===s.turn?'#dbea9e':'#eef2e8');label.position.set(seat.x,1.12,seat.z-.70);label.scale.set(3.0,.62,1);objects.add(label);
     });
     const center=data.cardCenter||{};
     if(game==='president'){
