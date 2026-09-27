@@ -3558,6 +3558,16 @@ if(window.SalonTableView){
   if(e.detail?.mode!=='3d')table3dSetPresentation(null);
   tableViewMountControl();
  });
+ const TABLE3D_BASE_CELEBRATE=celebrate;
+ celebrate=function(){
+  if(window.SalonTableView.getMode()==='3d'){
+   table3dSetPresentation(null);
+   table3dExitNativeFullscreen();
+   window.SalonTableView.setMode('2d',{persistPreference:false,reason:'game-over'});
+   if(view==='game')renderGame(false);
+  }
+  return TABLE3D_BASE_CELEBRATE();
+ };
 }
 
 validateSaved();applyPrefs();showHome();bootOnlineInvite();musicMount();
