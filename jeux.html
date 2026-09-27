@@ -1924,7 +1924,7 @@ function playBattle(s,a){if(a.type!=='battle')return false;let contenders=active
  s.battlePot=pot.length;s.battleReveal=reveals;s.battleWinner=winner;if(winner>=0)s.players[winner].hand.push(...shuffle(pot));say(s,winner>=0?s.players[winner].name+' remporte '+pot.length+' cartes'+(tied?' après bataille !':'.'):'Égalité sans réserve : les cartes sont partagées.');const live=active(s);if(live.length<=1||s.battleNumber>=200){s.totals=s.players.map(p=>p.hand.length);const best=Math.max(...s.totals);finish(s,live.filter(i=>s.totals[i]===best),live.length===1?'Toutes les cartes sont réunies !':'200 plis : le plus grand paquet gagne.');}else s.turn=next(s,s.turn,i=>s.players[i].hand.length>0);return true;}
 act=function(s,a){if(s.phase==='over')return false;if(s.id==='metropole')return playCity(s,a);if(s.id==='bataille')return playBattle(s,a);return legacyAct(s,a);};
 ai=function(s){return s.id==='metropole'?cityAI(s):s.id==='bataille'?{type:'battle'}:legacyAI(s);};
-projectGame=function(source,viewer){const v=legacyProjectGame(source,viewer);if(source.id==='metropole')delete v.events;if(source.id==='bataille')v.players.forEach((p,i)=>p.hand=hiddenCards(source.players[i].hand,'battle-'+i));return v;};
+projectGame=function(source,viewer){const v=legacyProjectGame(source,viewer);if(source.id==='metropole')delete v.events;if(source.id==='bataille'){v.players.forEach((p,i)=>p.hand=hiddenCards(source.players[i].hand,'battle-'+i));v.battleReveal=(source.battleReveal||[]).map((r,i)=>r.hidden?{owner:r.owner,hidden:true}:{owner:r.owner,hidden:false,card:clone(r.card)});}return v;};
 sanitizeOnlineAction=function(id,raw){if(['metropole','bataille'].includes(id)){if(!raw||typeof raw!=='object')return null;const allowed=id==='bataille'?['battle']:['roll','buy','decline','endTurn','mortgage','redeem','build','sellHouse','pay','bankrupt','bail','continue'];if(!allowed.includes(raw.type))return null;const a={type:raw.type};if(['mortgage','redeem','build','sellHouse'].includes(a.type)){if(!Number.isInteger(raw.index)||raw.index<0||raw.index>23)return null;a.index=raw.index;}return a;}return legacySanitizeAction(id,raw);};
 SCENES.metropole={accent:'#e5c48a',label:'Votre ville prend forme',hint:'Un quartier à la fois.'};SCENES.bataille={accent:'#bfcdec',label:'Les cartes décident',hint:'Le prochain pli vous attend.'};
 const legacyBoardHTML=boardHTML,legacyHandHTML=handHTML,legacyActionsHTML=actionsHTML,legacyPlayerStatus=playerStatus,legacyTurnText=turnText,legacyArt=art;
@@ -3115,7 +3115,8 @@ playSceneAction=function(ctx){
 /* Contrôleur de rendu : la 2D reste la couche de base et le fallback permanent. */
 const TABLE_VIEW_2D_RENDER=renderGame,TABLE_VIEW_SHOW_HOME=showHome;
 const TABLE_3D_CARD_GAMES=['president','menteur','suites','plis','encheres'];
-function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite',...TABLE_3D_CARD_GAMES].includes(S.id)}
+const TABLE_3D_SPECIAL_CARD_GAMES=['pouilleux','quatrevingtdixneuf','vingtetun','bataille'];
+function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
 function tableViewMountControl(){
  if(!window.SalonTableView)return;
  const supported=tableViewSupports3D();
@@ -3167,6 +3168,24 @@ if(window.SalonTableView){
    if(S.id==='plis')data.cardCenter={entries:[...(S.trickCards.length?S.trickCards:S.lastTrick)].map(e=>({owner:e.owner,card:e.card})),trump:S.trump,phase:S.phase,dealNumber:S.dealNumber,completedTricks:S.completedTricks};
    if(S.id==='encheres')data.cardCenter={prize:S.prize,bids:[...S.bids],pot:S.pot,bidRound:S.bidRound,revealed:S.phase!=='play',lastAuction:S.lastAuction};
   }
+  if(S&&TABLE_3D_SPECIAL_CARD_GAMES.includes(S.id)){
+   data.specialCardGame=S.id;
+   if(S.id==='pouilleux'){
+    const target=next(S,S.turn,k=>pHand(S,k)>0);
+    data.maid={target,targetName:S.players[target]?.name||'',targetCount:S.players[target]?.hand?.length||0,pairs:Math.floor(S.discard.length/2)};
+   }
+   if(S.id==='quatrevingtdixneuf'){
+    const hand=!gate&&!net.spectator?player(S).hand:[];
+    data.ninety={total:S.total99,dir:S.dir,last:S.discard.at(-1)||null,deckCount:S.deck.length,selectedIds:[...selection],selectableIds:canPlay()?hand.map(c=>c.id):[],legalIds:canPlay()?hand.filter(c=>legal99(S,c,1)||(c.rank===1&&legal99(S,c,11))).map(c=>c.id):[],lastEffect:S.lastEffect};
+   }
+   if(S.id==='vingtetun'){
+    const dealer=S.dealer.map((c,i)=>i===0||S.dealerRevealed||S.phase==='over'?c:{hidden:true,id:'dealer-hidden-'+i});
+    data.blackjack={phase:S.phase,dealer,dealerRevealed:!!S.dealerRevealed,hand:!gate&&!net.spectator?[...player(S).hand]:[],playerValue:!gate&&!net.spectator?bjValue(player(S).hand):null,dealerValue:dealer.length?(S.dealerRevealed||S.phase==='over'?bjValue(S.dealer):bjValue([S.dealer[0]])):0,bet:player(S)?.bet||0,chips:player(S)?.chips||0,status:player(S)?.status||''};
+   }
+   if(S.id==='bataille'){
+    data.battle={number:S.battleNumber,winner:S.battleWinner,pot:S.battlePot,counts:S.players.map(p=>p.hand.length),reveals:(S.battleReveal||[]).map(r=>r.hidden?{owner:r.owner,hidden:true}:{owner:r.owner,hidden:false,card:r.card})};
+   }
+  }
   return window.SalonTableView.render({
    args,
    state:gate?null:S,
@@ -3204,6 +3223,16 @@ if(window.SalonTableView){
      else if(['president','menteur'].includes(S.id)){if(selection.size>=4){toast('Quatre cartes au maximum.');return false}selection.add(id)}
      else{selection.clear();selection.add(id)}
      renderGame(false);return true;
+    },
+    specialCard(type,value){
+     if(!S||!TABLE_3D_SPECIAL_CARD_GAMES.includes(S.id)||!canPlay())return false;
+     if(S.id==='pouilleux'&&type==='pick'&&Number.isInteger(value)){dispatch({type:'pick',index:value});return true}
+     if(S.id==='quatrevingtdixneuf'&&type==='select'){
+      const id=String(value),c=player(S).hand.find(c=>c.id===id);if(!c)return false;
+      selection.clear();selection.add(id);renderGame(false);return true;
+     }
+     if(S.id==='bataille'&&type==='battle'){dispatch({type:'battle'});return true}
+     return false;
     }
    }
   });
