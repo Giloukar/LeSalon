@@ -80,7 +80,7 @@ export function createTable3DRenderer({onFatal}={}){
   let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='';
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
-  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,remoteCardGestures=new Map();
+  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
 
   function applyCameraFit(){
     if(!camera||!cameraPose)return;
@@ -241,6 +241,45 @@ export function createTable3DRenderer({onFatal}={}){
     else if(phase==='commit'){gesture.target=1;gesture.targetLateral=0;gesture.committed=true;gesture.returning=false}
     else{gesture.returning=false;gesture.committed=false}
     startMotion();
+  }
+  function cardFamilySnapshot(payload,center){
+    const state=payload?.state,game=payload?.viewData?.cardGame||payload?.gameId,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0,players=state?.players||[];
+    const base={game,key:[game,state?.startedAt||'',players.map(p=>p?.name||'').join('|')].join('~'),viewer,handCounts:players.map(p=>p?.hand?.length||0)};
+    if(game==='president')base.centerIds=(center.cards||[]).map(c=>c?.id).filter(Boolean);
+    else if(game==='menteur'){base.backCount=Number(center.backCount)||0;base.centerIds=(center.cards||[]).map(c=>c?.id).filter(Boolean)}
+    else if(game==='suites')base.centerIds=Object.values(center.lanes||{}).flat().map(c=>c?.id).filter(Boolean);
+    else if(game==='plis')base.centerIds=(center.entries||[]).map(e=>e?.card?.id).filter(Boolean);
+    else if(game==='encheres')base.bidIds=(center.bids||[]).map(c=>c?.id||null);
+    return base;
+  }
+  function cardFamilyOrigin(actor,viewer,opponentVisuals){
+    if(actor===viewer)return new THREE.Vector3(0,TABLE_Y+.30,2.45);
+    const seat=opponentVisuals.get(actor);return seat?new THREE.Vector3(seat.x,TABLE_Y+.30,seat.z+.08):new THREE.Vector3(0,TABLE_Y+.30,-2.25);
+  }
+  function animateCardFamilyConfirmed(game,payload,center,previous,currentSnapshot,opponentVisuals,centerVisuals){
+    if(!previous||previous.key!==currentSnapshot.key||!motionAllowed())return;
+    const actors=currentSnapshot.handCounts.map((count,i)=>({i,delta:(previous.handCounts?.[i]??count)-count})).filter(x=>x.delta>0);
+    if(!actors.length)return;
+    const actor=actors[0].i,amount=Math.min(4,actors[0].delta),from=cardFamilyOrigin(actor,currentSnapshot.viewer,opponentVisuals);
+    const oldIds=new Set(previous.centerIds||[]),newIds=(currentSnapshot.centerIds||[]).filter(id=>!oldIds.has(id));
+    const queue=(card,target,index,back=false,finalMesh=null)=>{
+      if(!target)return;const mesh=cardMesh(back?null:card,{back});if(finalMesh)finalMesh.visible=false;
+      queueCardFlight(mesh,from.clone().add(new THREE.Vector3((index-(amount-1)/2)*.10,0,0)),target.clone(),{duration:640+index*45,delay:index*85,lift:.86,fromRot:.03*(index-(amount-1)/2),toRot:0,onDone:()=>{if(finalMesh)finalMesh.visible=true}});
+    };
+    if(game==='menteur'){
+      const diff=Math.max(0,(currentSnapshot.backCount||0)-(previous.backCount||0));
+      for(let i=0;i<Math.min(amount,diff);i++)queue(null,new THREE.Vector3((i-(diff-1)/2)*.05,TABLE_Y+.24,.08-i*.018),i,true,null);
+      return;
+    }
+    if(game==='encheres'){
+      const bids=center.bids||[],prev=previous.bidIds||[];
+      bids.forEach((card,i)=>{if(!card||prev[i]===card.id)return;const visual=centerVisuals.get('bid-'+i);queue(card,visual?.position||new THREE.Vector3((i-(bids.length-1)/2)*1.18,TABLE_Y+.23,.75),0,!!card.hidden,visual?.mesh||null)});
+      return;
+    }
+    newIds.slice(0,amount).forEach((id,i)=>{
+      const visual=centerVisuals.get(id);if(!visual)return;
+      queue(visual.card,visual.position,i,!!visual.card?.hidden,visual.mesh);
+    });
   }
   function rummiBoardLayout(groups){
     const active=(groups||[]).map((group,index)=>({group,index})).filter(x=>x.group?.length),count=Math.max(1,active.length),maxLen=Math.max(1,...active.map(x=>x.group.length));
