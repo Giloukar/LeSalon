@@ -675,16 +675,62 @@ export function createTable3DRenderer({onFatal}={}){
     }
 
     if(game==='quatrevingtdixneuf'){
-      const ninety=data.ninety||{},selected=new Set(ninety.selectedIds||[]),selectable=new Set(ninety.selectableIds||[]),legal=new Set(ninety.legalIds||[]),own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length;
+      const ninety=data.ninety||{},selected=new Set(ninety.selectedIds||[]),selectable=new Set(ninety.selectableIds||[]),legal=new Set(ninety.legalIds||[]),own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,ownVisuals=new Map();
       own.forEach((card,i)=>{
         const slot=handCardSlot(n,i),chosen=selected.has(card.id),isLegal=legal.has(card.id),mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:selectable.has(card.id),playable:selectable.has(card.id)});
         mesh.userData.kind='special-select';mesh.userData.cardId=card.id;mesh.userData.home={position:new THREE.Vector3(slot.x,TABLE_Y+.12+slot.yOffset+(chosen?.25:isLegal?.08:0),slot.z),rotation:new THREE.Euler(-Math.PI/2,0,slot.fan),scale:new THREE.Vector3(1,1,1).multiplyScalar(slot.scale*(chosen?1.07:isLegal?1.025:.98))};
         mesh.position.copy(mesh.userData.home.position);mesh.rotation.copy(mesh.userData.home.rotation);mesh.scale.copy(mesh.userData.home.scale);makeLooseManipulable(mesh,{kind:'special-select',tapEnabled:selectable.has(card.id),cardId:card.id});objects.add(mesh);
+        ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
       });
-      if(ninety.last){const top=cardMesh(ninety.last,{back:!!ninety.last.hidden});placeCard(top,1.5,.05,TABLE_Y+.13,0,.9)}
+
+      const deckCount=Math.max(0,Number(ninety.deckCount)||0),deckPos=new THREE.Vector3(-2.1,TABLE_Y+.22,.05);
+      for(let i=0;i<Math.min(4,Math.max(1,deckCount));i++){
+        const mesh=cardMesh(null,{back:true});placeCard(mesh,deckPos.x,deckPos.z,TABLE_Y+.07+i*.028,-.025+i*.012,.78);
+      }
+      let top=null;
+      if(ninety.last){top=cardMesh(ninety.last,{back:!!ninety.last.hidden});placeCard(top,1.5,.05,TABLE_Y+.13,0,.9)}
       const counter=makeLabel('TOTAL '+Number(ninety.total||0)+' / 99',Number(ninety.total)>=85?'#f0b3a6':'#dbea9e');counter.scale.set(3.1,.72,1);counter.position.set(-.35,1.08,-.05);objects.add(counter);
-      const opponents=s.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer&&!x.p.out);
-      opponents.forEach(({p,i},k)=>{const label=makeLabel((p.name||'Joueur')+' · '+(p.hand?.length||0)+' cartes',i===s.turn?'#dbea9e':'#d8ded9');label.position.set((k-(opponents.length-1)/2)*2.7,.98,-2.55);label.scale.set(2.5,.52,1);objects.add(label)});
+
+      const opponents=s.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer&&!x.p.out),opponentVisuals=new Map();
+      opponents.forEach(({p,i},k)=>{
+        const seat=eightOpponentSeat(opponents.length,k),count=p.hand?.length||0,total=Math.min(5,count),span=total<=1?0:Math.min(2.2,(total-1)*.36),meshes=[];
+        for(let c=0;c<total;c++){const t=total<=1?.5:c/(total-1),mesh=cardMesh(null,{back:true});placeCard(mesh,seat.x+(t-.5)*span,seat.z+Math.abs(t-.5)*.08,TABLE_Y+.15+c*.006,(t-.5)*-.13,.64);meshes.push(mesh)}
+        const label=makeLabel((p.name||'Joueur')+' · '+count+' carte'+(count>1?'s':''),i===s.turn?'#dbea9e':'#d8ded9');label.position.set(seat.x,1.0,seat.z-.68);label.scale.set(2.5,.52,1);objects.add(label);
+        opponentVisuals.set(i,{...seat,meshes,count});
+      });
+
+      const snapshot=ninetySnapshot(payload,ninety,own),previous=lastNinetySnapshot;
+      if(previous&&previous.key===snapshot.key&&motionAllowed()&&snapshot.lastId&&snapshot.lastId!==previous.lastId){
+        const actor=previous.turn,viewerActor=actor===viewer,publicCard=ninety.last,discardTarget=new THREE.Vector3(1.5,TABLE_Y+.24,.05);
+        let playFrom;
+        if(viewerActor){
+          const removed=(previous.ownIds||[]).find(id=>!(snapshot.ownIds||[]).includes(id))||snapshot.lastId,index=Math.max(0,(previous.ownIds||[]).indexOf(removed)),slot=handCardSlot(previous.ownIds.length,index);
+          playFrom=new THREE.Vector3(slot.x,TABLE_Y+.28+slot.yOffset,slot.z);
+        }else{
+          const visual=opponentVisuals.get(actor);playFrom=new THREE.Vector3(visual?.x||0,TABLE_Y+.29,(visual?.z||-2.2)+.08);
+        }
+        if(top)top.visible=false;
+        queueCardFlight(cardMesh(publicCard,{back:!!publicCard?.hidden}),playFrom,discardTarget,{duration:520,lift:.72,fromRot:0,toRot:0,bank:.14,roll:viewerActor?.10:-.10,onDone:()=>{if(top)top.visible=true}});
+
+        const deckDropped=snapshot.deckCount<previous.deckCount;
+        if(deckDropped){
+          if(viewerActor){
+            const added=(snapshot.ownIds||[]).find(id=>!(previous.ownIds||[]).includes(id)),visual=added?ownVisuals.get(added):null;
+            if(visual){
+              visual.mesh.visible=false;
+              queueCardFlight(cardMesh(visual.card),deckPos,visual.position,{duration:500,delay:95,lift:.64,fromRot:-.03,toRot:visual.rotation,bank:.11,roll:-.09,fromScale:new THREE.Vector3(.78,.78,.78),toScale:visual.scale,onDone:()=>{visual.mesh.visible=true}});
+            }
+          }else{
+            const visual=opponentVisuals.get(actor);
+            if(visual){
+              const target=new THREE.Vector3(visual.x,TABLE_Y+.27,visual.z+.08);
+              queueCardFlight(cardMesh(null,{back:true}),deckPos,target,{duration:510,delay:95,lift:.62,fromRot:-.03,toRot:0,bank:.10,roll:.08,fromScale:new THREE.Vector3(.78,.78,.78),toScale:new THREE.Vector3(.64,.64,.64)});
+            }
+          }
+        }
+      }
+      lastNinetySnapshot=snapshot;
+
       if(payload.canInteract){
         const selectedId=[...selected][0],card=own.find(c=>c.id===selectedId);
         if(card){
@@ -695,7 +741,7 @@ export function createTable3DRenderer({onFatal}={}){
         }else if(!own.some(c=>legal.has(c.id))){const bust=actionSprite('JE SUIS BLOQUÉ','ninety-action',{command:'bust'},'#efaaa0');bust.position.set(0,1.05,1.45);objects.add(bust)}
       }
       if(title)title.textContent='VUE 3D · 99';
-      if(status)status.textContent=(ninety.dir===-1?'↺':'↻')+' · '+(ninety.deckCount||0)+' cartes en pioche';
+      if(status)status.textContent=(ninety.dir===-1?'↺':'↻')+' · '+deckCount+' cartes en pioche';
       if(help)help.textContent=ninety.lastEffect||'Sélectionnez une carte puis confirmez son effet dessous';
       return;
     }
