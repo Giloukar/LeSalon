@@ -329,6 +329,14 @@ export function createTable3DRenderer({onFatal}={}){
     const entry=lastRummiSnapshot?.positions?.get?.(id);if(!entry||!mesh)return;
     entry.position=mesh.position.clone();entry.scale=mesh.scale.clone();entry.rotation=mesh.rotation.z;
   }
+  function rememberGroupedCardDropOrigins(d){
+    rememberCardDropOrigin(current?.gameId,d.cardId,d.mesh);
+    (d.companions||[]).forEach(c=>rememberCardDropOrigin(current?.gameId,c.id,c.mesh));
+  }
+  function rememberGroupedRummiDropOrigins(d){
+    rememberRummiDropOrigin(d.tileId,d.mesh);
+    (d.companions||[]).forEach(c=>rememberRummiDropOrigin(c.id,c.mesh));
+  }
   function animateCardFamilyConfirmed(game,payload,center,previous,currentSnapshot,opponentVisuals,centerVisuals){
     if(!previous||previous.key!==currentSnapshot.key||!motionAllowed())return;
     const viewer=currentSnapshot.viewer,discardCorner=new THREE.Vector3(4.35,TABLE_Y+.24,-1.85);
@@ -1420,28 +1428,50 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function capturePointer(id){try{canvas?.setPointerCapture?.(id)}catch(_){}}
   function clampMotion(n,min,max){return Math.max(min,Math.min(max,Number(n)||0))}
-  function returnManipulatedCard(d,{snap=false}={}){
-    const mesh=d?.mesh,home=d?.home||mesh?.userData?.home;if(!mesh||!home)return;
-    if(snap||!motionAllowed()){mesh.position.copy(home.position);mesh.rotation.copy(home.rotation);mesh.scale.copy(home.scale);draw();return}
-    const throwX=clampMotion((d.velocityX||0)*.19,-1.8,1.8),throwZ=clampMotion((d.velocityY||0)*.16,-1.45,1.45),speed=Math.min(1,Math.hypot(d.velocityX||0,d.velocityY||0)/1.35);
+  function dragSelectionIds(obj,kind){
+    if(kind==='card-select'&&['president','menteur'].includes(current?.gameId)){
+      const ids=current?.viewData?.selectedIds||[];return ids.includes(obj.userData.cardId)?ids:[];
+    }
+    if(kind==='rummi-tile'&&current?.gameId==='rummikub'){
+      const ids=current?.viewData?.rummi?.selectedIds||[];return ids.includes(obj.userData.tileId)?ids:[];
+    }
+    return[];
+  }
+  function groupedDragCompanions(obj,kind){
+    const ids=dragSelectionIds(obj,kind);if(ids.length<2)return[];
+    const key=kind==='rummi-tile'?'tileId':'cardId',wanted=new Set(ids);
+    return objects.children.filter(mesh=>mesh!==obj&&wanted.has(mesh.userData?.[key])&&mesh.userData?.home).map((mesh,index)=>({
+      mesh,id:mesh.userData[key],index,
+      home:{position:mesh.userData.home.position.clone(),rotation:mesh.userData.home.rotation.clone(),scale:mesh.userData.home.scale.clone()}
+    }));
+  }
+  function restoreManipulatedMesh(mesh,home,d,{snap=false,index=0}={}){
+    if(!mesh||!home)return;
+    if(snap||!motionAllowed()){mesh.position.copy(home.position);mesh.rotation.copy(home.rotation);mesh.scale.copy(home.scale);return}
+    const throwX=clampMotion((d.velocityX||0)*.19,-1.8,1.8),throwZ=clampMotion((d.velocityY||0)*.16,-1.45,1.45),speed=Math.min(1,Math.hypot(d.velocityX||0,d.velocityY||0)/1.35),stagger=index*.035;
     manipAnimations.push({
       mesh,
       from:mesh.position.clone(),
-      control:mesh.position.clone().add(new THREE.Vector3(throwX,.38+.78*speed,throwZ)),
+      control:mesh.position.clone().add(new THREE.Vector3(throwX*(1-stagger),.38+.78*speed+index*.025,throwZ*(1-stagger))),
       to:home.position.clone(),
       fromRot:mesh.rotation.clone(),
       toRot:home.rotation.clone(),
       fromScale:mesh.scale.clone(),
       toScale:home.scale.clone(),
-      start:performance.now(),
-      duration:300+Math.round(speed*170),
+      start:performance.now()+index*18,
+      duration:300+Math.round(speed*170)+index*12,
       done:false
     });
-    startMotion();
+  }
+  function returnManipulatedCard(d,{snap=false}={}){
+    const mesh=d?.mesh,home=d?.home||mesh?.userData?.home;if(!mesh||!home)return;
+    restoreManipulatedMesh(mesh,home,d,{snap,index:0});
+    (d.companions||[]).forEach((c,i)=>restoreManipulatedMesh(c.mesh,c.home,d,{snap,index:i+1}));
+    if(snap||!motionAllowed())draw();else startMotion();
   }
   function beginLooseCardDrag(obj,e,kind){
-    const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()},gestureEnabled=!!(current?.canInteract&&LIVE_CARD_GAMES.has(current?.gameId)&&(['card-select','special-select'].includes(kind)||kind==='cactus-quick'));
-    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind,loose:true,mesh:obj,cardId:obj.userData.cardId,tileId:obj.userData.tileId,index:obj.userData.index,owner:obj.userData.owner,tapEnabled:!!obj.userData.tapEnabled,gestureEnabled,gestureStarted:false,gestureHome:home.position.clone(),startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,moved:false,home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
+    const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()},gestureEnabled=!!(current?.canInteract&&LIVE_CARD_GAMES.has(current?.gameId)&&(['card-select','special-select'].includes(kind)||kind==='cactus-quick')),companions=groupedDragCompanions(obj,kind);
+    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind,loose:true,mesh:obj,cardId:obj.userData.cardId,tileId:obj.userData.tileId,index:obj.userData.index,owner:obj.userData.owner,tapEnabled:!!obj.userData.tapEnabled,gestureEnabled,gestureStarted:false,gestureHome:home.position.clone(),companions,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,moved:false,home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
     host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
   }
   function moveLooseCardDrag(e){
@@ -1454,6 +1484,12 @@ export function createTable3DRenderer({onFatal}={}){
       d.mesh.position.set(p.x,1.05,p.z);
       d.mesh.rotation.set(-Math.PI/2,clampMotion(-d.velocityY*.012,-.20,.20),clampMotion(dx*.0028,-.24,.24));
       d.mesh.scale.copy(d.home.scale).multiplyScalar(1.045);
+      (d.companions||[]).forEach((c,i)=>{
+        const side=(i%2?1:-1)*(.055+Math.floor(i/2)*.028),back=.055+(i+1)*.032,target=new THREE.Vector3(d.mesh.position.x+side,d.mesh.position.y+.018*(i+1),d.mesh.position.z+back);
+        c.mesh.position.lerp(target,.42);
+        c.mesh.rotation.set(d.mesh.rotation.x,d.mesh.rotation.y,d.mesh.rotation.z+(i-(d.companions.length-1)/2)*.018);
+        c.mesh.scale.copy(c.home.scale).multiplyScalar(1.025);
+      });
     }
     if(d.gestureEnabled){
       if(!d.gestureStarted){d.gestureStarted=true;emitLocalCardGesture('start',0,0)}
@@ -1535,7 +1571,7 @@ export function createTable3DRenderer({onFatal}={}){
         if(directCardDropNear(d,'cactus')){emitLocalCardGesture('commit',1,0);current?.interactions?.cactus?.('quick',d.index);return}
       }
       if(d.kind==='card-select'&&d.gestureStarted&&directCardDropNear(d)){
-        rememberCardDropOrigin(current?.gameId,d.cardId,d.mesh);
+        rememberGroupedCardDropOrigins(d);
         if(current?.interactions?.cardDrop?.(d.cardId)){emitLocalCardGesture('commit',1,0);return}
       }
       if(d.kind==='special-select'&&current?.gameId==='quatrevingtdixneuf'&&d.gestureStarted&&directCardDropNear(d,'quatrevingtdixneuf')){
@@ -1544,7 +1580,7 @@ export function createTable3DRenderer({onFatal}={}){
       }
       if(d.kind==='rummi-tile'){
         const dest=d.rummiDrop?.dest??rummiDropDestination(d.mesh.position);
-        if(dest!==null){rememberRummiDropOrigin(d.tileId,d.mesh);if(current?.interactions?.rummi?.('drop',{id:d.tileId,dest}))return}
+        if(dest!==null){rememberGroupedRummiDropOrigins(d);if(current?.interactions?.rummi?.('drop',{id:d.tileId,dest}))return}
       }
       if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d);return
     }
