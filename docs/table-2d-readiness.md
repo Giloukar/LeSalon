@@ -364,3 +364,12 @@ Le canal de présence éphémère initialement réservé au 8 américain couvre 
 Pendant qu'un joueur actif déplace librement une carte, les autres clients peuvent voir un dos de carte interpolé depuis son siège vers la zone logique du jeu. Ce flux ne contient jamais l'identifiant, la famille, la valeur ni le contenu de la carte : uniquement le jeu courant, l'acteur, un identifiant de geste, la phase du geste et deux coordonnées normalisées de progression.
 
 Le serveur hôte relaie le geste uniquement si la connexion correspond au siège authentifié, si le jeu courant accepte ce canal, si la révision correspond et si l'acteur est bien le joueur actif. Le geste ne modifie ni l'état autoritatif, ni le RNG, ni la révision de partie. Le mouvement confirmé continue d'être animé depuis le changement d'état réel.
+
+
+## Chargeur déclaratif de packs GLB/GLTF
+
+La préparation aux futurs modèles ne nécessite plus d'écrire les factories à la main. `shared/table-3d-model-pack.js` expose `window.SalonTable3DModelPack` et accepte un manifest associant les kinds du registre à des fichiers GLB/GLTF.
+
+Le chargement se fait hors du moteur de jeu et GLTFLoader n'est importé qu'à la demande. Les scènes skinnées sont clonées via SkeletonUtils, les corrections de scale/rotation/offset restent à l'intérieur d'un wrapper manipulé par le renderer, et un échec individuel laisse automatiquement le placeholder procédural de cet asset.
+
+Le chargeur expose aussi un cycle de vie explicite (`load`, `unload`, `unloadAll`, `active`) et des événements de progression, ce qui permettra de connecter les futurs fichiers fournis au site sans modifier les jeux ni redémarrer une partie.
