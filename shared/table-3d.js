@@ -473,6 +473,81 @@ export function createTable3DRenderer({onFatal}={}){
     if(help)help.textContent=payload.canInteract?'Touchez une carte pour la sélectionner · validez ensuite avec les commandes habituelles':'La table 3D suit la partie · les commandes restent synchronisées dessous';
   }
 
+  function syncRummikub(payload){
+    clearObjects();dropMarker.visible=false;
+    const data=payload.viewData?.rummi||{},selected=new Set(data.selectedIds||[]),selectable=new Set(data.selectableIds||[]),rack=data.rack||[],groups=data.table||[];
+    camera.position.set(0,9.4,7.25);camera.lookAt(0,.15,.15);
+    const rackStep=Math.min(.70,8.8/Math.max(1,rack.length-1));
+    rack.forEach((tile,i)=>{
+      const mesh=rummiMesh(tile,selectable.has(tile.id),selected.has(tile.id)),x=(i-(rack.length-1)/2)*rackStep;
+      mesh.position.set(x,TABLE_Y+.16+(selected.has(tile.id) ? .18 : 0),3.15);mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};objects.add(mesh);
+    });
+    groups.forEach((group,k)=>{
+      const col=k%2,row=Math.floor(k/2),centerX=(col-.5)*5.1,z=-2.65+row*1.15,step=Math.min(.62,4.4/Math.max(1,group.length-1));
+      group.forEach((tile,i)=>{
+        const mesh=rummiMesh(tile,selectable.has(tile.id),selected.has(tile.id)),x=centerX+(i-(group.length-1)/2)*step;
+        mesh.position.set(x,TABLE_Y+.16+(selected.has(tile.id) ? .18 : 0),z);mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};objects.add(mesh);
+      });
+      const dest=(data.groupDestinations||[]).find(x=>x.index===k);
+      if(dest?.allowed){
+        const add=actionSprite('AJOUTER','rummi-place',{dest:k},'#dbea9e');add.scale.set(1.55,.40,1);add.position.set(centerX,.92,z+.48);objects.add(add);
+      }
+    });
+    const deck=makeLabel('PIOCHE · '+(data.deckCount||0),'#d8ded9');deck.scale.set(2.2,.48,1);deck.position.set(-4.35,.95,2.75);objects.add(deck);
+    const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
+    if(title)title.textContent='VUE 3D · RUMMIKUB';
+    if(status)status.textContent=data.opened?'Sortie faite':'30 points requis';
+    if(help)help.textContent=data.diagnostic?.text||'Sélectionnez des tuiles puis choisissez une destination · validation et annulation restent dessous';
+  }
+
+  function syncCity(payload){
+    clearObjects();dropMarker.visible=false;
+    const data=payload.viewData?.city||{},board=data.board||[],owners=data.owners||[],houses=data.houses||[],mortgaged=data.mortgaged||[],players=data.players||[];
+    camera.position.set(0,10.2,8.5);camera.lookAt(0,.05,0);
+    board.forEach((cell,i)=>{
+      const pos=cityWorld(i),owner=owners[i]??-1,ownerColor=owner>=0?players[owner]?.color||'':'',current=players[data.turn]?.pos===i;
+      const mesh=new THREE.Mesh(cityGeometry,cityMaterial(cell,ownerColor,!!mortgaged[i],current));mesh.position.copy(pos);mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData={kind:'city-cell',index:i,interactive:true};interactive.push(mesh);objects.add(mesh);
+      const number=cellLabel(i);number.position.set(pos.x,TABLE_Y+.19,pos.z);objects.add(number);
+      const count=Math.max(0,Math.min(3,Number(houses[i])||0));for(let h=0;h<count;h++){
+        const home=new THREE.Mesh(houseGeometry,pawnMaterial(ownerColor||'#dbea9e'));home.position.set(pos.x-.30+h*.30,TABLE_Y+.29,pos.z-.20);home.castShadow=true;objects.add(home);
+      }
+      if(owner>=0){const dot=new THREE.Mesh(new THREE.CylinderGeometry(.10,.10,.05,16),pawnMaterial(ownerColor||'#dbea9e'));dot.position.set(pos.x+.40,TABLE_Y+.19,pos.z+.23);objects.add(dot)}
+    });
+    players.forEach((p,i)=>{
+      if(p.out)return;const pos=cityWorld(p.pos),pawn=new THREE.Mesh(pawnGeometry,pawnMaterial(p.color||'#dbea9e'));pawn.position.set(pos.x+((i%3)-1)*.15,TABLE_Y+.42,pos.z+Math.floor(i/3)*.14);pawn.castShadow=true;objects.add(pawn);
+    });
+    const dice=data.dice||[];dice.forEach((v,i)=>{const d=dieMesh(v);d.position.set((i-(dice.length-1)/2)*.95,TABLE_Y+.78,.05);objects.add(d)});
+    const cash=players[data.turn]?.cash??0,turnName=players[data.turn]?.name||'';
+    const info=makeLabel((turnName?turnName+' · ':'')+cash+' ¤','#dbea9e');info.scale.set(3.0,.58,1);info.position.set(0,1.00,-.15);objects.add(info);
+    const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
+    if(title)title.textContent='VUE 3D · MÉTROPOLE';
+    if(status)status.textContent='Tour de table '+(data.lap||1)+' / 20 · '+String(data.phase||'').toUpperCase();
+    if(help)help.textContent='Touchez une case pour l’inspecter · achats, gestion et dettes restent arbitrés par le moteur';
+  }
+
+  function syncCactus(payload){
+    clearObjects();dropMarker.visible=false;
+    const data=payload.viewData?.cactus||{},players=data.players||[],modes=data.modes||[],mine=Number.isInteger(data.mine)?data.mine:0,n=Math.max(1,players.length);
+    camera.position.set(0,8.4,8.4);camera.lookAt(0,.12,0);
+    players.forEach((p,i)=>{
+      const rel=(i-mine+n)%n,angle=Math.PI/2+rel*Math.PI*2/n,cx=Math.cos(angle)*3.25,cz=Math.sin(angle)*2.55,tx=-Math.sin(angle),tz=Math.cos(angle),hand=p.hand||[];
+      hand.forEach((card,j)=>{
+        if(!card)return;const offset=(j-(hand.length-1)/2)*.62,mode=modes[i]?.[j]||'',mesh=cardMesh(card.hidden?null:card,{back:!!card.hidden});
+        mesh.position.set(cx+tx*offset,TABLE_Y+.14,cz+tz*offset);mesh.rotation.set(-Math.PI/2,0,-angle+Math.PI/2);mesh.scale.setScalar(.72);
+        if(mode){mesh.userData={kind:'cactus-'+mode,owner:i,index:j,interactive:true};mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};interactive.push(mesh)}
+        objects.add(mesh);
+      });
+      const label=makeLabel((p.name||'Joueur')+' · '+(p.score||0)+' pts'+(p.caller?' · CACTUS !':''),i===data.turn?'#dbea9e':'#d8ded9');label.scale.set(2.6,.50,1);label.position.set(cx,.96,cz+(cz>=0 ? .72 : -.72));objects.add(label);
+    });
+    const stackCount=Math.min(5,Math.max(1,Number(data.deckCount)||1));for(let i=0;i<stackCount;i++){const card=cardMesh(null,{back:true});placeCard(card,-1.20,.05,TABLE_Y+.10+i*.028,-.02+i*.01,.78)}
+    if(data.discard){const discard=cardMesh(data.discard.hidden?null:data.discard,{back:!!data.discard.hidden});placeCard(discard,.25,.05,TABLE_Y+.14,0,.82)}
+    if(data.drawn){const drawn=cardMesh(data.drawn.hidden?null:data.drawn,{back:!!data.drawn.hidden});placeCard(drawn,1.65,.05,TABLE_Y+.15,.04,.82)}
+    const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
+    if(title)title.textContent='VUE 3D · CACTUS';
+    if(status)status.textContent=String(data.phase||'').toUpperCase()+(data.caller!==null?' · dernier tour':'');
+    if(help)help.textContent=data.phase==='peek'?'Mémorisez uniquement les cartes révélées':data.phase==='swap'?'Touchez votre carte à remplacer':data.phase==='power'?'Touchez une de vos cartes à regarder':'Le jet rapide reste disponible hors tour quand il est autorisé';
+  }
+
   function syncEight(payload){
     clearObjects();dropMarker.visible=true;
     camera.position.set(0,7.25,9.25);camera.lookAt(0,.25,.2);
@@ -520,6 +595,9 @@ export function createTable3DRenderer({onFatal}={}){
     else if(payload?.gameId==='boite')syncBox(payload);
     else if(['president','menteur','suites','plis','encheres'].includes(payload?.gameId))syncCardFamily(payload);
     else if(['pouilleux','quatrevingtdixneuf','vingtetun','bataille'].includes(payload?.gameId))syncSpecialCards(payload);
+    else if(payload?.gameId==='rummikub')syncRummikub(payload);
+    else if(payload?.gameId==='metropole')syncCity(payload);
+    else if(payload?.gameId==='cactus')syncCactus(payload);
   }
   function render(payload){
     current=payload;if(!active)return;
@@ -528,7 +606,7 @@ export function createTable3DRenderer({onFatal}={}){
       resizeObserver?.disconnect();resizeObserver=null;host?.remove();host=null;
       document.documentElement.removeAttribute('data-table-3d-game');document.documentElement.removeAttribute('data-table-3d-phase');return;
     }
-    ensureHost();document.documentElement.dataset.table3dGame=payload.gameId||'';document.documentElement.dataset.table3dPhase=payload.state?.phase||'';
+    ensureHost();document.documentElement.dataset.table3dGame=payload.gameId||'';document.documentElement.dataset.table3dPhase=payload.state?.phase||payload.viewData?.cactus?.phase||'';
     syncCurrent(payload);draw();
   }
   function draw(){if(active&&renderer&&scene&&camera)renderer.render(scene,camera)}
@@ -543,7 +621,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(hovered===mesh)return;
     if(hovered&&!drag){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale);}
     hovered=mesh;
-    if(hovered&&!drag&&['card','card-select','maid-pick','special-select'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
+    if(hovered&&!drag&&['card','card-select','maid-pick','special-select','rummi-select','cactus-swap','cactus-target','cactus-quick'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
     draw();
   }
   function onPointerDown(e){
@@ -552,6 +630,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,kind:'deck',startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(obj.userData.kind==='card-select'){drag={pointerId:e.pointerId,kind:'card-select',cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(['maid-pick','special-select','battle-action'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,kind:obj.userData.kind,index:obj.userData.index,cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
+    if(['rummi-select','rummi-place','city-cell','cactus-swap','cactus-target','cactus-quick'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,kind:obj.userData.kind,tileId:obj.userData.tileId,dest:obj.userData.dest,index:obj.userData.index,owner:obj.userData.owner,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
       drag={pointerId:e.pointerId,kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return;
@@ -578,6 +657,10 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='maid-pick'){if(tap)current?.interactions?.specialCard?.('pick',d.index);return}
     if(d.kind==='special-select'){if(tap)current?.interactions?.specialCard?.('select',d.cardId);return}
     if(d.kind==='battle-action'){if(tap)current?.interactions?.specialCard?.('battle');return}
+    if(d.kind==='rummi-select'){if(tap)current?.interactions?.rummi?.('select',d.tileId);return}
+    if(d.kind==='rummi-place'){if(tap)current?.interactions?.rummi?.('place',d.dest);return}
+    if(d.kind==='city-cell'){if(tap)current?.interactions?.cityInspect?.(d.index);return}
+    if(['cactus-swap','cactus-target','cactus-quick'].includes(d.kind)){if(tap)current?.interactions?.cactusCard?.(d.kind.slice(7),d.owner,d.index);return}
     if(d.kind==='deck'){if(tap)current?.interactions?.draw?.();return}
     if(d.kind==='goose-roll'||d.kind==='goose-choice'){if(tap)current?.interactions?.goose?.(d.kind==='goose-roll'?'roll':'choose',d.steps);return}
     if(d.kind==='yam-roll'||d.kind==='yam-hold'){if(tap)current?.interactions?.yam?.(d.kind==='yam-hold'?'hold':'roll',d.index);return}
