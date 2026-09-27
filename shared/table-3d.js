@@ -967,8 +967,8 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function syncRummikub(payload){
     clearObjects();dropMarker.visible=false;
-    const data=payload.viewData?.rummi;if(!data)return;
-    const selected=new Set(data.selectedIds||[]),oldIds=new Set(data.refTableIds||[]),groups=data.table||[],layout=rummiBoardLayout(groups);
+    const data=payload.viewData?.rummi;if(!data){lastRummiSnapshot=null;return}
+    const selected=new Set(data.selectedIds||[]),oldIds=new Set(data.refTableIds||[]),groups=data.table||[],layout=rummiBoardLayout(groups),currentVisuals=new Map();
     setCameraPose(0,8.65+Math.max(0,layout.rows-2)*.45,10.45+Math.max(0,layout.rows-2)*.35,0,.2,-.18);
 
     layout.active.forEach(({group,index:gi},order)=>{
@@ -976,6 +976,7 @@ export function createTable3DRenderer({onFatal}={}){
         const slot=rummiGroupSlot(layout,order,group.length,ti),movable=data.canMove&&(data.canMoveOld||!oldIds.has(tile.id)),mesh=rummiTileMesh(tile,selected.has(tile.id),movable);
         mesh.position.set(slot.x,TABLE_Y+.37,slot.z);mesh.rotation.x=-Math.PI/2;mesh.scale.setScalar(slot.scale);
         mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};if(movable)makeLooseManipulable(mesh,{kind:'rummi-tile',tapEnabled:true,tileId:tile.id});objects.add(mesh);
+        currentVisuals.set(tile.id,{mesh,tile,position:mesh.position.clone(),scale:mesh.scale.clone(),rotation:mesh.rotation.z,zone:'table'});
       });
       if(data.canMove&&selected.size){
         const slot=rummiGroupSlot(layout,order,Math.max(1,group.length),Math.floor(Math.max(0,group.length-1)/2)),target=actionSprite('AJOUTER','rummi-dest',{dest:gi},'#dbea9e');
@@ -987,12 +988,43 @@ export function createTable3DRenderer({onFatal}={}){
       const empty=makeLabel('TABLE COMMUNE · PREMIÈRE COMBINAISON','#dbea9e');empty.position.set(0,1.0,-.65);empty.scale.set(4.9,.8,1);objects.add(empty);
     }
 
-    const hand=data.hand||[];
+    const hand=data.hand||[],drawPos=new THREE.Vector3(4.55,TABLE_Y+.43,2.35),deckCount=Math.max(0,Number(data.deckCount)||0);
+    if(deckCount){
+      for(let i=0;i<Math.min(4,deckCount);i++){
+        const hidden=rummiHiddenTileMesh();hidden.position.set(drawPos.x,drawPos.y+i*.026,drawPos.z);hidden.rotation.x=-Math.PI/2;hidden.rotation.z=.025*i;hidden.scale.setScalar(.82);objects.add(hidden);
+      }
+      const drawLabel=makeLabel('PIOCHE · '+deckCount,'#d8ded9');drawLabel.position.set(drawPos.x,1.04,drawPos.z-.70);drawLabel.scale.set(2.2,.46,1);objects.add(drawLabel);
+    }
+
     hand.forEach((tile,i)=>{
       const slot=rummiRackSlot(hand.length,i),mesh=rummiTileMesh(tile,selected.has(tile.id),!!data.canMove);
       mesh.position.set(slot.x,TABLE_Y+.42+slot.yOffset,slot.z);mesh.rotation.x=-Math.PI/2;mesh.scale.setScalar(slot.scale);
       mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'rummi-tile',tapEnabled:!!data.canMove,tileId:tile.id});objects.add(mesh);
+      currentVisuals.set(tile.id,{mesh,tile,position:mesh.position.clone(),scale:mesh.scale.clone(),rotation:mesh.rotation.z,zone:'hand'});
     });
+
+    const snapshot=rummiMotionSnapshot(payload,data,currentVisuals),previous=lastRummiSnapshot;
+    if(previous&&previous.key===snapshot.key&&motionAllowed()){
+      let animated=0;
+      for(const [id,visual] of currentVisuals){
+        if(animated>=24)break;
+        const before=previous.positions?.get(id);if(!before)continue;
+        const distance=before.position.distanceTo(visual.position),scaleDelta=before.scale.distanceTo(visual.scale);
+        if(distance<.10&&scaleDelta<.04&&before.zone===visual.zone)continue;
+        visual.mesh.visible=false;const flight=rummiTileMesh(visual.tile,false,false);
+        queueCardFlight(flight,before.position,visual.position,{duration:390+Math.min(130,distance*35),delay:Math.min(140,animated*18),lift:.30+Math.min(.28,distance*.05),fromRot:before.rotation||0,toRot:visual.rotation||0,bank:.08,roll:(animated%2?-.06:.06),fromScale:before.scale,toScale:visual.scale,onDone:()=>{visual.mesh.visible=true}});
+        animated++;
+      }
+      if(snapshot.deckCount<previous.deckCount){
+        const newHand=(snapshot.handIds||[]).filter(id=>!(previous.handIds||[]).includes(id));
+        newHand.slice(0,2).forEach((id,q)=>{
+          const visual=currentVisuals.get(id);if(!visual||previous.positions?.has(id))return;
+          visual.mesh.visible=false;const flight=rummiTileMesh(visual.tile,false,false),fromScale=new THREE.Vector3(.82,.82,.82);
+          queueCardFlight(flight,drawPos,visual.position,{duration:500+q*45,delay:80+q*75,lift:.62,fromRot:.04,toRot:visual.rotation||0,bank:.12,roll:(q%2?-.09:.09),fromScale,toScale:visual.scale,onDone:()=>{visual.mesh.visible=true}});
+        });
+      }
+    }
+    lastRummiSnapshot=snapshot;
 
     if(data.canMove&&selected.size){
       const actionZ=hand.length>10?1.05:1.48,fresh=actionSprite('NOUVEAU GROUPE','rummi-dest',{dest:'new'},'#dbea9e');fresh.position.set(-2.15,1.02,actionZ);objects.add(fresh);
@@ -1001,9 +1033,10 @@ export function createTable3DRenderer({onFatal}={}){
 
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     if(title)title.textContent='VUE 3D · RUMMIKUB';
-    if(status)status.textContent=(data.diagnostic?.text||((data.deckCount||0)+' tuiles dans la pioche'))+' · '+layout.active.length+' groupe'+(layout.active.length>1?'s':'');
-    if(help)help.textContent=data.canMove?'Sélectionnez des tuiles, puis choisissez un groupe ou le chevalet':'Le chevalet actif reste privé · table commune synchronisée';
+    if(status)status.textContent=(data.diagnostic?.text||(deckCount+' tuiles dans la pioche'))+' · '+layout.active.length+' groupe'+(layout.active.length>1?'s':'');
+    if(help)help.textContent=data.canMove?'Sélectionnez et déplacez : les tuiles glissent réellement entre chevalet et groupes':'Le chevalet actif reste privé · table commune synchronisée';
   }
+
   function syncCactus(payload){
     clearObjects();dropMarker.visible=false;
     setCameraPose(0,7.7,9.7,0,.2,.15);
