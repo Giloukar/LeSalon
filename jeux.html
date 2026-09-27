@@ -3512,9 +3512,17 @@ if(window.SalonTableView){
     specialCard(type,value){
      if(!S||!TABLE_3D_SPECIAL_CARD_GAMES.includes(S.id)||!canPlay())return false;
      if(S.id==='pouilleux'&&type==='pick'&&Number.isInteger(value)){dispatch({type:'pick',index:value});return true}
-     if(S.id==='quatrevingtdixneuf'&&type==='select'){
-      const id=String(value),c=player(S).hand.find(c=>c.id===id);if(!c)return false;
-      selection.clear();selection.add(id);renderGame(false);return true;
+     if(S.id==='quatrevingtdixneuf'){
+      if(type==='select'){
+       const id=String(value),c=player(S).hand.find(c=>c.id===id);if(!c)return false;
+       selection.clear();selection.add(id);renderGame(false);return true;
+      }
+      if(type==='play'&&value&&typeof value.id==='string'&&[1,11].includes(Number(value.ace||1))){dispatch({type:'card',id:value.id,ace:Number(value.ace||1)});return true}
+      if(type==='bust'){dispatch({type:'bust'});return true}
+     }
+     if(S.id==='vingtetun'){
+      if(type==='bet'&&Number.isFinite(Number(value))){dispatch({type:'bet',amount:Number(value)});return true}
+      if(['hit','stand','double'].includes(type)){dispatch({type});return true}
      }
      if(S.id==='bataille'&&type==='battle'){dispatch({type:'battle'});return true}
      return false;
