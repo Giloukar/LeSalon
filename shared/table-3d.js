@@ -82,7 +82,7 @@ export function createTable3DRenderer({onFatal}={}){
   let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='';
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
-  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
+  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,lastCactusSnapshot=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
 
   function applyCameraFit(){
     if(!camera||!cameraPose)return;
@@ -253,12 +253,16 @@ export function createTable3DRenderer({onFatal}={}){
     return{progress,lateral};
   }
   function eightGestureCoordinates(mesh,home){return cardGestureCoordinates(mesh,home,'huit')}
+  function cactusSeat(viewer,count,index){
+    const mine=index===viewer,angle=mine?Math.PI/2:(index/(count-1||1))*Math.PI-Math.PI/2;
+    return{mine,x:mine?0:Math.sin(angle)*4.2,z:mine?2.45:-2.15+Math.cos(angle)*.72};
+  }
   function currentCardOpponentSeat(actor){
     const state=current?.state,viewer=Number.isInteger(current?.privateIndex)?current.privateIndex:0,game=current?.gameId;
     if(!state?.players?.length||!Number.isInteger(actor)||actor===viewer)return null;
     if(game==='cactus'){
-      const players=current?.viewData?.cactus?.players||state.players,count=Math.max(1,players.length),angle=(actor/(count-1||1))*Math.PI-Math.PI/2;
-      return{x:Math.sin(angle)*4.2,z:-2.15+Math.cos(angle)*.72};
+      const players=current?.viewData?.cactus?.players||state.players,count=Math.max(1,players.length),seat=cactusSeat(viewer,count,actor);
+      return{x:seat.x,z:seat.z};
     }
     const opponents=state.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer&&!(game==='quatrevingtdixneuf'&&x.p?.out)),index=opponents.findIndex(x=>x.i===actor);
     if(index<0)return null;return eightOpponentSeat(opponents.length,index);
@@ -340,6 +344,18 @@ export function createTable3DRenderer({onFatal}={}){
   function eightSnapshot(payload,deckCount,top){
     const s=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0,own=s?.players?.[viewer]?.hand||[];
     return{key:[s?.startedAt||'',viewer,(s?.players||[]).map(p=>p?.name||'').join('|')].join('~'),viewer,deckCount,topId:top?.id||null,top:top?{id:top.id,suit:top.suit,rank:top.rank,joker:!!top.joker}:null,ownIds:own.map(c=>c?.id).filter(Boolean),handCounts:(s?.players||[]).map(p=>p?.hand?.length||0)};
+  }
+  function cactusSnapshot(payload,data){
+    const s=payload?.state,viewer=Number.isInteger(data?.viewer)?data.viewer:(Number.isInteger(payload?.privateIndex)?payload.privateIndex:0),players=data?.players||[],own=players[viewer]?.hand||[],discard=data?.discard;
+    return{
+      key:[s?.startedAt||'',viewer,players.map(p=>p?.name||'').join('|')].join('~'),
+      viewer,turn:Number(data?.turn??s?.turn??0),phase:String(data?.phase||s?.phase||''),source:data?.source||null,
+      deckCount:Math.max(0,Number(data?.deckCount)||0),
+      discardId:discard?.id||null,discard:discard?{id:discard.id,suit:discard.suit,rank:discard.rank,joker:!!discard.joker}:null,
+      drawnId:data?.drawn?.id||null,
+      ownIds:own.map(c=>c?.id).filter(Boolean),
+      handCounts:players.map(p=>(p?.hand||[]).filter(Boolean).length)
+    };
   }
   function queueCardFlight(mesh,from,to,{duration=620,delay=0,lift=.8,onDone=null,fromRot=0,toRot=0,bank=.10,roll=.08}={}){
     mesh.position.copy(from);mesh.rotation.set(-Math.PI/2,0,fromRot);cardFx.add(mesh);
@@ -867,11 +883,10 @@ export function createTable3DRenderer({onFatal}={}){
   function syncCactus(payload){
     clearObjects();dropMarker.visible=false;
     setCameraPose(0,7.7,9.7,0,.2,.15);
-    const data=payload.viewData?.cactus,s=payload.state;if(!data||!s)return;
-    const viewer=data.viewer,players=data.players||[],count=Math.max(1,players.length);
+    const data=payload.viewData?.cactus,s=payload.state;if(!data||!s){lastCactusSnapshot=null;return}
+    const viewer=data.viewer,players=data.players||[],count=Math.max(1,players.length),previous=lastCactusSnapshot,playerVisuals=new Map(),ownVisuals=new Map();
     players.forEach((p,i)=>{
-      const mine=i===viewer,angle=mine?Math.PI/2:(i/(count-1||1))*Math.PI-Math.PI/2;
-      const cx=mine?0:Math.sin(angle)*4.2,cz=mine?2.45:-2.15+Math.cos(angle)*.72;
+      const seat=cactusSeat(viewer,count,i),mine=seat.mine,cx=seat.x,cz=seat.z,meshes=[];
       (p.hand||[]).forEach((card,index)=>{
         if(!card)return;
         const col=index%2,row=Math.floor(index/2),x=cx+(col-.5)*1.02,z=cz+(row-.5)*.78;
@@ -882,8 +897,10 @@ export function createTable3DRenderer({onFatal}={}){
         mesh.userData.index=index;mesh.userData.owner=i;mesh.userData.interactive=interactiveCard;
         placeCard(mesh,x,z,TABLE_Y+.11,(col-.5)*.035,mine?0.76:0.62);
         mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};
-        if(mine)makeLooseManipulable(mesh,{kind:mesh.userData.kind,tapEnabled:interactiveCard,index,owner:i});
+        if(mine){makeLooseManipulable(mesh,{kind:mesh.userData.kind,tapEnabled:interactiveCard,index,owner:i});if(card.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z})}
+        meshes.push(mesh);
       });
+      playerVisuals.set(i,{...seat,meshes});
       const label=makeLabel((p.name||'Joueur')+' · '+p.score+' pts'+(data.caller===i?' · CACTUS !':''),i===data.turn?'#dbea9e':'#d8ded9');
       label.position.set(cx,1.08,cz+(mine?.95:-.88));label.scale.set(mine?3.4:2.65,mine?.72:.58,1);objects.add(label);
     });
@@ -893,8 +910,44 @@ export function createTable3DRenderer({onFatal}={}){
       mesh.userData.kind=top&&payload.canInteract&&data.phase==='draw'?'cactus-draw':'cactus-card';mesh.userData.interactive=top&&payload.canInteract&&data.phase==='draw';
       placeCard(mesh,-1.35,.1,TABLE_Y+.07+i*.035,-.02+i*.01,.82);
     }
-    if(data.discard){const mesh=cardMesh(data.discard,{interactiveCard:payload.canInteract&&data.phase==='draw'});mesh.userData.kind=payload.canInteract&&data.phase==='draw'?'cactus-take':'cactus-card';mesh.userData.interactive=payload.canInteract&&data.phase==='draw';placeCard(mesh,0,.1,TABLE_Y+.12,(visualHash(data.discard.id)-.5)*.12,.82);}
-    if(data.drawn){const mesh=cardMesh(data.drawn);mesh.userData.kind='cactus-drawn';placeCard(mesh,1.35,.1,TABLE_Y+.14,0,.88);}
+    let discardMesh=null,drawnMesh=null;
+    if(data.discard){discardMesh=cardMesh(data.discard,{interactiveCard:payload.canInteract&&data.phase==='draw'});discardMesh.userData.kind=payload.canInteract&&data.phase==='draw'?'cactus-take':'cactus-card';discardMesh.userData.interactive=payload.canInteract&&data.phase==='draw';placeCard(discardMesh,0,.1,TABLE_Y+.12,(visualHash(data.discard.id)-.5)*.12,.82)}
+    if(data.drawn){drawnMesh=cardMesh(data.drawn);drawnMesh.userData.kind='cactus-drawn';placeCard(drawnMesh,1.35,.1,TABLE_Y+.14,0,.88)}
+
+    const snapshot=cactusSnapshot(payload,data);
+    if(previous&&previous.key===snapshot.key&&motionAllowed()){
+      const discardChanged=!!snapshot.discardId&&snapshot.discardId!==previous.discardId;
+      const drawnAppeared=!!snapshot.drawnId&&snapshot.drawnId!==previous.drawnId;
+      const actorLoss=snapshot.handCounts.map((n,i)=>({i,delta:(previous.handCounts?.[i]??n)-n})).find(x=>x.delta>0)?.i;
+
+      if(drawnAppeared&&drawnMesh){
+        drawnMesh.visible=false;
+        const from=data.source==='discard'?new THREE.Vector3(0,TABLE_Y+.25,.1):new THREE.Vector3(-1.35,TABLE_Y+.25,.1),to=new THREE.Vector3(1.35,TABLE_Y+.25,.1);
+        const flight=cardMesh(data.source==='discard'?data.drawn:null,{back:data.source!=='discard'});
+        queueCardFlight(flight,from,to,{duration:500,lift:.58,fromRot:data.source==='discard'?(visualHash(data.drawn.id)-.5)*.12:-.03,toRot:0,bank:.13,roll:.11,onDone:()=>{drawnMesh.visible=true}});
+      }else if(discardChanged&&previous.drawnId&&snapshot.discardId===previous.drawnId&&discardMesh){
+        discardMesh.visible=false;
+        const flight=cardMesh(data.discard),from=new THREE.Vector3(1.35,TABLE_Y+.25,.1),to=new THREE.Vector3(0,TABLE_Y+.24,.1);
+        queueCardFlight(flight,from,to,{duration:460,lift:.48,fromRot:0,toRot:(visualHash(data.discard.id)-.5)*.12,bank:.12,roll:-.10,onDone:()=>{discardMesh.visible=true}});
+      }else if(discardChanged&&Number.isInteger(actorLoss)&&discardMesh){
+        discardMesh.visible=false;
+        const visual=playerVisuals.get(actorLoss);let from;
+        if(actorLoss===viewer&&previous.ownIds?.includes(snapshot.discardId)){
+          const index=previous.ownIds.indexOf(snapshot.discardId),col=index%2,row=Math.floor(index/2),seat=cactusSeat(viewer,count,actorLoss);
+          from=new THREE.Vector3(seat.x+(col-.5)*1.02,TABLE_Y+.25,seat.z+(row-.5)*.78);
+        }else from=new THREE.Vector3(visual?.x||0,TABLE_Y+.28,(visual?.z||-2.1)+.08);
+        const flight=cardMesh(data.discard),to=new THREE.Vector3(0,TABLE_Y+.24,.1);
+        queueCardFlight(flight,from,to,{duration:520,lift:.72,fromRot:0,toRot:(visualHash(data.discard.id)-.5)*.12,bank:.15,roll:(actorLoss%2?-.12:.12),onDone:()=>{discardMesh.visible=true}});
+      }else if(previous.phase==='draw'&&snapshot.phase==='swap'&&snapshot.deckCount<previous.deckCount&&!snapshot.drawnId){
+        const actor=previous.turn,visual=playerVisuals.get(actor),from=new THREE.Vector3(-1.35,TABLE_Y+.25,.1),to=new THREE.Vector3(visual?.x||0,TABLE_Y+.28,(visual?.z||-2.1)+.08),flight=cardMesh(null,{back:true});
+        queueCardFlight(flight,from,to,{duration:540,lift:.68,fromRot:-.03,toRot:0,bank:.12,roll:(actor%2?-.10:.10)});
+      }else if(previous.phase==='draw'&&snapshot.phase==='swap'&&snapshot.deckCount===previous.deckCount&&previous.discardId&&snapshot.discardId!==previous.discardId&&!snapshot.drawnId){
+        const actor=previous.turn,visual=playerVisuals.get(actor),from=new THREE.Vector3(0,TABLE_Y+.24,.1),to=new THREE.Vector3(visual?.x||0,TABLE_Y+.28,(visual?.z||-2.1)+.08),flight=cardMesh(previous.discard);
+        queueCardFlight(flight,from,to,{duration:520,lift:.62,fromRot:(visualHash(previous.discardId)-.5)*.12,toRot:0,bank:.13,roll:(actor%2?-.09:.09)});
+      }
+    }
+    lastCactusSnapshot=snapshot;
+
     if(payload.canInteract&&data.turn===viewer){
       if(data.phase==='peek'||data.phase==='reveal'){const ready=actionSprite('C’EST MÉMORISÉ','cactus-action',{command:'ready'},'#dbea9e');ready.position.set(0,1.04,1.18);objects.add(ready)}
       if(data.phase==='draw'&&data.caller===null){const call=actionSprite('CACTUS !','cactus-action',{command:'call'},'#e6d7b4');call.position.set(0,1.04,1.30);objects.add(call)}
