@@ -3116,7 +3116,7 @@ playSceneAction=function(ctx){
 const TABLE_VIEW_2D_RENDER=renderGame,TABLE_VIEW_SHOW_HOME=showHome;
 const TABLE_3D_CARD_GAMES=['president','menteur','suites','plis','encheres'];
 const TABLE_3D_SPECIAL_CARD_GAMES=['pouilleux','quatrevingtdixneuf','vingtetun','bataille'];
-function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite','cactus','rummikub','metropole','echo','ballon','anagrammes','intrus',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
+function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite','cactus','rummikub','metropole','echo','ballon','anagrammes','intrus','code',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
 function tableViewMountControl(){
  if(!window.SalonTableView)return;
  const supported=tableViewSupports3D();
@@ -3213,6 +3213,18 @@ if(window.SalonTableView){
     count:S.intrusCount,
     tiles:Array.isArray(S.intrusTiles)?[...S.intrusTiles]:Array.from({length:S.intrusCount},(_,i)=>i===S.intrusIndex),
     tried:[...S.tried],
+    feedback:S.feedback||'',
+    players:S.players.map(p=>({name:p.name,score:p.score}))
+   };
+  }
+  if(S?.id==='code'){
+   const reveal=['result','over'].includes(S.phase);
+   data.code3d={
+    phase:S.phase,
+    stage:S.stage,
+    turn:S.turn,
+    history:S.codeHistory.map(h=>({colors:[...h.colors],exact:h.exact,near:h.near})),
+    secret:reveal&&Array.isArray(S.secret)?[...S.secret]:[],
     feedback:S.feedback||'',
     players:S.players.map(p=>({name:p.name,score:p.score}))
    };
@@ -3369,6 +3381,12 @@ if(window.SalonTableView){
     intrus(type,value){
      if(!S||S.id!=='intrus'||!canPlay())return false;
      if(type==='spot'&&S.phase==='play'&&Number.isInteger(value)&&value>=0&&value<S.intrusCount&&!S.tried.includes(value)){dispatch({type:'spot',index:value});return true}
+     if(type==='continue'&&S.phase==='result'){dispatch({type:'continue'});return true}
+     return false;
+    },
+    codePuzzle(type,value){
+     if(!S||S.id!=='code'||!canPlay())return false;
+     if(type==='guess'&&S.phase==='play'&&Array.isArray(value)&&value.length===3&&value.every(n=>Number.isInteger(n)&&n>=0&&n<6)){dispatch({type:'codeGuess',colors:[...value]});return true}
      if(type==='continue'&&S.phase==='result'){dispatch({type:'continue'});return true}
      return false;
     },
