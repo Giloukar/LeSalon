@@ -313,8 +313,21 @@ export function createTable3DRenderer({onFatal}={}){
     const seat=opponentVisuals.get(actor);return seat?new THREE.Vector3(seat.x,TABLE_Y+.30,seat.z+.08):new THREE.Vector3(0,TABLE_Y+.30,-2.25);
   }
   function exactLocalCardOrigin(previous,id,index=0){
+    const direct=previous?.dragOrigins?.get?.(id);if(direct?.position)return direct.position.clone();
     const at=previous?.ownIds?.indexOf(id);if(at<0)return null;
     const slot=handCardSlot(previous.ownIds.length,at);return new THREE.Vector3(slot.x,TABLE_Y+.30+slot.yOffset,slot.z);
+  }
+  function rememberCardDropOrigin(game,id,mesh){
+    const snapshot=lastCardFamilySnapshots.get(game);if(!snapshot||!id||!mesh)return;
+    snapshot.dragOrigins??=new Map();snapshot.dragOrigins.set(id,{position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()});
+  }
+  function rememberNinetyDropOrigin(id,mesh){
+    if(!lastNinetySnapshot||!id||!mesh)return;
+    lastNinetySnapshot.dragOrigins??=new Map();lastNinetySnapshot.dragOrigins.set(id,{position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()});
+  }
+  function rememberRummiDropOrigin(id,mesh){
+    const entry=lastRummiSnapshot?.positions?.get?.(id);if(!entry||!mesh)return;
+    entry.position=mesh.position.clone();entry.scale=mesh.scale.clone();entry.rotation=mesh.rotation.z;
   }
   function animateCardFamilyConfirmed(game,payload,center,previous,currentSnapshot,opponentVisuals,centerVisuals){
     if(!previous||previous.key!==currentSnapshot.key||!motionAllowed())return;
@@ -686,6 +699,7 @@ export function createTable3DRenderer({onFatal}={}){
 
     if(game==='quatrevingtdixneuf'){
       const ninety=data.ninety||{},selected=new Set(ninety.selectedIds||[]),selectable=new Set(ninety.selectableIds||[]),legal=new Set(ninety.legalIds||[]),own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,ownVisuals=new Map();
+      const ninetyDrop=cardGestureTarget('quatrevingtdixneuf',TABLE_Y+.025);dropMarker.visible=!!(payload.canInteract&&selectable.size);dropMarker.position.set(ninetyDrop.x,TABLE_Y+.025,ninetyDrop.z);dropMarker.material.opacity=.2;
       own.forEach((card,i)=>{
         const slot=handCardSlot(n,i),chosen=selected.has(card.id),isLegal=legal.has(card.id),mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:selectable.has(card.id),playable:selectable.has(card.id)});
         mesh.userData.kind='special-select';mesh.userData.cardId=card.id;mesh.userData.home={position:new THREE.Vector3(slot.x,TABLE_Y+.12+slot.yOffset+(chosen?.25:isLegal?.08:0),slot.z),rotation:new THREE.Euler(-Math.PI/2,0,slot.fan),scale:new THREE.Vector3(1,1,1).multiplyScalar(slot.scale*(chosen?1.07:isLegal?1.025:.98))};
@@ -714,8 +728,9 @@ export function createTable3DRenderer({onFatal}={}){
         const actor=previous.turn,viewerActor=actor===viewer,publicCard=ninety.last,discardTarget=new THREE.Vector3(1.5,TABLE_Y+.24,.05);
         let playFrom;
         if(viewerActor){
-          const removed=(previous.ownIds||[]).find(id=>!(snapshot.ownIds||[]).includes(id))||snapshot.lastId,index=Math.max(0,(previous.ownIds||[]).indexOf(removed)),slot=handCardSlot(previous.ownIds.length,index);
-          playFrom=new THREE.Vector3(slot.x,TABLE_Y+.28+slot.yOffset,slot.z);
+          const removed=(previous.ownIds||[]).find(id=>!(snapshot.ownIds||[]).includes(id))||snapshot.lastId,direct=previous.dragOrigins?.get?.(removed);
+          if(direct?.position)playFrom=direct.position.clone();
+          else{const index=Math.max(0,(previous.ownIds||[]).indexOf(removed)),slot=handCardSlot(previous.ownIds.length,index);playFrom=new THREE.Vector3(slot.x,TABLE_Y+.28+slot.yOffset,slot.z)}
         }else{
           const visual=opponentVisuals.get(actor);playFrom=new THREE.Vector3(visual?.x||0,TABLE_Y+.29,(visual?.z||-2.2)+.08);
         }
@@ -801,6 +816,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(!s?.players?.length)return;
     setCameraPose(0,7.4,9.1,0,.22,.15);
     const selected=new Set(data.selectedIds||[]),selectable=new Set(data.selectableIds||[]),playable=new Set(data.cardPlayableIds||[]);
+    const dropTarget=cardGestureTarget(game,TABLE_Y+.025);dropMarker.visible=!!(payload.canInteract&&selectable.size);dropMarker.position.set(dropTarget.x,TABLE_Y+.025,dropTarget.z);dropMarker.material.opacity=.2;
     const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length;
     own.forEach((card,i)=>{
       const slot=handCardSlot(n,i),chosen=selected.has(card.id),canSelect=selectable.has(card.id),legal=playable.has(card.id);
@@ -1034,7 +1050,7 @@ export function createTable3DRenderer({onFatal}={}){
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     if(title)title.textContent='VUE 3D · RUMMIKUB';
     if(status)status.textContent=(data.diagnostic?.text||(deckCount+' tuiles dans la pioche'))+' · '+layout.active.length+' groupe'+(layout.active.length>1?'s':'');
-    if(help)help.textContent=data.canMove?'Sélectionnez et déplacez : les tuiles glissent réellement entre chevalet et groupes':'Le chevalet actif reste privé · table commune synchronisée';
+    if(help)help.textContent=data.canMove?'Glissez une tuile directement vers un groupe, la table ou le chevalet · touchez pour sélectionner plusieurs tuiles':'Le chevalet actif reste privé · table commune synchronisée';
   }
 
   function syncCactus(payload){
@@ -1442,10 +1458,43 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.gestureEnabled){
       if(!d.gestureStarted){d.gestureStarted=true;emitLocalCardGesture('start',0,0)}
       const gesture=cardGestureCoordinates(d.mesh,d.gestureHome);emitLocalCardGesture('move',gesture.progress,gesture.lateral);
+      d.overDrop=directCardDropNear(d);
+      const target=cardGestureTarget(current?.gameId,TABLE_Y+.025);showDropMarkerAt(target.x,target.z,d.overDrop);
+    }else if(d.kind==='rummi-tile'&&current?.gameId==='rummikub'){
+      d.rummiDrop=rummiDropTarget(d.mesh.position);
+      if(d.rummiDrop)showDropMarkerAt(d.rummiDrop.x,d.rummiDrop.z,true);else showDropMarkerAt(0,0,false);
     }
     draw();e.preventDefault();return true;
   }
   function cardDropRadius(d){return d?.pointerType==='touch'||matchMedia('(pointer: coarse)').matches?1.9:1.5}
+  function directCardDropNear(d,game=current?.gameId){
+    const target=cardGestureTarget(game),radius=cardDropRadius(d);return Math.hypot(d.mesh.position.x-target.x,d.mesh.position.z-target.z)<radius;
+  }
+  function showDropMarkerAt(x,z,active=true){
+    if(!dropMarker)return;
+    dropMarker.visible=!!active;
+    if(active){dropMarker.position.set(x,TABLE_Y+.025,z);dropMarker.material.opacity=.82}
+    else dropMarker.material.opacity=.2;
+  }
+  function rummiDropTarget(position){
+    const data=current?.viewData?.rummi;if(!data||!position)return null;
+    const groups=data.table||[],layout=rummiBoardLayout(groups);
+    let best=null;
+    for(let order=0;order<layout.active.length;order++){
+      const entry=layout.active[order],col=order%layout.cols,row=Math.floor(order/layout.cols),cx=(col-(layout.cols-1)/2)*layout.cellW,cz=layout.baseZ+row*layout.cellD;
+      const dx=Math.abs(position.x-cx),dz=Math.abs(position.z-cz);
+      if(dx<=layout.cellW*.47&&dz<=Math.min(.78,layout.cellD*.38)){
+        const score=dx/Math.max(.1,layout.cellW)+dz/Math.max(.1,layout.cellD);
+        if(!best||score<best.score)best={dest:entry.index,x:cx,z:cz,score};
+      }
+    }
+    if(best)return best;
+    if(position.z>=1.72&&Math.abs(position.x)<=4.45)return{dest:'hand',x:Math.max(-3.4,Math.min(3.4,position.x)),z:2.18,score:0};
+    const tableMinZ=layout.baseZ-.72,tableMaxZ=layout.baseZ+(layout.rows-1)*layout.cellD+.72;
+    if(position.z>=tableMinZ&&position.z<=tableMaxZ&&Math.abs(position.x)<=4.65)return{dest:'new',x:position.x,z:position.z,score:0};
+    return null;
+  }
+  function rummiDropDestination(position){return rummiDropTarget(position)?.dest??null}
   function onPointerDown(e){
     if(!active)return;
     const obj=hit(e);setHover(obj);if(!obj)return;
@@ -1478,12 +1527,24 @@ export function createTable3DRenderer({onFatal}={}){
   function finishDrag(e,cancelled=false){
     if(!drag||e.pointerId!==drag.pointerId)return;
     const d=drag;drag=null;host?.classList.remove('is-dragging');dropMarker.material.opacity=.2;
+    if(d.loose&&d.kind!=='card')dropMarker.visible=false;
     if(cancelled){if(d.kind==='card'&&d.canPlay||d.loose&&d.gestureStarted)emitLocalCardGesture('cancel',0,0);if(d.loose)returnManipulatedCard(d,{snap:document.hidden});else{syncCurrent(current);draw()}return}
     const tap=Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
     if(d.loose&&!tap){
       if(d.kind==='cactus-quick'&&d.gestureStarted){
-        const target=cardGestureTarget('cactus'),near=Math.hypot(d.mesh.position.x-target.x,d.mesh.position.z-target.z)<cardDropRadius(d);
-        if(near){emitLocalCardGesture('commit',1,0);current?.interactions?.cactus?.('quick',d.index);return}
+        if(directCardDropNear(d,'cactus')){emitLocalCardGesture('commit',1,0);current?.interactions?.cactus?.('quick',d.index);return}
+      }
+      if(d.kind==='card-select'&&d.gestureStarted&&directCardDropNear(d)){
+        rememberCardDropOrigin(current?.gameId,d.cardId,d.mesh);
+        if(current?.interactions?.cardDrop?.(d.cardId)){emitLocalCardGesture('commit',1,0);return}
+      }
+      if(d.kind==='special-select'&&current?.gameId==='quatrevingtdixneuf'&&d.gestureStarted&&directCardDropNear(d,'quatrevingtdixneuf')){
+        rememberNinetyDropOrigin(d.cardId,d.mesh);
+        if(current?.interactions?.specialCard?.('drop',d.cardId)){emitLocalCardGesture('commit',1,0);return}
+      }
+      if(d.kind==='rummi-tile'){
+        const dest=d.rummiDrop?.dest??rummiDropDestination(d.mesh.position);
+        if(dest!==null){rememberRummiDropOrigin(d.tileId,d.mesh);if(current?.interactions?.rummi?.('drop',{id:d.tileId,dest}))return}
       }
       if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d);return
     }
