@@ -270,3 +270,10 @@ L’ouverture de la vue 3D privilégie désormais un affichage plein écran. Le 
 Les contrôles HTML encore nécessaires au moteur (par exemple le choix de couleur après un 8 ou un Joker) sont transformés en tiroir flottant au-dessus de la scène plutôt que laissés hors écran. Les widgets globaux et effets 2D sont masqués pendant le plein écran pour éviter les chevauchements. Sur mobile, la navigation globale est remise dans le flux en 2D et le dock musical est compacté.
 
 Le placement de la main du 8 américain utilise maintenant des lignes équilibrées avec un espacement basé sur la largeur réelle des cartes. Jusqu’à huit cartes, la main reste sur une seule ligne sans chevauchement important ; au-delà, elle se répartit automatiquement sur deux puis trois lignes. Cette logique est indépendante des futurs modèles GLB/GLTF et pourra donc être réutilisée avec les assets Astra.
+
+
+## Cadrage mobile et retour 2D sécurisé
+
+Le cadrage 3D n’est plus basé uniquement sur le champ de vision : chaque pose de caméra est désormais recalculée à partir du ratio réel du viewport. En portrait étroit, la caméra recule proportionnellement pour conserver la largeur du plateau, sans imposer une orientation paysage ni déformer fortement la perspective.
+
+Sur les appareils à pointeur tactile, le mode plein écran utilise la couche CSS plein viewport mais n’appelle plus l’API Fullscreen native du navigateur. Cette séparation évite les transitions de contexte fragiles observées sur mobile au retour en 2D. Le retour suit maintenant un ordre déterministe : réduction de la couche 3D, sortie éventuelle du plein écran natif sur desktop, activation du renderer 2D, puis suppression de l’état de présentation 3D.
