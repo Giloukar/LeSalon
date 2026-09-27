@@ -203,6 +203,40 @@ export function createTable3DRenderer({onFatal}={}){
     const step=Math.min(3.0,6.0/Math.max(1,total-1));
     return{x:(index-(total-1)/2)*step,z:-2.34+Math.abs(index-(total-1)/2)*.06};
   }
+  function emitLocalCardGesture(phase,progress=0,lateral=0){
+    if(current?.gameId!=='huit')return;
+    const detail={phase,progress:Math.max(0,Math.min(1,Number(progress)||0)),lateral:Math.max(-1,Math.min(1,Number(lateral)||0))};
+    window.dispatchEvent(new CustomEvent('salon:local-card-gesture',{detail}));
+  }
+  function eightGestureCoordinates(mesh,home){
+    const target=new THREE.Vector3(1.25,1.02,.05),origin=home||mesh?.userData?.home?.position;if(!origin||!mesh)return{progress:0,lateral:0};
+    const vx=target.x-origin.x,vz=target.z-origin.z,wx=mesh.position.x-origin.x,wz=mesh.position.z-origin.z,den=Math.max(.0001,vx*vx+vz*vz),len=Math.sqrt(den);
+    const progress=Math.max(0,Math.min(1,(wx*vx+wz*vz)/den)),lateral=Math.max(-1,Math.min(1,(wx*vz-wz*vx)/(len*1.7)));
+    return{progress,lateral};
+  }
+  function currentEightOpponentSeat(actor){
+    const state=current?.state,viewer=Number.isInteger(current?.privateIndex)?current.privateIndex:0;
+    if(!state?.players?.length||!Number.isInteger(actor)||actor===viewer)return null;
+    const opponents=state.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer),index=opponents.findIndex(x=>x.i===actor);
+    if(index<0)return null;return eightOpponentSeat(opponents.length,index);
+  }
+  function onRemoteCardGesture(event){
+    if(!active||!motionAllowed()||current?.gameId!=='huit')return;
+    const d=event?.detail||{},actor=Number(d.actor),seat=currentEightOpponentSeat(actor);if(!seat)return;
+    const phase=['start','move','cancel','commit'].includes(d.phase)?d.phase:null;if(!phase)return;
+    let gesture=remoteCardGestures.get(actor);
+    if(!gesture||phase==='start'){
+      if(gesture?.mesh)cardFx.remove(gesture.mesh);
+      const mesh=cardMesh(null,{back:true});mesh.scale.setScalar(.74);mesh.rotation.set(-Math.PI/2,0,0);cardFx.add(mesh);
+      gesture={mesh,actor,from:new THREE.Vector3(seat.x,TABLE_Y+.28,seat.z+.10),to:new THREE.Vector3(1.25,TABLE_Y+.26,.05),progress:0,target:0,lateral:0,targetLateral:0,lastAt:performance.now(),returning:false,committed:false};
+      mesh.position.copy(gesture.from);remoteCardGestures.set(actor,gesture);
+    }
+    gesture.target=Math.max(0,Math.min(1,Number(d.progress)||0));gesture.targetLateral=Math.max(-1,Math.min(1,Number(d.lateral)||0));gesture.lastAt=performance.now();
+    if(phase==='cancel'){gesture.target=0;gesture.targetLateral=0;gesture.returning=true;gesture.committed=false}
+    else if(phase==='commit'){gesture.target=1;gesture.targetLateral=0;gesture.committed=true;gesture.returning=false}
+    else{gesture.returning=false;gesture.committed=false}
+    startMotion();
+  }
   function eightSnapshot(payload,deckCount,top){
     const s=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0;
     return{key:[s?.startedAt||'',viewer,(s?.players||[]).map(p=>p?.name||'').join('|')].join('~'),viewer,deckCount,topId:top?.id||null,top:top?{id:top.id,suit:top.suit,rank:top.rank,joker:!!top.joker}:null,handCounts:(s?.players||[]).map(p=>p?.hand?.length||0)};
