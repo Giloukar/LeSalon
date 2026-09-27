@@ -282,6 +282,16 @@ export function createTable3DRenderer({onFatal}={}){
       a.mesh.position.lerpVectors(p0,p1,u);a.mesh.position.y+=Math.sin(u*Math.PI)*(a.lift??.12);
       if(t<1)running=true;else a.mesh.position.copy(a.points.at(-1));
     }
+    for(const a of cardAnimations){
+      if(a.done)continue;
+      const elapsed=now-a.start-(a.delay||0);
+      if(elapsed<0){running=true;continue}
+      const t=Math.min(1,Math.max(0,elapsed/a.duration)),ease=1-Math.pow(1-t,3);
+      a.mesh.position.lerpVectors(a.from,a.to,ease);a.mesh.position.y+=Math.sin(t*Math.PI)*(a.lift??.8);
+      a.mesh.rotation.z=THREE.MathUtils.lerp(a.fromRot||0,a.toRot||0,ease);
+      if(t<1)running=true;else{a.mesh.position.copy(a.to);a.done=true;cardFx.remove(a.mesh);a.onDone?.()}
+    }
+    if(cardAnimations.some(a=>a.done))cardAnimations=cardAnimations.filter(a=>!a.done);
     draw();if(running)animationRaf=requestAnimationFrame(motionFrame);
   }
   function syncGoose(payload){
