@@ -109,3 +109,26 @@ Pour Ferme la boîte :
 - la possibilité de lancer un seul dé est dérivée de l’état existant (7, 8 et 9 fermés), sans règle dupliquée dans Three.js.
 
 Le `pointercancel` du renderer est désormais générique : il resynchronise le jeu actif au lieu de supposer qu’il s’agit du 8 américain.
+
+
+## Renderer générique de jeux de cartes
+
+La primitive de carte créée pour le 8 américain sert désormais de base commune à cinq jeux supplémentaires : Président, Menteur, Quatre suites, Chasse aux plis et Enchères.
+
+Le renderer ne contient aucune règle propre à ces jeux. Le pont dans `jeux.html` fournit :
+- la main visible déjà autorisée par la projection ;
+- les IDs sélectionnables ;
+- les IDs jouables lorsqu’une règle existante sait les calculer (`suitesLegal()`, `tricksLegal()`) ;
+- la sélection UI locale ;
+- une description minimale du centre de table.
+
+Toucher une carte 3D appelle uniquement `cardSelect(id)`, qui reproduit la sélection locale existante. Le coup n’est pas envoyé et l’état métier n’est pas modifié à ce moment-là. Les boutons habituels restent responsables de la validation finale par le moteur.
+
+Adaptations de centre de table :
+- Président : pli actuel, révolution et joueurs ayant passé ;
+- Menteur : tas face cachée, annonce courante et éventuelles cartes révélées ;
+- Quatre suites : quatre rangées issues directement de `S.lanes` ;
+- Chasse aux plis : cartes du pli courant ou du dernier pli, avec atout fourni par l’état ;
+- Enchères : lot courant et enchères telles qu’elles existent dans la projection cliente.
+
+Pour Enchères, un bid adverse projeté sous la forme `{hidden:true}` reste un simple dos de carte dans Three.js. Le renderer ne tente jamais de retrouver sa valeur depuis un identifiant ou depuis l’état hôte.
