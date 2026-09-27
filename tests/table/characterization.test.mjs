@@ -122,6 +122,10 @@ test('Three.js hardening adapts mobile quality, motion and reusable geometry',as
  assert.match(source,/function eightOpponentSeat\(total,index\)/);
  assert.match(source,/function eightSnapshot\(payload,deckCount,top\)/);
  assert.match(source,/function queueCardFlight\(mesh,from,to/);
+ assert.match(source,/function emitLocalCardGesture\(phase,progress=0,lateral=0\)/);
+ assert.match(source,/function onRemoteCardGesture\(event\)/);
+ assert.match(source,/remoteCardGestures=new Map\(\)/);
+ assert.match(source,/salon:remote-card-gesture/);
  assert.match(source,/snapshot\.deckCount<previous\.deckCount/);
  assert.match(source,/snapshot\.handCounts\[i\]===previous\.handCounts\[i\]-1/);
  assert.match(css,/58svh/);
@@ -135,6 +139,10 @@ test('Three.js hardening adapts mobile quality, motion and reusable geometry',as
  assert.match(css,/#game-actions\{position:fixed/);
 });
 
+
+test('live Eight card gestures are transient and never mutate online state',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','online');const r=await t.page.evaluate(()=>{net.gameId='huit';net.state.turn=0;S.turn=0;__test.packets.length=0;const before={view:clone(S),host:clone(net.state),revision:net.revision,random:__test.random};window.dispatchEvent(new CustomEvent('salon:local-card-gesture',{detail:{phase:'start',progress:0,lateral:0}}));window.dispatchEvent(new CustomEvent('salon:local-card-gesture',{detail:{phase:'move',progress:.58,lateral:.22}}));window.dispatchEvent(new CustomEvent('salon:local-card-gesture',{detail:{phase:'cancel',progress:0,lateral:0}}));return{before,after:{view:clone(S),host:clone(net.state),revision:net.revision,random:__test.random},packets:clone(__test.packets).filter(p=>p.type==='card-gesture')};});assert.deepEqual(r.after,r.before);assert.equal(r.packets.length>=2,true);for(const p of r.packets){assert.equal(p.matchId,'test');assert.equal(p.revision,1);assert.equal(p.actor,0);assert.equal('cardId'in p,false);assert.equal('suit'in p,false);assert.equal('rank'in p,false);}}finally{await browser.close();}});
+
+test('host relays a remote Eight drag preview without applying a move',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','online');const r=await t.page.evaluate(()=>{net.gameId='huit';net.state.turn=1;S.turn=1;let seen=null;window.addEventListener('salon:remote-card-gesture',e=>seen=clone(e.detail),{once:true});const before={state:clone(net.state),revision:net.revision,random:__test.random},conn=net.seats[1].conn;const handled=receiveSocial({type:'card-gesture',matchId:net.matchId,revision:net.revision,gesture:7,phase:'move',progress:.44,lateral:-.18},1,conn);return{handled,seen,before,after:{state:clone(net.state),revision:net.revision,random:__test.random}};});assert.equal(r.handled,true);assert.deepEqual(r.after,r.before);assert.equal(r.seen.actor,1);assert.equal(r.seen.gesture,7);assert.equal(r.seen.phase,'move');assert.equal(r.seen.progress,.44);assert.equal(r.seen.lateral,-.18);}finally{await browser.close();}});
 
 test('Eight 3D staging keeps opponent motion presentation-only',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
