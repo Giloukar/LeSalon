@@ -132,3 +132,31 @@ Adaptations de centre de table :
 - Enchères : lot courant et enchères telles qu’elles existent dans la projection cliente.
 
 Pour Enchères, un bid adverse projeté sous la forme `{hidden:true}` reste un simple dos de carte dans Three.js. Le renderer ne tente jamais de retrouver sa valeur depuis un identifiant ou depuis l’état hôte.
+
+
+## Adaptateurs 3D — Pouilleux, 99, Vingt-et-un et Bataille
+
+Ces quatre jeux réutilisent les mêmes cartes procédurales mais gardent des adaptateurs distincts, car leur interaction centrale diffère.
+
+Pouilleux :
+- la main propre reste visible ;
+- la main cible n’est représentée que par des dos de cartes et des indices de position ;
+- toucher un dos appelle l’action `pick(index)` existante.
+
+99 :
+- le total, le sens et la dernière carte viennent de l’état ;
+- la 3D ne fait que sélectionner une carte localement ;
+- les choix As +1/+11 et la validation restent entièrement dans `play99()` et les commandes existantes.
+
+Vingt-et-un :
+- la main locale et la banque sont représentées depuis un payload explicitement filtré ;
+- tant que `dealerRevealed` est faux, toute carte de banque après la première devient `{hidden:true}` dans le payload 3D, y compris en local ;
+- la phase de mise conserve le panneau 2D existant pour ne pas dupliquer les contrôles de jetons.
+
+Bataille :
+- les paquets joueurs sont uniquement représentés par leur taille et des dos ;
+- `battleReveal` est désormais aussi filtré dans `projectGame()` : une carte de guerre face cachée ne transporte plus sa valeur dans la projection cliente ;
+- seules les cartes `hidden:false` peuvent être dessinées face visible ;
+- l’action `battle` reste le seul déclencheur du moteur.
+
+Cette PR renforce donc la confidentialité réseau de Bataille indépendamment de la 3D.
