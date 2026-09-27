@@ -47,7 +47,7 @@ function cardBackTexture(){
 export function createTable3DRenderer({onFatal}={}){
   let renderer=null,scene=null,camera=null,host=null,canvas=null,resizeObserver=null;
   let active=false,current=null,drag=null,hovered=null;
-  const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2(),dragPlane=new THREE.Plane(new THREE.Vector3(0,1,0),-1.02);
+  const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2(),dragPlane=new THREE.Plane(new THREE.Vector3(0,1,0),-(TABLE_Y+.62));
   const interactive=[],faceTextures=new Map(),frontMaterials=new Map();
   const disposableTextures=[];
   const cardGeometry=new THREE.BoxGeometry(CARD_W,CARD_H,CARD_D,1,1,1);
@@ -156,9 +156,11 @@ export function createTable3DRenderer({onFatal}={}){
 
     const deckCount=Array.isArray(s.deck)?s.deck.length:Number(s.deckCount||0);
     for(let i=0;i<Math.min(5,Math.max(1,deckCount));i++){
-      const mesh=cardMesh(null,{back:true,interactiveCard:i===Math.min(5,Math.max(1,deckCount))-1});
-      mesh.userData.kind=i===Math.min(5,Math.max(1,deckCount))-1?'deck':'card';
-      if(mesh.userData.kind==='deck')mesh.userData.interactive=!!payload.canInteract;
+      const topDeck=i===Math.min(5,Math.max(1,deckCount))-1;
+      const mesh=cardMesh(null,{back:true});
+      mesh.userData.kind=topDeck?'deck':'card';
+      mesh.userData.interactive=topDeck&&!!payload.canInteract;
+      if(mesh.userData.interactive)interactive.push(mesh);
       placeCard(mesh,-1.25,.05,TABLE_Y+.07+i*.035,-.025+i*.012,1);
     }
     const top=s.discard?.at?.(-1);
@@ -219,7 +221,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(e.pointerId!==drag.pointerId||drag.kind!=='card')return;
     const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;if(!drag.moved&&Math.hypot(dx,dy)>6)drag.moved=true;
     if(!drag.moved)return;
-    updatePointer(e);const p=new THREE.Vector3();if(raycaster.ray.intersectPlane(dragPlane,p)){drag.mesh.position.set(p.x,1.02,p.z);drag.mesh.rotation.set(-Math.PI/2,0,(dx*.0025));}
+    updatePointer(e);const p=new THREE.Vector3();if(raycaster.ray.intersectPlane(dragPlane,p)){drag.mesh.position.set(p.x,TABLE_Y+.62,p.z);drag.mesh.rotation.set(-Math.PI/2,0,(dx*.0025));}
     const near=Math.hypot(drag.mesh.position.x-1.25,drag.mesh.position.z-.05)<1.45;dropMarker.material.opacity=near ? .82 : .2;draw();e.preventDefault();
   }
   function finishDrag(e,cancelled=false){
