@@ -1,0 +1,63 @@
+# Contrat d’intégration des modèles 3D
+
+Cette couche permet de remplacer progressivement les géométries procédurales de la table par des modèles GLB/GLTF sans modifier les moteurs de jeu.
+
+## Principe
+
+Les règles, l’état autoritatif et le réseau ne connaissent jamais les modèles 3D. Le renderer demande un objet visuel au registre `window.SalonTable3DAssets`. Si aucun modèle n’est disponible, le placeholder procédural existant est utilisé.
+
+Une factory doit retourner synchroniquement un `THREE.Object3D` neuf ou cloné. Pour un GLB chargé de manière asynchrone, chargez d’abord la ressource puis enregistrez la factory : le renderer actif se rafraîchit automatiquement dès l’enregistrement.
+
+## Familles disponibles
+
+| kind | Contexte principal | Taille canonique |
+| --- | --- | --- |
+| `card` | `card`, `back`, `id`, `playable` | 1.22 × 1.78 × 0.045 |
+| `rummikub-tile` | `tile`, `selected` | 0.62 × 0.90 × 0.085 |
+| `die` | `value`, `blank` | arête 0.68 |
+| `pawn` | `color` | rayon 0.24, hauteur 0.46 |
+| `golf-ball` | `sunk`, `stroke` | rayon 0.13 |
+| `golf-obstacle` | `radius`, `source` | rayon fourni |
+| `golf-portal` | `sunk` | rayon 0.31 |
+| `code-gem` | `value`, `symbol`, `color`, `revealed`, `index` | rayon 0.50 |
+| `balloon` | `pumps`, `pot`, `risk`, `scale` | rayon de base 1 |
+| `metropole-house` | `cellIndex`, `houseIndex`, `count`, `owner` | 0.19 × 0.25 × 0.19 |
+| `metropole-owner-marker` | `cellIndex`, `owner`, `color` | rayon 0.09, hauteur 0.22 |
+
+Chaque contexte contient également `THREE`, `kind` et `canonicalSize`.
+
+## Exemple de branchement d’un GLB déjà chargé
+
+```js
+const template = gltf.scene;
+
+const unregister = window.SalonTable3DAssets.register('pawn', ({ color }) => {
+  const model = template.clone(true);
+  model.scale.setScalar(0.46);
+  model.traverse(node => {
+    if (node.isMesh && node.material) {
+      node.material = node.material.clone();
+      node.material.color?.set(color);
+    }
+  });
+  return model;
+});
+```
+
+Le modèle peut être un `Mesh`, un `Group` ou n’importe quel `Object3D`. Les enfants sont automatiquement pris en compte par le raycasting ; les interactions restent attachées à la racine logique de l’objet.
+
+## Règles à respecter pour les futurs assets
+
+- Ne jamais écrire dans `S`, `net.state`, Supabase ou PeerJS depuis une factory.
+- Ne jamais calculer une règle ou un résultat de jeu dans le modèle.
+- Ne pas utiliser `Math.random()` pour une décision qui pourrait influencer le gameplay.
+- Retourner une instance indépendante lorsque l’objet peut être animé ou déplacé.
+- Normaliser l’origine du modèle autour de son centre logique et utiliser l’axe Y comme verticale.
+- Utiliser les dimensions canoniques comme cible de mise à l’échelle afin que les layouts existants restent valides.
+- Les textures, matériaux et animations propres au modèle peuvent évoluer librement tant qu’ils restent purement visuels.
+
+## Chargement progressif
+
+Le registre est observable. Quand une factory est ajoutée ou retirée, la scène 3D active se reconstruit immédiatement à partir du même état autoritatif. Cela permet de charger un pack de modèles en arrière-plan puis de le rendre disponible sans redémarrer la partie.
+
+Le fallback procédural reste permanent : retirer une factory ou rencontrer une erreur dans celle-ci ne doit jamais empêcher la partie de continuer.
