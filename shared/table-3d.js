@@ -408,6 +408,15 @@ export function createTable3DRenderer({onFatal}={}){
       handCounts:players.map(p=>(p?.hand||[]).filter(Boolean).length)
     };
   }
+  function ninetySnapshot(payload,ninety,own){
+    const s=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0,players=s?.players||[];
+    return{
+      key:[s?.startedAt||'',viewer,players.map(p=>p?.name||'').join('|')].join('~'),
+      viewer,turn:Number(s?.turn??0),deckCount:Math.max(0,Number(ninety?.deckCount)||0),
+      lastId:ninety?.last?.id||null,last:visualCardSnapshot(ninety?.last),
+      ownIds:(own||[]).map(c=>c?.id).filter(Boolean),handCounts:players.map(p=>p?.hand?.length||0)
+    };
+  }
   function queueCardFlight(mesh,from,to,{duration=620,delay=0,lift=.8,onDone=null,fromRot=0,toRot=0,bank=.10,roll=.08,fromScale=null,toScale=null}={}){
     mesh.position.copy(from);mesh.rotation.set(-Math.PI/2,0,fromRot);
     if(fromScale)mesh.scale.copy(fromScale);
