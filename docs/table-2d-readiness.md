@@ -71,3 +71,20 @@ Le prototype couvre :
 - perte WebGL ou échec de chargement ramenant localement en 2D.
 
 Le switch 2D/3D n’est affiché que pour le 8 américain tant que les autres jeux n’ont pas d’adapter 3D. Les modèles finaux ne sont pas encore nécessaires : la prochaine phase peut continuer avec cartes, dés, pions et tuiles procéduraux, puis remplacer ces géométries par des GLB sans toucher au moteur de jeu.
+
+
+## Dice3D et Jeu de l’oie
+
+Le renderer commun couvre désormais une deuxième famille de jeux : plateau + pions + dés.
+
+Pour le Jeu de l’oie :
+- les 63 coordonnées viennent de `CELL_COORDS` existant ;
+- les destinations autorisées viennent de `legacyGooseTarget()` ;
+- les valeurs des dés viennent exclusivement de `S.dice` ;
+- les dés 3D tournent visuellement mais terminent sur les valeurs déjà décidées par le moteur ;
+- les cases autorisées sont éclairées et cliquables ;
+- les pions utilisent `S.path` pour suivre visuellement le déplacement déjà résolu par les règles ;
+- grains, cases Oie et cases spéciales sont des représentations de données fournies au renderer, pas une seconde implémentation des règles ;
+- le renderer Three.js n’utilise aucun `Math.random()`.
+
+Cette couche `Dice3D` et les géométries de pion/tile sont conçues pour être réutilisées ensuite par Yam, Ferme la boîte et les autres jeux concernés.

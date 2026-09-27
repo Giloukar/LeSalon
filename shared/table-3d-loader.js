@@ -25,7 +25,7 @@ view.register('3d',{
   },
   activate(){renderer?.activate?.()},
   render(payload){
-    if(payload?.gameId!=='huit'){view.fallback('unsupported-game');return}
+    if(!['huit','oie'].includes(payload?.gameId)){view.fallback('unsupported-game');return}
     renderer?.render?.(payload);
   },
   deactivate(){renderer?.deactivate?.()},
