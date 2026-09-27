@@ -1458,7 +1458,11 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.gestureEnabled){
       if(!d.gestureStarted){d.gestureStarted=true;emitLocalCardGesture('start',0,0)}
       const gesture=cardGestureCoordinates(d.mesh,d.gestureHome);emitLocalCardGesture('move',gesture.progress,gesture.lateral);
-      d.overDrop=directCardDropNear(d);if(dropMarker?.visible)dropMarker.material.opacity=d.overDrop?.82:.2;
+      d.overDrop=directCardDropNear(d);
+      const target=cardGestureTarget(current?.gameId,TABLE_Y+.025);showDropMarkerAt(target.x,target.z,d.overDrop);
+    }else if(d.kind==='rummi-tile'&&current?.gameId==='rummikub'){
+      d.rummiDrop=rummiDropTarget(d.mesh.position);
+      if(d.rummiDrop)showDropMarkerAt(d.rummiDrop.x,d.rummiDrop.z,true);else showDropMarkerAt(0,0,false);
     }
     draw();e.preventDefault();return true;
   }
@@ -1466,17 +1470,31 @@ export function createTable3DRenderer({onFatal}={}){
   function directCardDropNear(d,game=current?.gameId){
     const target=cardGestureTarget(game),radius=cardDropRadius(d);return Math.hypot(d.mesh.position.x-target.x,d.mesh.position.z-target.z)<radius;
   }
-  function rummiDropDestination(position){
+  function showDropMarkerAt(x,z,active=true){
+    if(!dropMarker)return;
+    dropMarker.visible=!!active;
+    if(active){dropMarker.position.set(x,TABLE_Y+.025,z);dropMarker.material.opacity=.82}
+    else dropMarker.material.opacity=.2;
+  }
+  function rummiDropTarget(position){
     const data=current?.viewData?.rummi;if(!data||!position)return null;
     const groups=data.table||[],layout=rummiBoardLayout(groups);
+    let best=null;
     for(let order=0;order<layout.active.length;order++){
       const entry=layout.active[order],col=order%layout.cols,row=Math.floor(order/layout.cols),cx=(col-(layout.cols-1)/2)*layout.cellW,cz=layout.baseZ+row*layout.cellD;
-      if(Math.abs(position.x-cx)<=layout.cellW*.48&&Math.abs(position.z-cz)<=layout.cellD*.42)return entry.index;
+      const dx=Math.abs(position.x-cx),dz=Math.abs(position.z-cz);
+      if(dx<=layout.cellW*.47&&dz<=Math.min(.78,layout.cellD*.38)){
+        const score=dx/Math.max(.1,layout.cellW)+dz/Math.max(.1,layout.cellD);
+        if(!best||score<best.score)best={dest:entry.index,x:cx,z:cz,score};
+      }
     }
-    if(position.z>1.18)return 'hand';
-    if(position.z<1.25)return 'new';
+    if(best)return best;
+    if(position.z>=1.72&&Math.abs(position.x)<=4.45)return{dest:'hand',x:Math.max(-3.4,Math.min(3.4,position.x)),z:2.18,score:0};
+    const tableMinZ=layout.baseZ-.72,tableMaxZ=layout.baseZ+(layout.rows-1)*layout.cellD+.72;
+    if(position.z>=tableMinZ&&position.z<=tableMaxZ&&Math.abs(position.x)<=4.65)return{dest:'new',x:position.x,z:position.z,score:0};
     return null;
   }
+  function rummiDropDestination(position){return rummiDropTarget(position)?.dest??null}
   function onPointerDown(e){
     if(!active)return;
     const obj=hit(e);setHover(obj);if(!obj)return;
@@ -1509,6 +1527,7 @@ export function createTable3DRenderer({onFatal}={}){
   function finishDrag(e,cancelled=false){
     if(!drag||e.pointerId!==drag.pointerId)return;
     const d=drag;drag=null;host?.classList.remove('is-dragging');dropMarker.material.opacity=.2;
+    if(d.loose&&d.kind!=='card')dropMarker.visible=false;
     if(cancelled){if(d.kind==='card'&&d.canPlay||d.loose&&d.gestureStarted)emitLocalCardGesture('cancel',0,0);if(d.loose)returnManipulatedCard(d,{snap:document.hidden});else{syncCurrent(current);draw()}return}
     const tap=Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
     if(d.loose&&!tap){
@@ -1524,7 +1543,7 @@ export function createTable3DRenderer({onFatal}={}){
         if(current?.interactions?.specialCard?.('drop',d.cardId)){emitLocalCardGesture('commit',1,0);return}
       }
       if(d.kind==='rummi-tile'){
-        const dest=rummiDropDestination(d.mesh.position);
+        const dest=d.rummiDrop?.dest??rummiDropDestination(d.mesh.position);
         if(dest!==null){rememberRummiDropOrigin(d.tileId,d.mesh);if(current?.interactions?.rummi?.('drop',{id:d.tileId,dest}))return}
       }
       if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d);return
