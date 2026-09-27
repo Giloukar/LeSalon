@@ -373,3 +373,12 @@ La préparation aux futurs modèles ne nécessite plus d'écrire les factories �
 Le chargement se fait hors du moteur de jeu et GLTFLoader n'est importé qu'à la demande. Les scènes skinnées sont clonées via SkeletonUtils, les corrections de scale/rotation/offset restent à l'intérieur d'un wrapper manipulé par le renderer, et un échec individuel laisse automatiquement le placeholder procédural de cet asset.
 
 Le chargeur expose aussi un cycle de vie explicite (`load`, `unload`, `unloadAll`, `active`) et des événements de progression, ce qui permettra de connecter les futurs fichiers fournis au site sans modifier les jeux ni redémarrer une partie.
+
+
+## Flux physique des cartes — passe 2
+
+Le 8 américain anime maintenant aussi les transitions du joueur local à partir de l'état confirmé : lorsqu'une carte est jouée par clic ou déposée légalement, son ancienne position dans la main est reconstruite depuis le snapshot précédent puis la carte rejoint la défausse avec une trajectoire en arc. Lors d'une pioche, les nouvelles cartes sont identifiées par leurs IDs projetés, masquées à leur emplacement final pendant le vol, puis révélées une fois arrivées. Ces animations restent déterministes et strictement postérieures à la validation du moteur.
+
+Les vols de cartes utilisent désormais une légère inclinaison sur les axes X/Y en plus de la rotation de table, ce qui évite l'effet de translation parfaitement plate tout en conservant une orientation exacte à l'atterrissage. Aucun aléa de gameplay n'est introduit.
+
+Cactus bénéficie d'un geste physique spécifique : une carte éligible au jet rapide peut être glissée vers la défausse pour tenter le jet au lieu de devoir uniquement la toucher. Le mouvement est visible en direct par les autres joueurs, même hors tour, mais le paquet de présence ne contient toujours aucune identité, valeur ou couleur de carte. L'hôte autorise ce flux hors tour uniquement dans les phases où le jet rapide est réellement disponible ; le coup lui-même continue de passer par l'interaction Cactus autoritative existante.
