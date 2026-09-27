@@ -557,8 +557,46 @@ export function createTable3DRenderer({onFatal}={}){
     if(status)status.textContent=data.caller!==null?'Dernier tour · Cactus annoncé':data.phase==='peek'?'Mémorisez vos deux cartes':data.phase==='draw'?'Pioche ou défausse':data.phase==='swap'?'Échangez une carte':data.phase==='power'?'Pouvoir du 8':data.phase==='reveal'?'Mémorisez la carte':'Table synchronisée';
     if(help)help.textContent=data.phase==='peek'||data.phase==='reveal'?'Utilisez « C’est mémorisé » sous la table':data.phase==='draw'?'Cliquez la pioche ou la défausse · vos cartes permettent aussi le jet rapide':data.phase==='swap'?'Cliquez une de vos cartes pour l’échanger':data.phase==='power'?'Cliquez une de vos cartes pour la regarder':'Les cartes restent cachées comme dans la vue 2D';
   }
+  function cityWorld(index){
+    const side=Math.floor(index/6),step=index%6;
+    if(side===0)return new THREE.Vector3(-4.35+step*1.45,TABLE_Y+.13,3.05);
+    if(side===1)return new THREE.Vector3(4.35,TABLE_Y+.13,3.05-step*1.02);
+    if(side===2)return new THREE.Vector3(4.35-step*1.45,TABLE_Y+.13,-3.05);
+    return new THREE.Vector3(-4.35,TABLE_Y+.13,-3.05+step*1.02);
+  }
+  function cityCellMaterial(cell,owner,mortgaged,colors){
+    const color=cell?.type==='property'?(colors?.[cell.group]||'#8c9a86'):cell?.type==='chance'?'#9d7fb1':cell?.type==='tax'?'#b16f67':cell?.type==='gojail'?'#8e5b5b':cell?.type==='jail'?'#8b806c':'#718277';
+    return new THREE.MeshStandardMaterial({color:new THREE.Color(color),roughness:.86,metalness:.02,emissive:mortgaged?0x351d1d:owner>=0?0x172018:0x000000,emissiveIntensity:mortgaged?.42:owner>=0?.18:0});
+  }
+  function syncMetropole(payload){
+    clearObjects();dropMarker.visible=false;
+    const s=payload.state,data=payload.viewData?.city||{},board=data.board||[],owners=data.owners||[],houses=data.houses||[],mortgaged=data.mortgaged||[],colors=data.colors||[],playerColors=data.playerColors||[];
+    camera.position.set(0,9.35,9.9);camera.lookAt(0,.1,0);
+    const boardBase=new THREE.Mesh(new THREE.BoxGeometry(10.4,.18,7.45),new THREE.MeshStandardMaterial({color:0x243a30,roughness:.94}));boardBase.position.y=TABLE_Y-.02;boardBase.receiveShadow=true;boardBase.userData.temporaryMaterial=boardBase.material;objects.add(boardBase);
+    board.forEach((cell,i)=>{
+      const p=cityWorld(i),owner=owners[i]??-1,mat=cityCellMaterial(cell,owner,!!mortgaged[i],colors),tile=new THREE.Mesh(new THREE.BoxGeometry(1.28,.16,.88),mat);
+      tile.position.copy(p);tile.castShadow=true;tile.receiveShadow=true;tile.userData.temporaryMaterial=mat;objects.add(tile);
+      const label=makeLabel((i===0?'DÉPART · ':'')+(cell.name||('Case '+i)),mortgaged[i]?'#d69b96':owner>=0?(playerColors[owner]||'#dbea9e'):'#e5e9e3');label.scale.set(1.2,.26,1);label.position.set(p.x,TABLE_Y+.34,p.z);objects.add(label);
+      const count=Math.min(3,Number(houses[i]||0));for(let h=0;h<count;h++){const houseMat=new THREE.MeshStandardMaterial({color:0xdbea9e,roughness:.72}),house=new THREE.Mesh(new THREE.BoxGeometry(.19,.25,.19),houseMat);house.position.set(p.x+(h-1)*.24,TABLE_Y+.34,p.z-.27);house.userData.temporaryMaterial=houseMat;objects.add(house)}
+      if(owner>=0){const ownMat=new THREE.MeshStandardMaterial({color:new THREE.Color(playerColors[owner]||'#dbea9e'),roughness:.72}),peg=new THREE.Mesh(new THREE.CylinderGeometry(.07,.09,.22,12),ownMat);peg.position.set(p.x+.47,TABLE_Y+.34,p.z+.25);peg.userData.temporaryMaterial=ownMat;objects.add(peg)}
+    });
+    (data.players||[]).forEach((pl,i)=>{
+      if(pl.out)return;const p=cityWorld(Number(pl.pos)||0),pawn=new THREE.Mesh(pawnGeometry,pawnMaterial(playerColors[i]||['#dbea9e','#aacdf7','#e4ad91','#c9afe7'][i%4]));pawn.position.set(p.x+((i%2)? .17:-.17),TABLE_Y+.48,p.z+(i>1?.17:-.17));pawn.castShadow=true;objects.add(pawn);
+      const tag=makeLabel((pl.name||'Joueur')+' · '+pl.cash+' ¤'+(pl.jailed?' · détenu':''),i===s.turn?'#dbea9e':'#d8ded9');tag.scale.set(1.65,.31,1);tag.position.set(pawn.position.x,TABLE_Y+.92,pawn.position.z);objects.add(tag);
+    });
+    const dice=Array.isArray(data.dice)?data.dice:[1,1],key='city|'+(s?.moves??0)+'|'+dice.join('-'),animate=s?.moves>0&&key!==lastDiceKey;if(animate)lastDiceKey=key;
+    dice.forEach((value,i)=>{const die=dieMesh(value);die.position.set(-.52+i*1.04,TABLE_Y+.78,.05);objects.add(die);if(animate&&!matchMedia('(prefers-reduced-motion: reduce)').matches){const h=visualHash(key+'|'+i);die.rotation.set(5+h*4,7+h*5,4+h*6);diceAnimations.push({mesh:die,start:performance.now(),duration:620+i*70,rx:die.rotation.x,ry:die.rotation.y,rz:die.rotation.z})}});
+    if(payload.canInteract&&data.phase==='roll'){const roll=actionSprite('LANCER LES DÉS','city-roll');roll.position.set(0,1.05,1.45);objects.add(roll)}
+    const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
+    if(title)title.textContent='VUE 3D · MÉTROPOLE';
+    if(status)status.textContent='Tour '+(data.lap||1)+' / 20 · '+(data.players?.[s.turn]?.name||'Joueur')+' · '+(data.phase==='debt'?'dette '+(data.debt?.amount||0)+' ¤':data.phase==='buy'?'achat proposé':data.phase==='roll'?'prêt à lancer':'gestion');
+    if(help)help.textContent=data.phase==='roll'&&payload.canInteract?'Cliquez pour lancer · achats, constructions et finances restent dans le panneau 2D':'Le plateau 3D reflète exactement les propriétés, maisons et positions du moteur';
+    if(diceAnimations.length)startMotion();
+  }
+
   function syncCurrent(payload){
-    if(payload?.gameId==='rummikub')syncRummikub(payload);
+    if(payload?.gameId==='metropole')syncMetropole(payload);
+    else if(payload?.gameId==='rummikub')syncRummikub(payload);
     else if(payload?.gameId==='cactus')syncCactus(payload);
     else if(payload?.gameId==='huit')syncEight(payload);
     else if(payload?.gameId==='oie')syncGoose(payload);
@@ -598,7 +636,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,kind:'deck',startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(obj.userData.kind==='card-select'){drag={pointerId:e.pointerId,kind:'card-select',cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(['maid-pick','special-select','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
-    if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close'].includes(obj.userData.kind)){
+    if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
       drag={pointerId:e.pointerId,kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return;
     }
@@ -633,6 +671,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='rummi-dest'){if(tap)current?.interactions?.rummi?.('move',d.dest);return}
     if(d.kind==='deck'){if(tap)current?.interactions?.draw?.();return}
     if(d.kind==='goose-roll'||d.kind==='goose-choice'){if(tap)current?.interactions?.goose?.(d.kind==='goose-roll'?'roll':'choose',d.steps);return}
+    if(d.kind==='city-roll'){if(tap)current?.interactions?.city?.('roll');return}
     if(d.kind==='yam-roll'||d.kind==='yam-hold'){if(tap)current?.interactions?.yam?.(d.kind==='yam-hold'?'hold':'roll',d.index);return}
     if(d.kind==='box-roll'||d.kind==='box-toggle'||d.kind==='box-close'){
       if(tap)current?.interactions?.box?.(d.kind==='box-roll'?'roll':d.kind==='box-toggle'?'toggle':'close',d.kind==='box-roll'?d.count:d.number);return;

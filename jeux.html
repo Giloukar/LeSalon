@@ -3116,7 +3116,7 @@ playSceneAction=function(ctx){
 const TABLE_VIEW_2D_RENDER=renderGame,TABLE_VIEW_SHOW_HOME=showHome;
 const TABLE_3D_CARD_GAMES=['president','menteur','suites','plis','encheres'];
 const TABLE_3D_SPECIAL_CARD_GAMES=['pouilleux','quatrevingtdixneuf','vingtetun','bataille'];
-function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite','cactus','rummikub',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
+function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite','cactus','rummikub','metropole',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
 function tableViewMountControl(){
  if(!window.SalonTableView)return;
  const supported=tableViewSupports3D();
@@ -3166,6 +3166,22 @@ if(window.SalonTableView){
     source:canPlay()?S.source:null,
     reveal:S.reveal?{owner:S.reveal.owner,index:S.reveal.index}:null,
     players:S.players.map((p,i)=>({name:p.name,score:p.cactusScore,hand:p.hand.map((c,index)=>c?clone(c):null),quick:legacyCactusOwnQuickAllowed(i)&&!((i===S.turn)&&['swap','power','reveal','peek'].includes(S.phase))}))
+   };
+  }
+  if(S?.id==='metropole'){
+   data.city={
+    board:CITY_BOARD.map((c,i)=>({name:c.name,type:c.type,group:c.group??-1,price:c.price??0,rent:c.type==='property'&&S.owners[i]>=0?cityRent(S,i):0})),
+    colors:CITY_COLORS.slice(),
+    playerColors:COLORS.slice(),
+    owners:[...S.owners],
+    houses:[...S.houses],
+    mortgaged:[...S.mortgaged],
+    dice:[...S.dice],
+    lap:S.lap,
+    phase:S.phase,
+    offer:S.offer??null,
+    debt:S.debt?{amount:S.debt.amount,reason:S.debt.reason}:null,
+    players:S.players.map(p=>({name:p.name,cash:p.cash,pos:p.pos,jailed:p.jailed,out:p.out}))
    };
   }
   if(S?.id==='rummikub'){
@@ -3279,6 +3295,11 @@ if(window.SalonTableView){
      else if(['president','menteur'].includes(S.id)){if(selection.size>=4){toast('Quatre cartes au maximum.');return false}selection.add(id)}
      else{selection.clear();selection.add(id)}
      renderGame(false);return true;
+    },
+    city(type){
+     if(!S||S.id!=='metropole'||!canPlay())return false;
+     if(type==='roll'&&S.phase==='roll'){dispatch({type:'roll'});return true}
+     return false;
     },
     specialCard(type,value){
      if(!S||!TABLE_3D_SPECIAL_CARD_GAMES.includes(S.id)||!canPlay())return false;
