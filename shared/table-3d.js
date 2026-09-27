@@ -789,7 +789,7 @@ export function createTable3DRenderer({onFatal}={}){
     }
     if(data.discard){const mesh=cardMesh(data.discard,{interactiveCard:payload.canInteract&&data.phase==='draw'});mesh.userData.kind=payload.canInteract&&data.phase==='draw'?'cactus-take':'cactus-card';mesh.userData.interactive=payload.canInteract&&data.phase==='draw';placeCard(mesh,0,.1,TABLE_Y+.12,(visualHash(data.discard.id)-.5)*.12,.82);}
     if(data.drawn){const mesh=cardMesh(data.drawn);mesh.userData.kind='cactus-drawn';placeCard(mesh,1.35,.1,TABLE_Y+.14,0,.88);}
-    if(payload.canInteract){
+    if(payload.canInteract&&data.turn===viewer){
       if(data.phase==='peek'||data.phase==='reveal'){const ready=actionSprite('C’EST MÉMORISÉ','cactus-action',{command:'ready'},'#dbea9e');ready.position.set(0,1.04,1.18);objects.add(ready)}
       if(data.phase==='draw'&&data.caller===null){const call=actionSprite('CACTUS !','cactus-action',{command:'call'},'#e6d7b4');call.position.set(0,1.04,1.30);objects.add(call)}
       if(data.phase==='swap'&&data.source==='draw'){const discard=actionSprite('JETER LA PIOCHE','cactus-action',{command:'discard'},'#efaaa0');discard.position.set(2.55,1.04,.15);objects.add(discard)}
