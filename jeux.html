@@ -3453,6 +3453,13 @@ if(window.SalonTableView){
       const dest=value,ids=[...selection];if(!ids.length)return false;
       dispatch({type:'move',ids,dest});selection.clear();return true;
      }
+     if(type==='drop'&&value&&typeof value==='object'){
+      const id=String(value.id||''),dest=value.dest,pool=[...player(S).hand,...S.table.flat()];
+      if(!pool.some(t=>t.id===id)||!(dest==='new'||dest==='hand'||Number.isInteger(dest)&&dest>=0&&dest<S.table.length))return false;
+      const ids=selection.has(id)?[...selection]:[id];if(!ids.length||ids.some(tileId=>!pool.some(t=>t.id===tileId)))return false;
+      const old=new Set(S.refTable.flat().map(t=>t.id));if(dest==='hand'&&ids.some(tileId=>old.has(tileId)))return false;
+      dispatch({type:'move',ids,dest});selection.clear();return true;
+     }
      if(['commit','draw','undo','undoStep'].includes(type)){dispatch({type});return true}
      return false;
     },
@@ -3489,6 +3496,23 @@ if(window.SalonTableView){
      else if(['president','menteur'].includes(S.id)){if(selection.size>=4){toast('Quatre cartes au maximum.');return false}selection.add(id)}
      else{selection.clear();selection.add(id)}
      renderGame(false);return true;
+    },
+    cardDrop(id){
+     if(!S||!TABLE_3D_CARD_GAMES.includes(S.id)||!canPlay()||typeof id!=='string')return false;
+     const c=player(S).hand.find(c=>c.id===id);if(!c)return false;
+     if(S.id==='president'){
+      const ids=selection.has(id)?[...selection]:[id],cards=player(S).hand.filter(c=>ids.includes(c.id));
+      if(!presidentLegal(S,cards))return false;dispatch({type:'play',ids});return true;
+     }
+     if(S.id==='menteur'){
+      if(S.phase!=='play')return false;const ids=selection.has(id)?[...selection]:[id];
+      if(ids.length<1||ids.length>4||ids.some(cardId=>!player(S).hand.some(c=>c.id===cardId)))return false;
+      dispatch({type:'play',ids});return true;
+     }
+     if(S.id==='suites'){if(!suitesLegal(S,c))return false;dispatch({type:'card',id});return true}
+     if(S.id==='plis'){if(S.phase!=='play'||!tricksLegal(S,c))return false;dispatch({type:'card',id});return true}
+     if(S.id==='encheres'){if(S.phase!=='play'||S.bids?.[S.turn])return false;dispatch({type:'bid',id});return true}
+     return false;
     },
     cardAction(type){
      if(!S||!TABLE_3D_CARD_GAMES.includes(S.id)||!canPlay())return false;
@@ -3564,6 +3588,11 @@ if(window.SalonTableView){
        selection.clear();selection.add(id);renderGame(false);return true;
       }
       if(type==='play'&&value&&typeof value.id==='string'&&[1,11].includes(Number(value.ace||1))){dispatch({type:'card',id:value.id,ace:Number(value.ace||1)});return true}
+      if(type==='drop'&&typeof value==='string'){
+       const c=player(S).hand.find(c=>c.id===value);if(!c)return false;
+       if(c.rank===1){const can1=legal99(S,c,1),can11=legal99(S,c,11);if(can1===can11)return false;dispatch({type:'card',id:c.id,ace:can11?11:1});return true}
+       if(!legal99(S,c,1))return false;dispatch({type:'card',id:c.id,ace:1});return true;
+      }
       if(type==='bust'){dispatch({type:'bust'});return true}
      }
      if(S.id==='vingtetun'){
