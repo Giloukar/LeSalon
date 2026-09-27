@@ -3142,7 +3142,7 @@ if(window.SalonTableView){
   if(S?.id==='huit'&&canPlay()&&!showSuit)data.playableIds=mine.filter(c=>eightLegal(S,c)).map(c=>c.id);
   if(S?.id==='oie'){
    const d=S.goosePending?.dice||[],steps=d.length===2?[d[0],d[1],d[0]+d[1]]:[];
-   data.boardCoords=CELL_COORDS.map(p=>p.slice());data.gooseCells=[...GEESE];data.choiceTargets=steps.map(n=>legacyGooseTarget(player(S).pos,n));
+   data.boardCoords=CELL_COORDS.map(p=>p.slice());data.gooseCells=[...GEESE];data.gooseChoices=steps.map(n=>({steps:n,target:legacyGooseTarget(player(S).pos,n)}));data.choiceTargets=data.gooseChoices.map(x=>x.target);
    data.specialCells={bridge:6,inn:19,well:31,maze:42,prison:52,skull:58,goal:63};data.playerColors=COLORS.slice();
   }
   return window.SalonTableView.render({
