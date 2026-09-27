@@ -1014,10 +1014,18 @@ export function createTable3DRenderer({onFatal}={}){
 
     const hand=data.hand||[],drawPos=new THREE.Vector3(4.55,TABLE_Y+.43,2.35),deckCount=Math.max(0,Number(data.deckCount)||0);
     if(deckCount){
-      for(let i=0;i<Math.min(4,deckCount);i++){
-        const hidden=rummiHiddenTileMesh();hidden.position.set(drawPos.x,drawPos.y+i*.026,drawPos.z);hidden.rotation.x=-Math.PI/2;hidden.rotation.z=.025*i;hidden.scale.setScalar(.82);objects.add(hidden);
+      const visiblePile=Math.min(4,deckCount);
+      for(let i=0;i<visiblePile;i++){
+        const hidden=rummiHiddenTileMesh(),top=i===visiblePile-1;hidden.position.set(drawPos.x,drawPos.y+i*.026,drawPos.z);hidden.rotation.x=-Math.PI/2;hidden.rotation.z=.025*i;hidden.scale.setScalar(.82);
+        if(top&&data.canMove){
+          hidden.userData.home={position:hidden.position.clone(),rotation:hidden.rotation.clone(),scale:hidden.scale.clone()};
+          makeLooseManipulable(hidden,{kind:'rummi-draw',tapEnabled:true});
+        }
+        objects.add(hidden);
       }
-      const drawLabel=makeLabel('PIOCHE · '+deckCount,'#d8ded9');drawLabel.position.set(drawPos.x,1.04,drawPos.z-.70);drawLabel.scale.set(2.2,.46,1);objects.add(drawLabel);
+      const drawLabel=makeLabel('PIOCHE · '+deckCount+(data.canMove?' · TOUCHEZ / GLISSEZ':''),'#d8ded9');drawLabel.position.set(drawPos.x,1.04,drawPos.z-.70);drawLabel.scale.set(2.35,.46,1);objects.add(drawLabel);
+    }else{
+      const empty=makeLabel('PIOCHE VIDE','#9da8a0');empty.position.set(drawPos.x,1.02,drawPos.z-.25);empty.scale.set(1.8,.42,1);objects.add(empty);
     }
 
     hand.forEach((tile,i)=>{
@@ -1055,10 +1063,24 @@ export function createTable3DRenderer({onFatal}={}){
       const toHand=actionSprite('AU CHEVALET','rummi-dest',{dest:'hand'},'#d8ded9');toHand.position.set(2.15,1.02,actionZ);objects.add(toHand);
     }
 
+    if(data.canMove){
+      const controlX=-4.25;
+      if(data.canCommit){
+        const commit=actionSprite('VALIDER LE TOUR','rummi-action',{command:'commit'},'#dbea9e');commit.position.set(controlX,1.03,.82);commit.scale.set(1.72,.45,1);objects.add(commit);
+      }
+      if(Number(data.undoCount)>0){
+        const undoStep=actionSprite('ANNULER LE DERNIER','rummi-action',{command:'undoStep'},'#d8ded9');undoStep.position.set(controlX,1.03,.05);undoStep.scale.set(1.72,.42,1);objects.add(undoStep);
+        const reset=actionSprite('RECOMMENCER LE TOUR','rummi-action',{command:'undo'},'#e6d7b4');reset.position.set(controlX,1.03,-.72);reset.scale.set(1.72,.42,1);objects.add(reset);
+      }
+      if(!deckCount){
+        const pass=actionSprite('PASSER · PIOCHE VIDE','rummi-action',{command:'draw'},'#d8ded9');pass.position.set(3.95,1.03,1.15);pass.scale.set(1.85,.44,1);objects.add(pass);
+      }
+    }
+
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     if(title)title.textContent='VUE 3D · RUMMIKUB';
     if(status)status.textContent=(data.diagnostic?.text||(deckCount+' tuiles dans la pioche'))+' · '+layout.active.length+' groupe'+(layout.active.length>1?'s':'');
-    if(help)help.textContent=data.canMove?'Glissez une tuile directement vers un groupe, la table ou le chevalet · touchez pour sélectionner plusieurs tuiles':'Le chevalet actif reste privé · table commune synchronisée';
+    if(help)help.textContent=data.canMove?'Glissez les tuiles · touchez ou ramenez la pioche vers le chevalet · validez et annulez directement sur la table':'Le chevalet actif reste privé · table commune synchronisée';
   }
 
   function syncCactus(payload){
