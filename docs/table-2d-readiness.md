@@ -346,3 +346,12 @@ Les premières familles branchées sont :
 Une factory reçoit uniquement le contexte visuel nécessaire, ainsi que `THREE` et des dimensions canoniques. Le renderer accepte un `Object3D` ou un groupe complet : le raycasting remonte automatiquement vers la racine interactive. Si aucune factory n'est enregistrée, si elle retourne une valeur invalide ou si elle échoue, la géométrie procédurale actuelle reste le fallback.
 
 Cette API est volontairement extérieure aux règles, à `S`, à `net.state` et au protocole PeerJS. Elle constitue le point d'entrée prévu pour les futurs modèles GLB/GLTF : les assets pourront être remplacés progressivement sans modifier les moteurs ni les interactions autoritatives.
+
+
+## Assets spécialisés et remplacement à chaud
+
+Le registre d'assets couvre maintenant aussi les objets propres à plusieurs scènes : balle, obstacles et portail du Mini-golf, gemmes de Code Secret, ballon de Bulle ou Double, maisons et marqueurs de propriétaire de Métropole.
+
+Le renderer s'abonne au registre pendant sa durée de vie. Une factory enregistrée après l'ouverture de la vue 3D provoque une reconstruction purement visuelle de la scène depuis la même projection autoritative ; retirer la factory rétablit le placeholder procédural. Le chargement d'un GLB peut donc être asynchrone sans bloquer la partie : seule la factory finale doit être synchrone une fois le modèle disponible.
+
+Le contrat complet des factories, leurs contextes et leurs dimensions canoniques est décrit dans `docs/table-3d-assets.md`.
