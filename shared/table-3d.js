@@ -18,7 +18,9 @@ function canvasTexture(draw,w=512,h=720){
   return tex;
 }
 function roundRect(ctx,x,y,w,h,r){
-  ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.closePath();
+  ctx.beginPath();
+  if(typeof ctx.roundRect==='function')ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h);
+  ctx.closePath();
 }
 function cardFaceTexture(card){
   return canvasTexture((g,w,h)=>{
@@ -148,7 +150,7 @@ export function createTable3DRenderer({onFatal}={}){
   function tileMaterial(kind='normal',highlight=false){
     const key=kind+(highlight?'-hot':'');if(tileMaterials.has(key))return tileMaterials.get(key);
     const colors={normal:0xd8d3b5,goose:0xaabd8a,trap:0xc4a36e,danger:0x9e6b5e,goal:0xdbea9e};
-    const mat=new THREE.MeshStandardMaterial({color:colors[kind]||colors.normal,roughness:.9,emissive:highlight?0x6b7240:0x000000,emissiveIntensity:highlight?.42:0});
+    const mat=new THREE.MeshStandardMaterial({color:colors[kind]||colors.normal,roughness:.9,emissive:highlight?0x6b7240:0x000000,emissiveIntensity:highlight ? .42 : 0});
     tileMaterials.set(key,mat);return mat;
   }
   function pawnMaterial(color){
@@ -337,11 +339,13 @@ export function createTable3DRenderer({onFatal}={}){
 
   function activate(){active=true;init()}
   function deactivate(){
-    active=false;drag=null;hovered=null;resizeObserver?.disconnect();resizeObserver=null;host?.remove();host=null;
+    active=false;drag=null;hovered=null;diceAnimations.length=0;pawnAnimations.length=0;
+    if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
+    resizeObserver?.disconnect();resizeObserver=null;host?.remove();host=null;
     document.documentElement.removeAttribute('data-table-3d-game');
   }
   function destroy(){
-    deactivate();
+    deactivate();clearObjects();
     canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);
     cardGeometry.dispose();tileGeometry.dispose();pawnGeometry.dispose();dieGeometry.dispose();edgeMaterial.dispose();backMaterial.dispose();for(const m of frontMaterials.values())m.dispose();for(const m of tileMaterials.values())m.dispose();for(const m of pawnMaterials.values())m.dispose();for(const m of dieFaceMaterials.values())m.dispose();for(const m of cellLabelMaterials.values())m.dispose();for(const t of disposableTextures)t.dispose();for(const t of cellLabelTextures)t.dispose();
     tableMesh?.geometry?.dispose();tableMesh?.material?.dispose();dropMarker?.geometry?.dispose();dropMarker?.material?.dispose();renderer?.dispose();
