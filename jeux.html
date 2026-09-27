@@ -3116,7 +3116,7 @@ playSceneAction=function(ctx){
 const TABLE_VIEW_2D_RENDER=renderGame,TABLE_VIEW_SHOW_HOME=showHome;
 const TABLE_3D_CARD_GAMES=['president','menteur','suites','plis','encheres'];
 const TABLE_3D_SPECIAL_CARD_GAMES=['pouilleux','quatrevingtdixneuf','vingtetun','bataille'];
-function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite','cactus',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
+function tableViewSupports3D(){return !!S&&view==='game'&&['huit','oie','yam','boite','cactus','rummikub',...TABLE_3D_CARD_GAMES,...TABLE_3D_SPECIAL_CARD_GAMES].includes(S.id)}
 function tableViewMountControl(){
  if(!window.SalonTableView)return;
  const supported=tableViewSupports3D();
@@ -3168,6 +3168,22 @@ if(window.SalonTableView){
     players:S.players.map((p,i)=>({name:p.name,score:p.cactusScore,hand:p.hand.map((c,index)=>c?clone(c):null),quick:legacyCactusOwnQuickAllowed(i)&&!((i===S.turn)&&['swap','power','reveal','peek'].includes(S.phase))}))
    };
   }
+  if(S?.id==='rummikub'){
+   const mine=!gate&&!net.spectator?player(S).hand:[];
+   const oldIds=new Set(S.refTable.flat().map(t=>t.id));
+   data.rummi={
+    hand:clone(mine),
+    table:clone(S.table),
+    selectedIds:[...selection],
+    deckCount:S.deck.length,
+    opened:!!player(S).opened,
+    turn:S.turn,
+    refTableIds:[...oldIds],
+    canMove:!!canPlay(),
+    canMoveOld:!!player(S).opened,
+    diagnostic:canPlay()?rummiDiagnostic(S):null
+   };
+  }
   if(S&&TABLE_3D_CARD_GAMES.includes(S.id)){
    const hand=!gate&&!net.spectator?player(S).hand:[],mine=canPlay()?hand:[];
    data.cardGame=S.id;data.selectedIds=[...selection];data.selectableIds=[];
@@ -3217,6 +3233,19 @@ if(window.SalonTableView){
     draw(){if(!S||S.id!=='huit'||!canPlay())return false;dispatch({type:'draw'});return true},
     goose(type,steps){if(!S||S.id!=='oie'||!canPlay())return false;dispatch(type==='choose'?{type:'gooseChoose',steps}: {type});return true},
     yam(type,index){if(!S||S.id!=='yam'||!canPlay())return false;dispatch(type==='hold'?{type:'hold',index}:{type:'roll'});return true},
+    rummi(type,value){
+     if(!S||S.id!=='rummikub'||!canPlay())return false;
+     if(type==='select'){
+      const id=String(value),pool=[...player(S).hand,...S.table.flat()];if(!pool.some(t=>t.id===id))return false;
+      if(selection.has(id))selection.delete(id);else selection.add(id);renderGame(false);return true;
+     }
+     if(type==='move'){
+      const dest=value,ids=[...selection];if(!ids.length)return false;
+      dispatch({type:'move',ids,dest});selection.clear();return true;
+     }
+     if(['commit','draw','undo','undoStep'].includes(type)){dispatch({type});return true}
+     return false;
+    },
     cactus(type,value){
      if(!S||S.id!=='cactus')return false;
      if(type==='quick'){
