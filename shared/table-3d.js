@@ -699,6 +699,7 @@ export function createTable3DRenderer({onFatal}={}){
 
     if(game==='quatrevingtdixneuf'){
       const ninety=data.ninety||{},selected=new Set(ninety.selectedIds||[]),selectable=new Set(ninety.selectableIds||[]),legal=new Set(ninety.legalIds||[]),own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,ownVisuals=new Map();
+      const ninetyDrop=cardGestureTarget('quatrevingtdixneuf',TABLE_Y+.025);dropMarker.visible=!!(payload.canInteract&&selectable.size);dropMarker.position.set(ninetyDrop.x,TABLE_Y+.025,ninetyDrop.z);dropMarker.material.opacity=.2;
       own.forEach((card,i)=>{
         const slot=handCardSlot(n,i),chosen=selected.has(card.id),isLegal=legal.has(card.id),mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:selectable.has(card.id),playable:selectable.has(card.id)});
         mesh.userData.kind='special-select';mesh.userData.cardId=card.id;mesh.userData.home={position:new THREE.Vector3(slot.x,TABLE_Y+.12+slot.yOffset+(chosen?.25:isLegal?.08:0),slot.z),rotation:new THREE.Euler(-Math.PI/2,0,slot.fan),scale:new THREE.Vector3(1,1,1).multiplyScalar(slot.scale*(chosen?1.07:isLegal?1.025:.98))};
@@ -815,6 +816,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(!s?.players?.length)return;
     setCameraPose(0,7.4,9.1,0,.22,.15);
     const selected=new Set(data.selectedIds||[]),selectable=new Set(data.selectableIds||[]),playable=new Set(data.cardPlayableIds||[]);
+    const dropTarget=cardGestureTarget(game,TABLE_Y+.025);dropMarker.visible=!!(payload.canInteract&&selectable.size);dropMarker.position.set(dropTarget.x,TABLE_Y+.025,dropTarget.z);dropMarker.material.opacity=.2;
     const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length;
     own.forEach((card,i)=>{
       const slot=handCardSlot(n,i),chosen=selected.has(card.id),canSelect=selectable.has(card.id),legal=playable.has(card.id);
@@ -1048,7 +1050,7 @@ export function createTable3DRenderer({onFatal}={}){
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     if(title)title.textContent='VUE 3D · RUMMIKUB';
     if(status)status.textContent=(data.diagnostic?.text||(deckCount+' tuiles dans la pioche'))+' · '+layout.active.length+' groupe'+(layout.active.length>1?'s':'');
-    if(help)help.textContent=data.canMove?'Sélectionnez et déplacez : les tuiles glissent réellement entre chevalet et groupes':'Le chevalet actif reste privé · table commune synchronisée';
+    if(help)help.textContent=data.canMove?'Glissez une tuile directement vers un groupe, la table ou le chevalet · touchez pour sélectionner plusieurs tuiles':'Le chevalet actif reste privé · table commune synchronisée';
   }
 
   function syncCactus(payload){
