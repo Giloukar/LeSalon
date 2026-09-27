@@ -330,3 +330,19 @@ La couche de manipulation locale n'est plus limitée aux jeux de cartes à séle
 - les tuiles du chevalet Rummikub, ainsi que les tuiles communes réellement déplaçables, utilisent la même couche physique locale.
 
 Le mouvement libre est volontairement séparé du moteur : la position, la rotation, la vitesse et le retour inertiel ne sont jamais écrits dans l'état de partie et ne partent pas sur le réseau. Cette frontière prépare le branchement de modèles 3D externes plus riches (mains, cartes, tuiles, animations de lancer) sans transformer la physique de présentation en source de vérité.
+
+
+## Registre d'assets 3D remplaçables
+
+Le renderer possède désormais une frontière explicite entre **objet de jeu** et **modèle 3D**. Le fichier `shared/table-3d-assets.js` expose `window.SalonTable3DAssets` avec les opérations `register`, `registerMany`, `unregister`, `create`, `has`, `list` et `subscribe`.
+
+Les premières familles branchées sont :
+
+- `card` : cartes de tous les jeux utilisant la primitive commune ;
+- `rummikub-tile` : tuiles Rummikub ;
+- `die` : dés communs, y compris l'état neutre avant lancer ;
+- `pawn` : pions du Jeu de l'oie et de Métropole.
+
+Une factory reçoit uniquement le contexte visuel nécessaire, ainsi que `THREE` et des dimensions canoniques. Le renderer accepte un `Object3D` ou un groupe complet : le raycasting remonte automatiquement vers la racine interactive. Si aucune factory n'est enregistrée, si elle retourne une valeur invalide ou si elle échoue, la géométrie procédurale actuelle reste le fallback.
+
+Cette API est volontairement extérieure aux règles, à `S`, à `net.state` et au protocole PeerJS. Elle constitue le point d'entrée prévu pour les futurs modèles GLB/GLTF : les assets pourront être remplacés progressivement sans modifier les moteurs ni les interactions autoritatives.
