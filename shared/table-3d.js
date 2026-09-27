@@ -242,6 +242,22 @@ export function createTable3DRenderer({onFatal}={}){
     else{gesture.returning=false;gesture.committed=false}
     startMotion();
   }
+  function rummiBoardLayout(groups){
+    const active=(groups||[]).map((group,index)=>({group,index})).filter(x=>x.group?.length),count=Math.max(1,active.length),maxLen=Math.max(1,...active.map(x=>x.group.length));
+    let cols=count<=2?count:maxLen>=10?2:count>=7?3:Math.min(3,Math.ceil(Math.sqrt(count*1.25)));
+    cols=Math.max(1,cols);const rows=Math.max(1,Math.ceil(count/cols)),width=9.35,depth=3.55,cellW=width/cols,cellD=depth/rows;
+    return{active,cols,rows,cellW,cellD,baseZ:-2.05,width,depth};
+  }
+  function rummiGroupSlot(layout,order,length,tileIndex){
+    const col=order%layout.cols,row=Math.floor(order/layout.cols),baseX=(col-(layout.cols-1)/2)*layout.cellW,baseZ=layout.baseZ+row*layout.cellD;
+    const natural=.66,scale=Math.max(.48,Math.min(.96,(layout.cellW-.28)/(Math.max(1,length)*natural))),spacing=natural*scale;
+    return{x:baseX+(tileIndex-(length-1)/2)*spacing,z:baseZ,scale,row,col};
+  }
+  function rummiRackSlot(count,index){
+    const total=Math.max(1,count),rows=total<=10?1:total<=20?2:3,perRow=Math.ceil(total/rows),row=Math.floor(index/perRow),start=row*perRow,rowCount=Math.min(perRow,total-start),local=index-start;
+    const scale=rows===1?.92:rows===2?.82:.72,spacing=.68*scale,t=rowCount<=1?.5:local/(rowCount-1);
+    return{x:(local-(rowCount-1)/2)*spacing,z:2.05+row*.78+Math.abs(t-.5)*.04,scale,row,yOffset:row*.012+local*.001};
+  }
   function eightSnapshot(payload,deckCount,top){
     const s=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0;
     return{key:[s?.startedAt||'',viewer,(s?.players||[]).map(p=>p?.name||'').join('|')].join('~'),viewer,deckCount,topId:top?.id||null,top:top?{id:top.id,suit:top.suit,rank:top.rank,joker:!!top.joker}:null,handCounts:(s?.players||[]).map(p=>p?.hand?.length||0)};
@@ -648,33 +664,41 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function syncRummikub(payload){
     clearObjects();dropMarker.visible=false;
-    setCameraPose(0,8.15,10.2,0,.15,-.15);
     const data=payload.viewData?.rummi;if(!data)return;
-    const selected=new Set(data.selectedIds||[]),oldIds=new Set(data.refTableIds||[]);
-    const groups=data.table||[],cols=4;
-    groups.forEach((group,gi)=>{
-      if(!group?.length)return;
-      const col=gi%cols,row=Math.floor(gi/cols),baseX=(col-(cols-1)/2)*2.45,baseZ=-2.15+row*1.12;
+    const selected=new Set(data.selectedIds||[]),oldIds=new Set(data.refTableIds||[]),groups=data.table||[],layout=rummiBoardLayout(groups);
+    setCameraPose(0,8.65+Math.max(0,layout.rows-2)*.45,10.45+Math.max(0,layout.rows-2)*.35,0,.2,-.18);
+
+    layout.active.forEach(({group,index:gi},order)=>{
       group.forEach((tile,ti)=>{
-        const movable=data.canMove&&(data.canMoveOld||!oldIds.has(tile.id)),mesh=rummiTileMesh(tile,selected.has(tile.id),movable);
-        mesh.position.set(baseX+(ti-(group.length-1)/2)*.54,TABLE_Y+.37,baseZ);mesh.rotation.x=-Math.PI/2;mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};objects.add(mesh);
+        const slot=rummiGroupSlot(layout,order,group.length,ti),movable=data.canMove&&(data.canMoveOld||!oldIds.has(tile.id)),mesh=rummiTileMesh(tile,selected.has(tile.id),movable);
+        mesh.position.set(slot.x,TABLE_Y+.37,slot.z);mesh.rotation.x=-Math.PI/2;mesh.scale.setScalar(slot.scale);
+        mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};objects.add(mesh);
       });
       if(data.canMove&&selected.size){
-        const target=actionSprite('AJOUTER','rummi-dest',{dest:gi},'#dbea9e');target.position.set(baseX,TABLE_Y+.82,baseZ+.62);target.scale.set(1.5,.38,1);objects.add(target);
+        const slot=rummiGroupSlot(layout,order,Math.max(1,group.length),Math.floor(Math.max(0,group.length-1)/2)),target=actionSprite('AJOUTER','rummi-dest',{dest:gi},'#dbea9e');
+        target.position.set(slot.x,TABLE_Y+.84,slot.z+Math.min(.58,layout.cellD*.34));target.scale.set(Math.min(1.45,layout.cellW*.48),.36,1);objects.add(target);
       }
     });
-    const hand=data.hand||[],span=Math.min(8.2,Math.max(2,(hand.length-1)*.52));
-    hand.forEach((tile,i)=>{
-      const t=hand.length<=1?.5:i/(hand.length-1),x=(t-.5)*span,mesh=rummiTileMesh(tile,selected.has(tile.id),!!data.canMove);
-      mesh.position.set(x,TABLE_Y+.42,2.72+Math.abs(t-.5)*.15);mesh.rotation.x=-Math.PI/2;mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};objects.add(mesh);
-    });
-    if(data.canMove&&selected.size){
-      const fresh=actionSprite('NOUVEAU GROUPE','rummi-dest',{dest:'new'},'#dbea9e');fresh.position.set(-2.15,1.02,1.55);objects.add(fresh);
-      const toHand=actionSprite('AU CHEVALET','rummi-dest',{dest:'hand'},'#d8ded9');toHand.position.set(2.15,1.02,1.55);objects.add(toHand);
+
+    if(!layout.active.length){
+      const empty=makeLabel('TABLE COMMUNE · PREMIÈRE COMBINAISON','#dbea9e');empty.position.set(0,1.0,-.65);empty.scale.set(4.9,.8,1);objects.add(empty);
     }
+
+    const hand=data.hand||[];
+    hand.forEach((tile,i)=>{
+      const slot=rummiRackSlot(hand.length,i),mesh=rummiTileMesh(tile,selected.has(tile.id),!!data.canMove);
+      mesh.position.set(slot.x,TABLE_Y+.42+slot.yOffset,slot.z);mesh.rotation.x=-Math.PI/2;mesh.scale.setScalar(slot.scale);
+      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};objects.add(mesh);
+    });
+
+    if(data.canMove&&selected.size){
+      const actionZ=hand.length>10?1.05:1.48,fresh=actionSprite('NOUVEAU GROUPE','rummi-dest',{dest:'new'},'#dbea9e');fresh.position.set(-2.15,1.02,actionZ);objects.add(fresh);
+      const toHand=actionSprite('AU CHEVALET','rummi-dest',{dest:'hand'},'#d8ded9');toHand.position.set(2.15,1.02,actionZ);objects.add(toHand);
+    }
+
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     if(title)title.textContent='VUE 3D · RUMMIKUB';
-    if(status)status.textContent=data.diagnostic?.text||((data.deckCount||0)+' tuiles dans la pioche');
+    if(status)status.textContent=(data.diagnostic?.text||((data.deckCount||0)+' tuiles dans la pioche'))+' · '+layout.active.length+' groupe'+(layout.active.length>1?'s':'');
     if(help)help.textContent=data.canMove?'Sélectionnez des tuiles, puis choisissez un groupe ou le chevalet':'Le chevalet actif reste privé · table commune synchronisée';
   }
   function syncCactus(payload){
