@@ -61,3 +61,47 @@ Le modèle peut être un `Mesh`, un `Group` ou n’importe quel `Object3D`. Les 
 Le registre est observable. Quand une factory est ajoutée ou retirée, la scène 3D active se reconstruit immédiatement à partir du même état autoritatif. Cela permet de charger un pack de modèles en arrière-plan puis de le rendre disponible sans redémarrer la partie.
 
 Le fallback procédural reste permanent : retirer une factory ou rencontrer une erreur dans celle-ci ne doit jamais empêcher la partie de continuer.
+
+
+## Packs déclaratifs GLB/GLTF
+
+Pour les packs de modèles complets, `window.SalonTable3DModelPack` évite d'écrire une factory à la main pour chaque fichier. Le chargeur importe GLTFLoader uniquement lorsqu'un pack est demandé, précharge les modèles, prépare un clonage compatible avec les scènes skinnées, puis enregistre les factories prêtes dans `SalonTable3DAssets`.
+
+Exemple :
+
+```js
+const pack = await window.SalonTable3DModelPack.load({
+  id: 'salon-real-assets-v1',
+  assets: {
+    pawn: {
+      src: './assets/3d/pawn.glb',
+      scale: 0.46,
+      rotationDeg: [0, 180, 0],
+      tintFrom: 'color'
+    },
+    balloon: {
+      src: './assets/3d/balloon.glb',
+      scaleFrom: 'scale'
+    },
+    'golf-ball': {
+      src: './assets/3d/golf-ball.glb'
+    }
+  }
+});
+```
+
+Chaque entrée accepte :
+
+- `src` : chemin GLB/GLTF ;
+- `scale` : facteur uniforme ou tableau `[x, y, z]` ;
+- `rotationDeg` : rotation de correction en degrés ;
+- `offset` : décalage local `[x, y, z]` ;
+- `scaleFrom` : nom d'un champ numérique du contexte à multiplier à l'échelle courante, utile par exemple pour le ballon ;
+- `tintFrom` : nom d'un champ couleur du contexte, utile pour les pions et marqueurs ;
+- `configure(object, context)` : hook optionnel lorsque le manifest est défini en JavaScript et qu'une adaptation plus spécifique est nécessaire.
+
+Les transformations ne sont appliquées que lorsqu'elles sont déclarées : les transformations natives du fichier restent donc intactes par défaut.
+
+Le chargement est tolérant aux erreurs par asset. Un fichier qui échoue apparaît dans `result.failed` et conserve son placeholder procédural, pendant que les autres modèles du pack sont activés. `result.unload()` ou `SalonTable3DModelPack.unload(id)` retire les factories du pack et revient immédiatement aux placeholders.
+
+L'événement `salon:table-3d-model-pack` publie les phases `loading`, `progress`, `ready` et `unloaded`, ce qui permettra d'ajouter plus tard une interface de progression sans coupler cette interface au renderer.
