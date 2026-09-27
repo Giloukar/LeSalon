@@ -308,3 +308,12 @@ La couverture 3D existe sur les 22 jeux, mais le niveau de mise en scène n'est 
 | Mini-jeux | Echo, Ballon, Anagrammes, Intrus, Code Secret, Mini Golf | scènes 3D interactives et état autoritatif respecté | identité visuelle plus riche et transitions de phase plus cinématiques |
 
 Le 8 américain reste actuellement la référence pour les interactions de cartes : drag tactile, présence distante, pioche et pose animées. Les layouts adaptatifs de main sont maintenant partagés avec les autres jeux de cartes afin d'éviter de reproduire les problèmes de chevauchement. La priorité suivante est Rummikub, puis la généralisation des mouvements de cartes et des transitions de phase aux jeux de cartes spécialisés.
+
+
+## Manipulation physique des cartes
+
+La couche 3D ne limite plus toutes les cartes à un simple clic. Dans les jeux à sélection (Président, Menteur, Quatre Suites, Chasse aux plis, Enchères, ainsi que le 99), une carte peut maintenant être saisie et déplacée librement au-dessus de la table. Tant qu'aucune action de règle n'est validée, ce déplacement reste purement visuel : relâcher la carte la fait revenir vers sa place avec une trajectoire inertielle qui dépend de la vitesse du geste. Cela permet déjà de tester le ressenti de « prendre / déplacer / lancer » une carte sans introduire d'action illégale ou de mutation réseau.
+
+Président, Menteur, Quatre Suites, Chasse aux plis et Enchères exposent également leurs validations principales directement dans la scène 3D. La sélection reste gérée par le moteur existant, puis un contrôle 3D déclenche l'action autoritative correspondante : poser, passer, croire/challenger, ramasser un pli ou confirmer une enchère.
+
+Cette séparation entre **manipulation libre** et **action autoritative** est volontaire. Elle permet de brancher plus tard des modèles de cartes et des mains beaucoup plus riches, avec rotations, lâchers ou gestes libres, sans confondre la physique locale du rendu avec les règles de jeu.
