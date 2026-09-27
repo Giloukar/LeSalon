@@ -61,6 +61,7 @@ export function createTable3DRenderer({onFatal}={}){
   const neutralDieMaterial=new THREE.MeshStandardMaterial({color:0xd8d3c4,roughness:.82,metalness:0});
   let animationRaf=0,diceAnimations=[],pawnAnimations=[],lastDiceKey='',lastMoveKey='';
   let wordSelection=[],wordDraftKey='';
+  let codeDraft=[0,1,2],codeDraftKey='';
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
   let objects=new THREE.Group(),dropMarker=null,tableMesh=null;
@@ -588,6 +589,35 @@ export function createTable3DRenderer({onFatal}={}){
     if(help)help.textContent=phase==='watch'?'Mémorisez les lumières dans l’ordre puis cachez la séquence':phase==='repeat'?'Touchez les quatre pads dans le bon ordre':phase==='result'?(data.feedback||'Séquence terminée'):'Scores synchronisés avec le moteur';
   }
 
+  function syncCode(payload){
+    clearObjects();dropMarker.visible=false;
+    const s=payload.state,data=payload.viewData?.code3d||{},phase=data.phase||s?.phase||'play',history=Array.isArray(data.history)?data.history:[],secret=Array.isArray(data.secret)?data.secret:[],symbols=['●','◆','▲','■','✦','☾'],colors=['#f0a6b7','#93d4ec','#e6d58c','#bbaceb','#a8ddb8','#efbc88'];
+    const key=[s?.turn??0,data.stage||1,history.length,phase].join('|');if(codeDraftKey!==key){codeDraftKey=key;codeDraft=[0,1,2]}
+    camera.position.set(0,6.65,8.45);camera.lookAt(0,.45,.1);
+    const vaultMat=new THREE.MeshStandardMaterial({color:phase==='result'?0x3c4b38:0x332c43,roughness:.8,metalness:.1,emissive:phase==='result'?0x26331d:0x171320,emissiveIntensity:.25}),vault=new THREE.Mesh(new THREE.BoxGeometry(6.8,.28,3.7),vaultMat);
+    vault.position.set(0,TABLE_Y+.12,.05);vault.receiveShadow=true;vault.castShadow=true;vault.userData.temporaryMaterial=vaultMat;objects.add(vault);
+    const shown=phase==='result'&&secret.length===3?secret:codeDraft;
+    for(let i=0;i<3;i++){
+      const value=Math.max(0,Math.min(5,Number(shown[i]??i))),geo=new THREE.SphereGeometry(.5,28,20),mat=new THREE.MeshStandardMaterial({color:new THREE.Color(colors[value]),roughness:.38,metalness:.12,emissive:new THREE.Color(colors[value]),emissiveIntensity:phase==='result'?.38:.18}),gem=new THREE.Mesh(geo,mat);
+      gem.position.set((i-1)*1.72,TABLE_Y+1.15,.15);gem.scale.set(1,1.12,.72);gem.castShadow=true;gem.userData.temporaryGeometry=geo;gem.userData.temporaryMaterial=mat;
+      if(phase==='play'&&payload.canInteract){gem.userData={...gem.userData,kind:'code-cycle',index:i,interactive:true,home:{scale:gem.scale.clone()}};interactive.push(gem)}
+      objects.add(gem);
+      const label=makeLabel((i+1)+' · '+symbols[value],colors[value]);label.scale.set(1.2,.42,1);label.position.set(gem.position.x,TABLE_Y+1.83,.15);objects.add(label);
+    }
+    const recent=history.slice(-4);
+    recent.forEach((h,j)=>{
+      const row=history.length-recent.length+j+1,guess=(h.colors||[]).map(n=>symbols[n]||'?').join(' '),label=makeLabel(row+' · '+guess+'   '+Number(h.exact||0)+' ✓  '+Number(h.near||0)+' ↔','#d9d0e4');
+      label.scale.set(4.4,.42,1);label.position.set(0,.78,-1.2-j*.48);objects.add(label);
+    });
+    if(phase==='play'&&payload.canInteract){const submit=actionSprite('TESTER LE CODE','code-submit',{},'#d2b6fa');submit.position.set(0,1.02,2.42);objects.add(submit)}
+    else if(phase==='result'&&payload.canInteract){const next=actionSprite('CONTINUER','code-continue',{},'#dbea9e');next.position.set(0,1.02,2.42);objects.add(next)}
+    (data.players||[]).forEach((p,i)=>{const tag=makeLabel((p.name||'Joueur')+' · '+Number(p.score||0),i===s?.turn?'#dbea9e':'#d8ded9');tag.scale.set(1.7,.34,1);tag.position.set((i-(data.players.length-1)/2)*2.15,.9,-2.75);objects.add(tag)});
+    const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]'),left=Math.max(0,6-history.length);
+    if(title)title.textContent='VUE 3D · CODE SECRET';
+    if(status)status.textContent='Coffre '+(data.stage||1)+' / 5 · '+(phase==='play'?left+' proposition'+(left>1?'s':'')+' restante'+(left>1?'s':''):phase==='result'?(data.feedback||'Coffre terminé'):'partie terminée');
+    if(help)help.textContent=phase==='play'?'Touchez chaque gemme pour changer son symbole puis testez la combinaison':phase==='result'?'Le code est maintenant révélé · continuez pour le coffre suivant':'Scores synchronisés';
+  }
+
   function syncIntrus(payload){
     clearObjects();dropMarker.visible=false;
     const s=payload.state,data=payload.viewData?.intrus||{},phase=data.phase||s?.phase||'play',count=Math.max(0,Number(data.count||0)),tiles=Array.isArray(data.tiles)?data.tiles:[],tried=new Set(Array.isArray(data.tried)?data.tried:[]),stage=Math.max(1,Math.min(5,Number(data.stage||1))),revealed=phase==='result'||phase==='over';
@@ -710,7 +740,8 @@ export function createTable3DRenderer({onFatal}={}){
   }
 
   function syncCurrent(payload){
-    if(payload?.gameId==='intrus')syncIntrus(payload);
+    if(payload?.gameId==='code')syncCode(payload);
+    else if(payload?.gameId==='intrus')syncIntrus(payload);
     else if(payload?.gameId==='anagrammes')syncAnagram(payload);
     else if(payload?.gameId==='ballon')syncBalloon(payload);
     else if(payload?.gameId==='echo')syncEcho(payload);
@@ -746,7 +777,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(hovered===mesh)return;
     if(hovered&&!drag){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale);}
     hovered=mesh;
-    if(hovered&&!drag&&['card','card-select','maid-pick','special-select','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-dest','intrus-spot'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
+    if(hovered&&!drag&&['card','card-select','maid-pick','special-select','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-dest','intrus-spot','code-cycle'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
     draw();
   }
   function onPointerDown(e){
@@ -755,7 +786,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,kind:'deck',startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(obj.userData.kind==='card-select'){drag={pointerId:e.pointerId,kind:'card-select',cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
     if(['maid-pick','special-select','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-dest'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
-    if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue','intrus-spot','intrus-continue'].includes(obj.userData.kind)){
+    if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue','intrus-spot','intrus-continue','code-cycle','code-submit','code-continue'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
       drag={pointerId:e.pointerId,kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return;
     }
@@ -790,6 +821,9 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='rummi-dest'){if(tap)current?.interactions?.rummi?.('move',d.dest);return}
     if(d.kind==='deck'){if(tap)current?.interactions?.draw?.();return}
     if(d.kind==='goose-roll'||d.kind==='goose-choice'){if(tap)current?.interactions?.goose?.(d.kind==='goose-roll'?'roll':'choose',d.steps);return}
+    if(d.kind==='code-cycle'){if(tap){codeDraft[d.index]=(Number(codeDraft[d.index]||0)+1)%6;syncCode(current);draw()}return}
+    if(d.kind==='code-submit'){if(tap)current?.interactions?.codePuzzle?.('guess',[...codeDraft]);return}
+    if(d.kind==='code-continue'){if(tap)current?.interactions?.codePuzzle?.('continue');return}
     if(d.kind==='intrus-spot'){if(tap)current?.interactions?.intrus?.('spot',d.index);return}
     if(d.kind==='intrus-continue'){if(tap)current?.interactions?.intrus?.('continue');return}
     if(d.kind==='word-letter'){if(tap&&!wordSelection.includes(d.index)){wordSelection.push(d.index);syncAnagram(current);draw()}return}
@@ -818,7 +852,7 @@ export function createTable3DRenderer({onFatal}={}){
 
   function activate(){active=true;init()}
   function deactivate(){
-    active=false;drag=null;hovered=null;wordSelection=[];wordDraftKey='';diceAnimations.length=0;pawnAnimations.length=0;
+    active=false;drag=null;hovered=null;wordSelection=[];wordDraftKey='';codeDraft=[0,1,2];codeDraftKey='';diceAnimations.length=0;pawnAnimations.length=0;
     if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
     resizeObserver?.disconnect();resizeObserver=null;host?.remove();host=null;
     document.documentElement.removeAttribute('data-table-3d-game');document.documentElement.removeAttribute('data-table-3d-phase');
