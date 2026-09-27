@@ -115,6 +115,15 @@ test('Three.js hardening adapts mobile quality, motion and reusable geometry',as
  assert.match(source,/lostpointercapture/);
  assert.match(source,/function capturePointer\(id\)\{try\{/);
  assert.match(source,/cardDropRadius/);
+ assert.match(source,/const baseScale=rows===1\?Math\.max\(\.82,1-Math\.max\(0,total-6\)\*\.04\):rows===2\?\.88:\.64/);
+ assert.match(source,/spacing=rowCount<=1\?0:CARD_W\*scale\+\.10/);
+ assert.match(source,/const farFill=new THREE\.DirectionalLight/);
+ assert.match(source,/const farGlow=new THREE\.PointLight/);
+ assert.match(source,/function eightOpponentSeat\(total,index\)/);
+ assert.match(source,/function eightSnapshot\(payload,deckCount,top\)/);
+ assert.match(source,/function queueCardFlight\(mesh,from,to/);
+ assert.match(source,/snapshot\.deckCount<previous\.deckCount/);
+ assert.match(source,/snapshot\.handCounts\[i\]===previous\.handCounts\[i\]-1/);
  assert.match(css,/58svh/);
  assert.match(css,/54svh/);
  assert.match(css,/data-table-view="3d"\] \.table-column>\.scene-surface/);
@@ -124,4 +133,14 @@ test('Three.js hardening adapts mobile quality, motion and reusable geometry',as
  assert.match(css,/height:100dvh/);
  assert.match(css,/\.table-3d-window-controls/);
  assert.match(css,/#game-actions\{position:fixed/);
+});
+
+
+test('Eight 3D staging keeps opponent motion presentation-only',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/cardFx=new THREE\.Group\(\)/);
+ assert.match(source,/cardAnimations\.push\(/);
+ assert.match(source,/cardFx\.remove\(a\.mesh\)/);
+ assert.doesNotMatch(source,/cardAnimations[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/queueCardFlight[^\n]*onlineAct\(/);
 });

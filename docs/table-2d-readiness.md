@@ -277,3 +277,12 @@ Le placement de la main du 8 américain utilise maintenant des lignes équilibr�
 Le cadrage 3D n’est plus basé uniquement sur le champ de vision : chaque pose de caméra est désormais recalculée à partir du ratio réel du viewport. En portrait étroit, la caméra recule proportionnellement pour conserver la largeur du plateau, sans imposer une orientation paysage ni déformer fortement la perspective.
 
 Sur les appareils à pointeur tactile, le mode plein écran utilise la couche CSS plein viewport mais n’appelle plus l’API Fullscreen native du navigateur. Cette séparation évite les transitions de contexte fragiles observées sur mobile au retour en 2D. Le retour suit maintenant un ordre déterministe : réduction de la couche 3D, sortie éventuelle du plein écran natif sur desktop, activation du renderer 2D, puis suppression de l’état de présentation 3D.
+
+
+## Mise en scène des cartes et présence adverse
+
+Le 8 américain utilise maintenant un layout de main qui évite de compter sur le chevauchement pour faire tenir les cartes : jusqu’à huit cartes, une rangée est conservée avec une réduction progressive ; de neuf à seize cartes, la main se répartit sur deux rangées espacées ; au-delà, trois rangées compactes sont utilisées avec un ajustement automatique de largeur. L’ordre vertical est légèrement décalé pour éviter les conflits visuels entre surfaces coplanaires.
+
+La moitié opposée de la table reçoit davantage de lumière de remplissage et le brouillard commence plus loin, afin que les adversaires et leurs cartes restent lisibles même sur mobile portrait. Les adversaires sont également rapprochés vers le centre et leurs étiquettes sont agrandies pour que plusieurs joueurs restent visibles dans le champ.
+
+Pour le 8 américain, le renderer conserve un instantané strictement visuel de l’état précédent. Quand un adversaire joue une carte confirmée, la carte publique se déplace de sa zone vers la défausse. Quand un adversaire pioche, un ou plusieurs dos de cartes se déplacent de la pioche vers sa main. Ces animations ne produisent aucune action de jeu et n’altèrent ni l’état ni le réseau ; elles ne font qu’interpoler entre deux états déjà validés par le moteur.
