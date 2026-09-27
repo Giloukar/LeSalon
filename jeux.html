@@ -2597,7 +2597,7 @@ document.addEventListener('pointermove',e=>{
  const dx=e.clientX-d.x,dy=e.clientY-d.y;
  if(!d.moved&&Math.hypot(dx,dy)<8)return;
  if(!d.moved){
-  d.moved=true;d.source.classList.add('eight-drag-source');d.ghost=d.source.cloneNode(true);d.ghost.removeAttribute('id');d.ghost.removeAttribute('data-action');d.ghost.classList.add('eight-drag-ghost');d.ghost.setAttribute('aria-hidden','true');d.ghost.style.width=d.rect.width+'px';d.ghost.style.height=d.rect.height+'px';document.body.appendChild(d.ghost);
+  d.moved=true;d.source.classList.add('eight-drag-source');d.ghost=d.source.cloneNode(true);d.ghost.removeAttribute('id');d.ghost.removeAttribute('data-action');d.ghost.classList.remove('eight-drag-source');d.ghost.classList.add('eight-drag-ghost');d.ghost.setAttribute('aria-hidden','true');d.ghost.style.width=d.rect.width+'px';d.ghost.style.height=d.rect.height+'px';document.body.appendChild(d.ghost);
  }
  e.preventDefault();
  if(!d.ghost)return;
