@@ -57,7 +57,8 @@ export function createTable3DRenderer({onFatal}={}){
   const pawnGeometry=new THREE.CylinderGeometry(.16,.24,.46,18);
   const dieGeometry=new THREE.BoxGeometry(.68,.68,.68);
   const edgeMaterial=new THREE.MeshStandardMaterial({color:0xe9e2d1,roughness:.72,metalness:0});
-  const tileMaterials=new Map(),pawnMaterials=new Map(),dieFaceMaterials=new Map(),cellLabelMaterials=new Map(),cellLabelTextures=[];
+  const tileMaterials=new Map(),pawnMaterials=new Map(),dieFaceMaterials=new Map(),cellLabelMaterials=new Map(),boxTileMaterials=new Map(),cellLabelTextures=[];
+  const neutralDieMaterial=new THREE.MeshStandardMaterial({color:0xd8d3c4,roughness:.82,metalness:0});
   let animationRaf=0,diceAnimations=[],pawnAnimations=[],lastDiceKey='',lastMoveKey='';
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
@@ -176,6 +177,17 @@ export function createTable3DRenderer({onFatal}={}){
     cellLabelTextures.push(tex);const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:true});cellLabelMaterials.set(n,mat);return mat;
   }
   function cellLabel(n){const sp=new THREE.Sprite(cellLabelMaterial(n));sp.scale.set(.48,.34,1);return sp}
+  function actionSprite(text,kind,data={},accent='#dbea9e'){
+    const sp=makeLabel(text,accent);sp.scale.set(2.55,.58,1);sp.userData={...sp.userData,kind,interactive:true,...data};interactive.push(sp);return sp;
+  }
+  function blankDieMesh(){
+    const mesh=new THREE.Mesh(dieGeometry,neutralDieMaterial);mesh.castShadow=true;mesh.receiveShadow=true;return mesh;
+  }
+  function boxTileMaterial(closed=false,selected=false){
+    const key=(closed?'closed':'open')+(selected?'-selected':'');if(boxTileMaterials.has(key))return boxTileMaterials.get(key);
+    const mat=new THREE.MeshStandardMaterial({color:closed?0x3a433d:selected?0xdbea9e:0xc8b98e,roughness:.86,emissive:selected?0x58622e:0x000000,emissiveIntensity:selected?.42:0});
+    boxTileMaterials.set(key,mat);return mat;
+  }
   function worldForCell(n,coords){
     if(!Number.isInteger(n)||n<=0)return new THREE.Vector3(-4.75,TABLE_Y+.42,3.15);
     const p=coords?.[n-1]||[4,3];return new THREE.Vector3((p[0]-4)*1.07,TABLE_Y+.42,(p[1]-3)*.87);
@@ -242,6 +254,59 @@ export function createTable3DRenderer({onFatal}={}){
     if(diceAnimations.length||pawnAnimations.length)startMotion();
   }
 
+  function syncYam(payload){
+    clearObjects();dropMarker.visible=false;
+    const s=payload.state,dice=payload.viewData?.yamDice||s?.dice||[1,1,1,1,1],held=payload.viewData?.yamHeld||s?.held||[],rolls=Number(payload.viewData?.yamRolls??s?.rolls??0);
+    camera.position.set(0,6.75,8.6);camera.lookAt(0,.25,.15);
+    const key='yam|'+(s?.turn??0)+'|'+rolls+'|'+dice.join('-'),animate=rolls>0&&key!==lastDiceKey;if(animate)lastDiceKey=key;
+    dice.forEach((value,i)=>{
+      const die=rolls?dieMesh(value):blankDieMesh(),x=(i-2)*1.35,z=held[i]?.42:0;
+      die.position.set(x,TABLE_Y+.78,z);die.scale.setScalar(held[i]?1.06:1);
+      if(payload.canInteract&&rolls>0&&rolls<3){die.userData={kind:'yam-hold',index:i,interactive:true};interactive.push(die)}
+      objects.add(die);
+      if(held[i]){
+        const pad=new THREE.Mesh(new THREE.CylinderGeometry(.5,.5,.08,28),tileMaterial('goose',true));pad.position.set(x,TABLE_Y+.36,z);objects.add(pad);
+      }
+      if(animate&&!held[i]&&!matchMedia('(prefers-reduced-motion: reduce)').matches){const h=visualHash(key+'|'+i);die.rotation.set(5+h*4,7+h*5,4+h*6);diceAnimations.push({mesh:die,start:performance.now(),duration:610+i*55,rx:die.rotation.x,ry:die.rotation.y,rz:die.rotation.z})}
+    });
+    if(payload.canInteract&&rolls<3&&held.filter(Boolean).length<5){
+      const roll=actionSprite(rolls?'RELANCER':'LANCER','yam-roll');roll.position.set(0,1.05,2.25);objects.add(roll);
+    }
+    const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
+    if(title)title.textContent='VUE 3D · YAM';
+    if(status)status.textContent=rolls?'Lancer '+rolls+' / 3 · '+held.filter(Boolean).length+' dé'+(held.filter(Boolean).length>1?'s':'')+' conservé'+(held.filter(Boolean).length>1?'s':''):'Cinq dés prêts';
+    if(help)help.textContent=rolls&&rolls<3?'Touchez un dé pour le conserver · catégories et score restent synchronisés dessous':rolls>=3?'Trois lancers joués · choisissez une catégorie dessous':'Lancez les cinq dés';
+    if(diceAnimations.length)startMotion();
+  }
+
+  function syncBox(payload){
+    clearObjects();dropMarker.visible=false;
+    const s=payload.state,dice=payload.viewData?.boxDice||s?.boxDice||[],open=new Set(payload.viewData?.boxNumbers||s?.boxNumbers||[]),selected=new Set(payload.viewData?.boxSelected||[]),stage=payload.viewData?.boxStage||s?.boxStage||'roll';
+    camera.position.set(0,6.9,8.4);camera.lookAt(0,.28,.05);
+    for(let n=1;n<=9;n++){
+      const isOpen=open.has(n),isSelected=selected.has(n),x=(n-5)*1.05;
+      const tile=new THREE.Mesh(tileGeometry,boxTileMaterial(!isOpen,isSelected));tile.scale.set(1,.22,1.18);tile.position.set(x,TABLE_Y+(isOpen?.42:.31),-1.15);tile.rotation.x=isOpen?-.34:0;tile.castShadow=true;tile.receiveShadow=true;
+      if(isOpen&&stage==='choose'&&payload.canInteract){tile.userData={kind:'box-toggle',number:n,interactive:true};interactive.push(tile)}
+      objects.add(tile);const label=cellLabel(n);label.scale.set(.58,.4,1);label.position.set(x,TABLE_Y+(isOpen?.62:.39),-1.12);objects.add(label);
+    }
+    const key='box|'+(s?.moves??0)+'|'+dice.join('-'),animate=dice.length>0&&key!==lastDiceKey;if(animate)lastDiceKey=key;
+    dice.forEach((value,i)=>{
+      const die=dieMesh(value);die.position.set((i-(dice.length-1)/2)*1.1,TABLE_Y+.82,.45);objects.add(die);
+      if(animate&&!matchMedia('(prefers-reduced-motion: reduce)').matches){const h=visualHash(key+'|'+i);die.rotation.set(5+h*4,7+h*5,4+h*6);diceAnimations.push({mesh:die,start:performance.now(),duration:600+i*70,rx:die.rotation.x,ry:die.rotation.y,rz:die.rotation.z})}
+    });
+    if(stage==='roll'&&payload.canInteract){
+      const two=actionSprite('LANCER 2 DÉS','box-roll',{count:2});two.position.set(-1.45,1.05,2.3);objects.add(two);
+      if(payload.viewData?.boxCanOne){const one=actionSprite('LANCER 1 DÉ','box-roll',{count:1},'#b7d5ee');one.position.set(1.45,1.05,2.3);objects.add(one)}
+    }else if(stage==='choose'&&payload.canInteract){
+      const total=dice.reduce((a,b)=>a+b,0),sum=[...selected].reduce((a,b)=>a+b,0),confirm=actionSprite('FERMER · '+sum+' / '+total,'box-close',{},sum===total&&sum>0?'#dbea9e':'#9ca69e');confirm.position.set(0,1.05,2.3);confirm.userData.enabled=sum===total&&sum>0;objects.add(confirm);
+    }
+    const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
+    if(title)title.textContent='VUE 3D · FERME LA BOÎTE';
+    if(status)status.textContent=stage==='choose'?'Total '+dice.reduce((a,b)=>a+b,0)+' · '+open.size+' volets ouverts':'Passage '+(s?.boxRound||1)+' / 3';
+    if(help)help.textContent=stage==='choose'?'Touchez les volets dont la somme égale les dés puis confirmez':'Lancez deux dés · un seul devient disponible quand 7, 8 et 9 sont fermés';
+    if(diceAnimations.length)startMotion();
+  }
+
   function syncEight(payload){
     clearObjects();dropMarker.visible=true;
     camera.position.set(0,7.25,9.25);camera.lookAt(0,.25,.2);
@@ -282,6 +347,12 @@ export function createTable3DRenderer({onFatal}={}){
     if(status){const requested=SUIT_NAME[s.suit]||'',attack=s.pendingDraw>0?' · attaque +'+s.pendingDraw:'';status.textContent=(requested?requested+' demandé':'')+attack}
     if(help)help.textContent='Cliquez ou glissez une carte vers la défausse · cliquez la pioche pour piocher';
   }
+  function syncCurrent(payload){
+    if(payload?.gameId==='huit')syncEight(payload);
+    else if(payload?.gameId==='oie')syncGoose(payload);
+    else if(payload?.gameId==='yam')syncYam(payload);
+    else if(payload?.gameId==='boite')syncBox(payload);
+  }
   function render(payload){
     current=payload;if(!active)return;
     init();
@@ -290,9 +361,7 @@ export function createTable3DRenderer({onFatal}={}){
       document.documentElement.removeAttribute('data-table-3d-game');return;
     }
     ensureHost();document.documentElement.dataset.table3dGame=payload.gameId||'';
-    if(payload.gameId==='huit')syncEight(payload);
-    else if(payload.gameId==='oie')syncGoose(payload);
-    draw();
+    syncCurrent(payload);draw();
   }
   function draw(){if(active&&renderer&&scene&&camera)renderer.render(scene,camera)}
   function updatePointer(e){
@@ -313,7 +382,10 @@ export function createTable3DRenderer({onFatal}={}){
     if(!active||!current?.canInteract)return;
     const obj=hit(e);setHover(obj);if(!obj)return;
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,kind:'deck',startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
-    if(obj.userData.kind==='goose-roll'||obj.userData.kind==='goose-choice'){drag={pointerId:e.pointerId,kind:obj.userData.kind,steps:obj.userData.steps,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return}
+    if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close'].includes(obj.userData.kind)){
+      if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
+      drag={pointerId:e.pointerId,kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,startX:e.clientX,startY:e.clientY};canvas.setPointerCapture?.(e.pointerId);return;
+    }
     if(obj.userData.kind!=='card'||!obj.userData.playable)return;
     drag={pointerId:e.pointerId,kind:'card',mesh:obj,cardId:obj.userData.cardId,startX:e.clientX,startY:e.clientY,moved:false};
     host?.classList.add('is-dragging');canvas.setPointerCapture?.(e.pointerId);e.preventDefault();
@@ -330,14 +402,13 @@ export function createTable3DRenderer({onFatal}={}){
   function finishDrag(e,cancelled=false){
     if(!drag||e.pointerId!==drag.pointerId)return;
     const d=drag;drag=null;host?.classList.remove('is-dragging');dropMarker.material.opacity=.2;
-    if(cancelled){syncEight(current);draw();return}
-    if(d.kind==='deck'){
-      if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8)current?.interactions?.draw?.();
-      return;
-    }
-    if(d.kind==='goose-roll'||d.kind==='goose-choice'){
-      if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8)current?.interactions?.goose?.(d.kind==='goose-roll'?'roll':'choose',d.steps);
-      return;
+    if(cancelled){syncCurrent(current);draw();return}
+    const tap=Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
+    if(d.kind==='deck'){if(tap)current?.interactions?.draw?.();return}
+    if(d.kind==='goose-roll'||d.kind==='goose-choice'){if(tap)current?.interactions?.goose?.(d.kind==='goose-roll'?'roll':'choose',d.steps);return}
+    if(d.kind==='yam-roll'||d.kind==='yam-hold'){if(tap)current?.interactions?.yam?.(d.kind==='yam-hold'?'hold':'roll',d.index);return}
+    if(d.kind==='box-roll'||d.kind==='box-toggle'||d.kind==='box-close'){
+      if(tap)current?.interactions?.box?.(d.kind==='box-roll'?'roll':d.kind==='box-toggle'?'toggle':'close',d.kind==='box-roll'?d.count:d.number);return;
     }
     const near=d.moved&&Math.hypot(d.mesh.position.x-1.25,d.mesh.position.z-.05)<1.45;
     if(!d.moved||near){current?.interactions?.playCard?.(d.cardId);return}
@@ -356,7 +427,7 @@ export function createTable3DRenderer({onFatal}={}){
   function destroy(){
     deactivate();clearObjects();
     canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);
-    cardGeometry.dispose();tileGeometry.dispose();pawnGeometry.dispose();dieGeometry.dispose();edgeMaterial.dispose();backMaterial.dispose();for(const m of frontMaterials.values())m.dispose();for(const m of tileMaterials.values())m.dispose();for(const m of pawnMaterials.values())m.dispose();for(const m of dieFaceMaterials.values())m.dispose();for(const m of cellLabelMaterials.values())m.dispose();for(const t of disposableTextures)t.dispose();for(const t of cellLabelTextures)t.dispose();
+    cardGeometry.dispose();tileGeometry.dispose();pawnGeometry.dispose();dieGeometry.dispose();edgeMaterial.dispose();backMaterial.dispose();for(const m of frontMaterials.values())m.dispose();for(const m of tileMaterials.values())m.dispose();for(const m of pawnMaterials.values())m.dispose();for(const m of dieFaceMaterials.values())m.dispose();for(const m of cellLabelMaterials.values())m.dispose();for(const m of boxTileMaterials.values())m.dispose();neutralDieMaterial.dispose();for(const t of disposableTextures)t.dispose();for(const t of cellLabelTextures)t.dispose();
     tableMesh?.geometry?.dispose();tableMesh?.material?.dispose();dropMarker?.geometry?.dispose();dropMarker?.material?.dispose();renderer?.dispose();
     renderer=scene=camera=canvas=null;current=null;
   }
