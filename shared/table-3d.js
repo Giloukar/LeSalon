@@ -10,7 +10,7 @@ const visualHash=str=>{
   for(const ch of String(str)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}
   return (h>>>0)/4294967295;
 };
-const motionAllowed=()=>document.documentElement.dataset.motion!=='off'&&motionAllowed();
+const motionAllowed=()=>document.documentElement.dataset.motion!=='off'&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
 const targetPixelRatio=()=>{
   const dpr=Math.max(1,Number(globalThis.devicePixelRatio)||1),coarse=matchMedia('(pointer: coarse)').matches,memory=Number(globalThis.navigator?.deviceMemory||8);
   return Math.min(dpr,(coarse||memory<=4)?1.5:2);
@@ -146,7 +146,8 @@ export function createTable3DRenderer({onFatal}={}){
     const column=document.querySelector('.table-column');if(!column)return null;
     if(!host?.isConnected){
       host=document.createElement('section');host.className='table-3d-host';host.setAttribute('aria-label','Vue 3D de la table');
-      host.innerHTML='<div class="table-3d-hud"><span class="table-3d-accent" data-table-3d-title>VUE 3D</span><span data-table-3d-status>Table synchronisée</span></div><div class="table-3d-help" data-table-3d-help>Vue immersive synchronisée avec la partie</div>';
+      host.innerHTML='<div class="table-3d-window-controls" aria-label="Affichage 3D"><button type="button" class="table-3d-window-button table-3d-minimize" data-table-3d-window="embedded" aria-label="Réduire la vue 3D dans la page" title="Réduire la vue 3D">↙</button><button type="button" class="table-3d-window-button table-3d-expand" data-table-3d-window="full" aria-label="Agrandir la vue 3D" title="Plein écran">⛶</button><button type="button" class="table-3d-window-button table-3d-close" data-table-view-mode="2d" aria-label="Revenir à la vue 2D" title="Revenir à la vue 2D">×</button></div><div class="table-3d-hud"><span class="table-3d-accent" data-table-3d-title>VUE 3D</span><span data-table-3d-status>Table synchronisée</span></div><div class="table-3d-help" data-table-3d-help>Vue immersive synchronisée avec la partie</div>';
+      host.querySelectorAll('[data-table-3d-window]').forEach(button=>button.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.dispatchEvent(new CustomEvent('salon:table-3d-window',{detail:{mode:button.dataset.table3dWindow}}))}));
       const banner=column.querySelector('.turn-banner');banner?.after(host);if(!banner)column.prepend(host);
       host.append(canvas);
       resizeObserver?.disconnect();resizeObserver=new ResizeObserver(resize);resizeObserver.observe(host);resize();
@@ -171,6 +172,13 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function placeCard(mesh,x,z,y=TABLE_Y+.07,rot=0,scale=1){
     mesh.position.set(x,y,z);mesh.rotation.set(-Math.PI/2,0,rot);mesh.scale.setScalar(scale);objects.add(mesh);return mesh;
+  }
+  function handCardSlot(count,index){
+    const rows=Math.max(1,Math.min(3,Math.ceil(Math.max(1,count)/8))),perRow=Math.ceil(Math.max(1,count)/rows),row=Math.floor(index/perRow),start=row*perRow,rowCount=Math.min(perRow,count-start),local=index-start;
+    const scale=rows===1?1:rows===2?.92:.82,spacing=rowCount<=1?0:Math.min(CARD_W*scale*1.08,8.9/(rowCount-1));
+    const x=(local-(rowCount-1)/2)*spacing,t=rowCount<=1?.5:local/(rowCount-1),fan=(t-.5)*-.12;
+    const z=rows===1?2.62+Math.abs(t-.5)*.12:1.72+row*1.18+Math.abs(t-.5)*.08;
+    return{x,z,fan,scale};
   }
   function tileMaterial(kind='normal',highlight=false){
     const key=kind+(highlight?'-hot':'');if(tileMaterials.has(key))return tileMaterials.get(key);
@@ -482,12 +490,11 @@ export function createTable3DRenderer({onFatal}={}){
     if(!s?.players?.length)return;
     const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),playable=new Set(payload.viewData?.playableIds||[]);
 
-    const n=own.length,span=Math.min(7.1,Math.max(1.4,(n-1)*.62));
+    const n=own.length;
     own.forEach((card,i)=>{
-      const t=n<=1 ? .5 : i/(n-1),x=(t-.5)*span,fan=(t-.5)*-.20,z=2.55+Math.abs(t-.5)*.26;
-      const mesh=cardMesh(card,{id:card.id,interactiveCard:playable.has(card.id),playable:playable.has(card.id)});
-      const lift=playable.has(card.id) ? .14 : 0;
-      placeCard(mesh,x,z,TABLE_Y+.12+lift,fan,playable.has(card.id)?1.035:1);
+      const slot=handCardSlot(n,i),mesh=cardMesh(card,{id:card.id,interactiveCard:playable.has(card.id),playable:playable.has(card.id)});
+      const lift=playable.has(card.id) ? .14 : 0,scale=slot.scale*(playable.has(card.id)?1.025:1);
+      placeCard(mesh,slot.x,slot.z,TABLE_Y+.12+lift,slot.fan,scale);
       mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};
     });
 
