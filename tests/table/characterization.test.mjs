@@ -417,6 +417,24 @@ test('completed trick cards drag as one physical group and collect through the e
 
 test('physical trick collection still uses the authoritative collect action',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'plis','online');const r=await t.page.evaluate(async()=>{net.gameId='plis';net.state.phase='trickResult';net.state.turn=0;net.state.completedTricks=1;net.state.trickCards=[{owner:0,card:{id:'trick-a',rank:10,suit:'S'}},{owner:1,card:{id:'trick-b',rank:9,suit:'S'}}];net.state.lastTrick=[];net.state.discard=[];S=projectGame(net.state,0);let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const before={moves:net.state.moves,discard:net.state.discard.length,revision:net.revision};const collected=seen.interactions.cardAction('collect');return{collected,before,after:{moves:net.state.moves,discard:net.state.discard.map(c=>c.id),phase:net.state.phase,trick:net.state.trickCards.length,revision:net.revision}};});assert.equal(r.collected,true);assert.equal(r.after.moves,r.before.moves+1);assert.deepEqual(r.after.discard,['trick-a','trick-b']);assert.equal(r.after.phase,'play');assert.equal(r.after.trick,0);assert.equal(r.after.revision,r.before.revision+1);}finally{await browser.close();}});
 
+test('free tabletop toss physics stays local and yields to authoritative drop zones',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/tossAnimations=\[\]/);
+ assert.match(source,/const TOSSABLE_KINDS=new Set/);
+ assert.match(source,/function freeTossVelocity\(d\)/);
+ assert.match(source,/function startFreeToss\(d\)/);
+ assert.match(source,/worldVelocity:new THREE\.Vector3\(\)/);
+ assert.match(source,/d\.worldVelocity\.lerp\(rawWorld,\.46\)/);
+ assert.match(source,/const xLimit=5\.05,zLimit=3\.08/);
+ assert.match(source,/a\.velocity\.x=-Math\.abs\(a\.velocity\.x\)\*\.54/);
+ assert.match(source,/if\(startFreeToss\(d\)\)return/);
+ assert.match(source,/if\(d\.kind==='card-select'.*directCardDropNear\(d\)/s);
+ assert.match(source,/if\(d\.kind==='rummi-tile'\)/);
+ assert.doesNotMatch(source,/startFreeToss[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/freeTossVelocity[^\n]*onlineAct\(/);
+ assert.doesNotMatch(source,/tossAnimations[^\n]*publishOnline\(/);
+});
+
 test('free 3D tabletop manipulation stays presentation-only until an explicit valid action',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/manipAnimations=\[\]/);
