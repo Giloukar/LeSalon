@@ -1870,15 +1870,52 @@ export function createTable3DRenderer({onFatal}={}){
     obj.rotation.z+=direction*-Math.PI/18;
     const home=obj.userData.home||meshTransform(obj);saveLocalPose(obj,home);updateLocalPoseResetButton();draw();e.preventDefault();
   }
+  function localStackCompanions(mesh){
+    const key=mesh?.userData?.localPoseKey,pose=key?localPoses.get(key):null;if(!key||!pose)return[];
+    const prefix=activePoseScope+'|',kind=key.slice(prefix.length).split('|')[0],near=[];
+    for(const [otherKey,other] of localPoses){
+      if(!otherKey.startsWith(prefix)||otherKey.slice(prefix.length).split('|')[0]!==kind)continue;
+      if(Math.abs(other.position.x-pose.position.x)>=.58||Math.abs(other.position.z-pose.position.z)>=.78)continue;
+      near.push({key:otherKey,pose:other});
+    }
+    if(near.length<2)return[];
+    const maxOrder=Math.max(...near.map(x=>Number(x.pose.order)||0));if((Number(pose.order)||0)!==maxOrder)return[];
+    const meshByKey=new Map(objects.children.filter(o=>o?.userData?.localPoseKey).map(o=>[o.userData.localPoseKey,o]));
+    return near.filter(x=>x.key!==key).sort((a,b)=>(Number(a.pose.order)||0)-(Number(b.pose.order)||0)).map((x,index)=>{
+      const obj=meshByKey.get(x.key);if(!obj)return null;
+      return{mesh:obj,id:obj.userData.tileId||obj.userData.cardId,index,home:cloneTransform(obj.userData.home||meshTransform(obj))}
+    }).filter(Boolean);
+  }
+  function clearStackHold(d){
+    if(d?.stackTimer){clearTimeout(d.stackTimer);d.stackTimer=0}
+  }
+  function enableLocalStackDrag(d){
+    if(!d?.mesh||d.stackMode)return !!d?.stackMode;
+    const companions=localStackCompanions(d.mesh);if(!companions.length)return false;
+    clearStackHold(d);
+    if(d.gestureStarted){emitLocalCardGesture('cancel',0,0);d.gestureStarted=false}
+    if(d.kind==='card'&&d.canPlay)emitLocalCardGesture('cancel',0,0);
+    d.gestureEnabled=false;d.stackMode=true;d.companions=companions;
+    companions.forEach(c=>stopTossForMesh(c.mesh));
+    d.mesh.scale.copy(d.home.scale).multiplyScalar(1.055);
+    companions.forEach((c,i)=>c.mesh.scale.copy(c.home.scale).multiplyScalar(1.025+i*.002));
+    host?.classList.add('is-stack-dragging');draw();return true;
+  }
+  function armLocalStackDrag(d,e){
+    if(!d?.mesh||!localStackCompanions(d.mesh).length)return;
+    d.stackAvailable=true;
+    if(e?.shiftKey){enableLocalStackDrag(d);return}
+    if(e?.pointerType==='touch')d.stackTimer=setTimeout(()=>{if(drag===d&&!d.moved&&!d.twist)enableLocalStackDrag(d)},340);
+  }
   function beginLooseCardDrag(obj,e,kind){
     const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()},gestureEnabled=!!(current?.canInteract&&LIVE_CARD_GAMES.has(current?.gameId)&&(['card-select','special-select'].includes(kind)||kind==='cactus-quick')),companions=groupedDragCompanions(obj,kind);
     stopTossForMesh(obj);companions.forEach(c=>stopTossForMesh(c.mesh));
-    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind,loose:true,mesh:obj,cardId:obj.userData.cardId,tileId:obj.userData.tileId,index:obj.userData.index,owner:obj.userData.owner,tapEnabled:!!obj.userData.tapEnabled,gestureEnabled,gestureStarted:false,gestureHome:home.position.clone(),companions,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),manualRotation:obj.rotation.z,rotated:false,twist:null,moved:false,home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
-    host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
+    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind,loose:true,mesh:obj,cardId:obj.userData.cardId,tileId:obj.userData.tileId,index:obj.userData.index,owner:obj.userData.owner,tapEnabled:!!obj.userData.tapEnabled,gestureEnabled,gestureStarted:false,gestureHome:home.position.clone(),companions,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),manualRotation:obj.rotation.z,rotated:false,twist:null,stackMode:false,stackTimer:0,moved:false,home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
+    armLocalStackDrag(drag,e);host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
   }
   function moveLooseCardDrag(e){
     const d=drag,now=performance.now(),dt=Math.max(8,now-(d.lastAt||now)),dx=e.clientX-d.startX,dy=e.clientY-d.startY;
-    if(!d.moved&&Math.hypot(dx,dy)>6)d.moved=true;
+    if(!d.moved&&Math.hypot(dx,dy)>6){d.moved=true;clearStackHold(d)}
     if(!d.moved)return false;
     d.velocityX=(e.clientX-d.lastX)/dt*16.67;d.velocityY=(e.clientY-d.lastY)/dt*16.67;d.lastX=e.clientX;d.lastY=e.clientY;d.lastAt=now;
     updatePointer(e);const p=new THREE.Vector3();
@@ -1952,6 +1989,7 @@ export function createTable3DRenderer({onFatal}={}){
   function onPointerDown(e){
     if(!active)return;
     if(drag?.mesh&&e.pointerId!==drag.pointerId&&e.pointerType==='touch'){
+      clearStackHold(drag);
       const angle=Math.atan2(e.clientY-drag.lastY,e.clientX-drag.lastX);
       drag.twist={pointerId:e.pointerId,lastAngle:angle};capturePointer(e.pointerId);e.preventDefault();return;
     }
@@ -1966,8 +2004,8 @@ export function createTable3DRenderer({onFatal}={}){
     }
     if(obj.userData.kind!=='card')return;
     const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()},canPlay=!!obj.userData.playable;
-    stopTossForMesh(obj);drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card',mesh:obj,cardId:obj.userData.cardId,canPlay,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),manualRotation:obj.rotation.z,rotated:false,twist:null,moved:false,overDrop:false,gestureHome:home.position.clone(),home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
-    if(canPlay)emitLocalCardGesture('start',0,0);host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
+    stopTossForMesh(obj);drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card',mesh:obj,cardId:obj.userData.cardId,canPlay,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),manualRotation:obj.rotation.z,rotated:false,twist:null,stackMode:false,stackTimer:0,moved:false,overDrop:false,gestureHome:home.position.clone(),home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
+    armLocalStackDrag(drag,e);if(canPlay&&!drag.stackMode)emitLocalCardGesture('start',0,0);host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
   }
   function onPointerMove(e){
     if(!active)return;
@@ -1979,20 +2017,25 @@ export function createTable3DRenderer({onFatal}={}){
     if(e.pointerId!==drag.pointerId)return;
     if(drag.loose){moveLooseCardDrag(e);return}
     if(drag.kind!=='card')return;
-    const now=performance.now(),dt=Math.max(8,now-(drag.lastAt||now)),dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;if(!drag.moved&&Math.hypot(dx,dy)>6)drag.moved=true;
+    const now=performance.now(),dt=Math.max(8,now-(drag.lastAt||now)),dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;if(!drag.moved&&Math.hypot(dx,dy)>6){drag.moved=true;clearStackHold(drag)}
     if(!drag.moved)return;
     drag.velocityX=(e.clientX-drag.lastX)/dt*16.67;drag.velocityY=(e.clientY-drag.lastY)/dt*16.67;drag.lastX=e.clientX;drag.lastY=e.clientY;drag.lastAt=now;
-    updatePointer(e);const p=new THREE.Vector3();if(raycaster.ray.intersectPlane(dragPlane,p)){const rawWorld=new THREE.Vector3(p.x-(drag.lastWorld?.x??drag.mesh.position.x),0,p.z-(drag.lastWorld?.z??drag.mesh.position.z)).multiplyScalar(16.67/dt);drag.worldVelocity??=new THREE.Vector3();drag.worldVelocity.lerp(rawWorld,.46);drag.lastWorld?.set?.(p.x,1.02,p.z);drag.mesh.position.set(p.x,1.02,p.z);const lean=clampMotion(drag.velocityX*.009,-.07,.07);drag.mesh.rotation.set(-Math.PI/2,clampMotion(-drag.velocityY*.010,-.16,.16),(Number.isFinite(drag.manualRotation)?drag.manualRotation:drag.home.rotation.z)+lean);}
+    updatePointer(e);const p=new THREE.Vector3();if(raycaster.ray.intersectPlane(dragPlane,p)){const rawWorld=new THREE.Vector3(p.x-(drag.lastWorld?.x??drag.mesh.position.x),0,p.z-(drag.lastWorld?.z??drag.mesh.position.z)).multiplyScalar(16.67/dt);drag.worldVelocity??=new THREE.Vector3();drag.worldVelocity.lerp(rawWorld,.46);drag.lastWorld?.set?.(p.x,1.02,p.z);drag.mesh.position.set(p.x,1.02,p.z);const lean=clampMotion(drag.velocityX*.009,-.07,.07);drag.mesh.rotation.set(-Math.PI/2,clampMotion(-drag.velocityY*.010,-.16,.16),(Number.isFinite(drag.manualRotation)?drag.manualRotation:drag.home.rotation.z)+lean);(drag.companions||[]).forEach((c,i)=>{const side=(i%2?1:-1)*(.055+Math.floor(i/2)*.028),back=.055+(i+1)*.032,target=new THREE.Vector3(drag.mesh.position.x+side,drag.mesh.position.y+.018*(i+1),drag.mesh.position.z+back);c.mesh.position.lerp(target,.42);c.mesh.rotation.set(drag.mesh.rotation.x,drag.mesh.rotation.y,drag.mesh.rotation.z+(i-(drag.companions.length-1)/2)*.018);c.mesh.scale.copy(c.home.scale).multiplyScalar(1.025);});}
     const near=drag.canPlay&&Math.hypot(drag.mesh.position.x-1.25,drag.mesh.position.z-.05)<cardDropRadius(drag);drag.overDrop=near;dropMarker.material.opacity=near ? .82 : .2;
-    if(drag.canPlay){const gesture=eightGestureCoordinates(drag.mesh,drag.gestureHome);emitLocalCardGesture('move',gesture.progress,gesture.lateral)}draw();e.preventDefault();
+    if(drag.canPlay&&!drag.stackMode){const gesture=eightGestureCoordinates(drag.mesh,drag.gestureHome);emitLocalCardGesture('move',gesture.progress,gesture.lateral)}draw();e.preventDefault();
   }
   function finishDrag(e,cancelled=false){
     if(!drag||e.pointerId!==drag.pointerId)return;
-    const d=drag;drag=null;host?.classList.remove('is-dragging');dropMarker.material.opacity=.2;
+    const d=drag;clearStackHold(d);drag=null;host?.classList.remove('is-dragging','is-stack-dragging');dropMarker.material.opacity=.2;
     if(d.loose&&d.kind!=='card')dropMarker.visible=false;
     if(cancelled){if(d.kind==='card'&&d.canPlay||d.loose&&d.gestureStarted)emitLocalCardGesture('cancel',0,0);if(d.loose)returnManipulatedCard(d,{snap:document.hidden});else{syncCurrent(current);draw()}return}
-    const tap=!d.rotated&&Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
+    const tap=!d.stackMode&&!d.rotated&&Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
     if(d.loose&&!tap){
+      if(d.stackMode){
+        if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);
+        if(Number.isFinite(d.manualRotation))d.mesh.rotation.z=d.manualRotation;
+        if(startFreeToss(d))return;if(settlePersistentPlacement(d))return;returnManipulatedCard(d);return;
+      }
       if(d.kind==='cactus-quick'&&d.gestureStarted){
         if(directCardDropNear(d,'cactus')){emitLocalCardGesture('commit',1,0);current?.interactions?.cactus?.('quick',d.index);return}
       }
@@ -2080,6 +2123,11 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='box-roll'||d.kind==='box-toggle'||d.kind==='box-close'){
       if(tap)current?.interactions?.box?.(d.kind==='box-roll'?'roll':d.kind==='box-toggle'?'toggle':'close',d.kind==='box-roll'?d.count:d.number);return;
     }
+    if(d.stackMode){
+      if(d.canPlay)emitLocalCardGesture('cancel',0,0);
+      if(Number.isFinite(d.manualRotation))d.mesh.rotation.z=d.manualRotation;
+      if(startFreeToss(d))return;if(settlePersistentPlacement(d))return;returnManipulatedCard(d);return;
+    }
     const near=d.canPlay&&d.moved&&(d.overDrop||Math.hypot(d.mesh.position.x-1.25,d.mesh.position.z-.05)<cardDropRadius(d));
     if(d.canPlay&&(!d.moved||near)){emitLocalCardGesture('commit',1,0);current?.interactions?.playCard?.(d.cardId);return}
     if(d.canPlay)emitLocalCardGesture('cancel',0,0);
@@ -2090,7 +2138,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function cancelActiveDrag(pointerId=null){
     if(!drag||(pointerId!==null&&drag.pointerId!==pointerId))return;
-    const d=drag,wasCard=d.kind==='card',wasLoose=!!d.loose;if(wasCard&&d.canPlay||wasLoose&&d.gestureStarted)emitLocalCardGesture('cancel',0,0);drag=null;host?.classList.remove('is-dragging');if(dropMarker)dropMarker.material.opacity=.2;
+    const d=drag,wasCard=d.kind==='card',wasLoose=!!d.loose;clearStackHold(d);if(wasCard&&d.canPlay||wasLoose&&d.gestureStarted)emitLocalCardGesture('cancel',0,0);drag=null;host?.classList.remove('is-dragging','is-stack-dragging');if(dropMarker)dropMarker.material.opacity=.2;
     if(wasLoose||wasCard){returnManipulatedCard(d,{snap:document.hidden});return}
   }
   function releaseTwistPointer(e){
