@@ -475,3 +475,14 @@ Le gagnant d'un pli peut désormais saisir directement l'une des cartes du pli t
 Le relâchement valide appelle uniquement `cardAction('collect')`. Avant cet appel, la couche de présentation mémorise les positions, rotations et échelles exactes des cartes déplacées. Quand l'état confirmé suivant montre que le pli a quitté la table, l'animation de ramassage repart de ces positions réelles au lieu de faire revenir brièvement les cartes au centre.
 
 Un relâchement hors de la zone valide n'envoie aucune action et toutes les cartes du groupe reviennent avec l'inertie locale existante. La logique de gagnant, de score, de manche et de distribution suivante reste entièrement dans le moteur Chasse aux plis.
+
+
+## Cactus — échange physique bidirectionnel
+
+La phase d'échange Cactus est désormais manipulable dans les deux sens. Le joueur actif peut prendre la carte piochée et la déposer sur l'une de ses cartes cachées, ou saisir directement la carte à remplacer et la tirer vers la carte piochée. Dans les deux cas, la détection géométrique ne modifie aucun état : elle transmet seulement l'index choisi à l'interaction existante `cactus('swap', index)`.
+
+Le moteur conserve l'autorité et publie après un échange réussi un marqueur minimal `lastSwap` composé uniquement de `owner`, `index`, `source` et `serial`. Ce marqueur décrit un mouvement physiquement observable sans contenir l'identité, la valeur ou la couleur d'une carte cachée. Il permet aux autres clients de reconstruire le même échange après réception de l'état confirmé.
+
+Après confirmation, la carte entrante et la carte sortante se croisent réellement : l'ancienne carte quitte son emplacement vers la défausse tandis que la nouvelle rejoint le même emplacement. Pour le joueur actif, l'animation peut reprendre depuis la position exacte de son drag. Pour les autres joueurs, une carte venant de la pioche reste un dos ; une carte prise sur la défausse peut rester visible pendant son trajet puisqu'elle était déjà publique.
+
+Cette passe corrige aussi le chemin visuel de la prise de défausse : le moteur utilise la source `take`, qui est maintenant interprétée correctement par le renderer au lieu d'être traitée comme une pioche cachée.
