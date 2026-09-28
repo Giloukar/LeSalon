@@ -341,6 +341,12 @@ export function createTable3DRenderer({onFatal}={}){
     rememberRummiDropOrigin(d.tileId,d.mesh);
     (d.companions||[]).forEach(c=>rememberRummiDropOrigin(c.id,c.mesh));
   }
+  function rememberTrickCollectOrigins(d){
+    const snapshot=lastCardFamilySnapshots.get('plis');if(!snapshot)return;
+    snapshot.trickOrigins??=new Map();
+    const remember=(id,mesh)=>{if(id&&mesh)snapshot.trickOrigins.set(id,{position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()})};
+    remember(d.cardId,d.mesh);(d.companions||[]).forEach(c=>remember(c.id,c.mesh));
+  }
   function animateCardFamilyConfirmed(game,payload,center,previous,currentSnapshot,opponentVisuals,centerVisuals,ownVisuals){
     if(!previous||previous.key!==currentSnapshot.key||!motionAllowed())return;
     const viewer=currentSnapshot.viewer,discardCorner=new THREE.Vector3(4.35,TABLE_Y+.24,-1.85);
@@ -374,10 +380,10 @@ export function createTable3DRenderer({onFatal}={}){
     if(game==='plis'&&previous.phase==='trickResult'&&currentSnapshot.phase==='play'&&previous.entries?.length){
       const target=cardFamilyOrigin(previous.turn,viewer,opponentVisuals);
       previous.entries.forEach((entry,i)=>{
-        const count=previous.entries.length,a=(Math.PI*2*i/Math.max(1,count))-Math.PI/2;
-        const from=new THREE.Vector3(Math.cos(a)*1.45,TABLE_Y+.26,Math.sin(a)*1.1);
+        const count=previous.entries.length,a=(Math.PI*2*i/Math.max(1,count))-Math.PI/2,direct=previous.trickOrigins?.get?.(entry.card.id);
+        const from=direct?.position?.clone?.()||new THREE.Vector3(Math.cos(a)*1.45,TABLE_Y+.26,Math.sin(a)*1.1);
         const mesh=cardMesh(entry.card,{back:!!entry.card.hidden});
-        queueCardFlight(mesh,from,target.clone().add(new THREE.Vector3((i-(count-1)/2)*.08,0,0)),{duration:500+i*35,delay:i*45,lift:.66,fromRot:i*.06,toRot:0,bank:.13,roll:(i%2?-.10:.10)});
+        queueCardFlight(mesh,from,target.clone().add(new THREE.Vector3((i-(count-1)/2)*.08,0,0)),{duration:440+i*30,delay:i*38,lift:.54,fromRot:direct?.rotation??i*.06,toRot:0,bank:.11,roll:(i%2?-.09:.09),fromScale:direct?.scale||null,toScale:new THREE.Vector3(.72,.72,.72)});
       });
     }
 
@@ -1053,10 +1059,12 @@ export function createTable3DRenderer({onFatal}={}){
         const label=makeLabel((SUIT_NAME[suit]||suit).toUpperCase(),['H','D'].includes(suit)?'#eab3ad':'#dbea9e');label.scale.set(1.6,.42,1);label.position.set(-4.65,.92,(row-1.5)*1.25);objects.add(label);
       });
     }else if(game==='plis'){
-      const physicalEntries=Array.isArray(s?.trickCards)&&s.trickCards.length?(center.entries||[]):(['trickResult','over'].includes(String(s?.phase||''))?(center.entries||[]):[]);
+      const physicalEntries=Array.isArray(s?.trickCards)&&s.trickCards.length?(center.entries||[]):(['trickResult','over'].includes(String(s?.phase||''))?(center.entries||[]):[]),canCollectTrick=!!(payload.canInteract&&data.cardAction?.canCollect);
       physicalEntries.forEach((entry,i)=>{
-        const a=(Math.PI*2*i/Math.max(1,physicalEntries.length))-Math.PI/2,x=Math.cos(a)*1.45,z=Math.sin(a)*1.1,mesh=cardMesh(entry.card,{back:!!entry.card?.hidden});
-        placeCard(mesh,x,z,TABLE_Y+.16,i*.06,.78);if(entry.card?.id)centerVisuals.set(entry.card.id,{mesh,card:entry.card,position:new THREE.Vector3(x,TABLE_Y+.26,z)});
+        const a=(Math.PI*2*i/Math.max(1,physicalEntries.length))-Math.PI/2,x=Math.cos(a)*1.45,z=Math.sin(a)*1.1,mesh=cardMesh(entry.card,{back:!!entry.card?.hidden,id:entry.card?.id});
+        placeCard(mesh,x,z,TABLE_Y+.16,i*.06,.78);
+        if(canCollectTrick&&entry.card?.id){mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'trick-collect',tapEnabled:true,cardId:entry.card.id})}
+        if(entry.card?.id)centerVisuals.set(entry.card.id,{mesh,card:entry.card,position:new THREE.Vector3(x,TABLE_Y+.26,z)});
       });
     }else if(game==='encheres'){
       if(center.prize){const prize=cardMesh(center.prize,{back:!!center.prize.hidden});placeCard(prize,0,-.55,TABLE_Y+.15,0,.88)}
@@ -1643,7 +1651,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(hovered===mesh)return;
     if(hovered&&!drag){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale);}
     hovered=mesh;
-    if(hovered&&!drag&&['card','card-select','maid-pick','battle-card','special-select','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-draw','rummi-dest','intrus-spot','code-cycle'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
+    if(hovered&&!drag&&['card','card-select','maid-pick','battle-card','trick-collect','special-select','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-draw','rummi-dest','intrus-spot','code-cycle'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
     draw();
   }
   function capturePointer(id){try{canvas?.setPointerCapture?.(id)}catch(_){}}
@@ -1658,6 +1666,10 @@ export function createTable3DRenderer({onFatal}={}){
     return[];
   }
   function groupedDragCompanions(obj,kind){
+    if(kind==='trick-collect')return objects.children.filter(mesh=>mesh!==obj&&mesh.userData?.kind==='trick-collect'&&mesh.userData?.home).map((mesh,index)=>({
+      mesh,id:mesh.userData.cardId,index,
+      home:{position:mesh.userData.home.position.clone(),rotation:mesh.userData.home.rotation.clone(),scale:mesh.userData.home.scale.clone()}
+    }));
     const ids=dragSelectionIds(obj,kind);if(ids.length<2)return[];
     const key=kind==='rummi-tile'?'tileId':'cardId',wanted=new Set(ids);
     return objects.children.filter(mesh=>mesh!==obj&&wanted.has(mesh.userData?.[key])&&mesh.userData?.home).map((mesh,index)=>({
