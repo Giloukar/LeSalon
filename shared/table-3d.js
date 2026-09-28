@@ -710,16 +710,53 @@ export function createTable3DRenderer({onFatal}={}){
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
 
     if(game==='pouilleux'){
-      const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length;
-      own.forEach((card,i)=>{const slot=handCardSlot(n,i),mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,slot.x,slot.z,TABLE_Y+.11+slot.yOffset,slot.fan,slot.scale);makeLooseManipulable(mesh,{kind:'loose-card'})});
+      const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,ownVisuals=new Map();
+      own.forEach((card,i)=>{
+        const slot=handCardSlot(n,i),mesh=cardMesh(card,{back:!!card.hidden});
+        placeCard(mesh,slot.x,slot.z,TABLE_Y+.11+slot.yOffset,slot.fan,slot.scale);makeLooseManipulable(mesh,{kind:'loose-card'});
+        if(card?.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
+      });
       const maid=data.maid||{},count=Number(maid.targetCount)||0,visible=Math.min(24,count);
       for(let i=0;i<visible;i++){
         const slot=pickCardSlot(visible,i),mesh=cardMesh(null,{back:true});placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.rot,slot.scale);
         if(payload.canInteract){mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'maid-pick',tapEnabled:true,index:i})}
       }
+
+      const discard=(s.discard||[]),discardVisuals=[],discardPos=new THREE.Vector3(3.55,TABLE_Y+.23,.25);
+      discard.slice(-4).forEach((card,i,arr)=>{
+        const mesh=cardMesh(card,{back:!!card?.hidden});placeCard(mesh,discardPos.x+i*.035,discardPos.z-i*.025,TABLE_Y+.10+i*.022,.06*(i-(arr.length-1)/2),.66);
+        discardVisuals.push({mesh,card,position:mesh.position.clone()});
+      });
+      if(discard.length){
+        const pileLabel=makeLabel('PAIRES · '+Math.floor(discard.length/2),'#e6d7b4');pileLabel.position.set(discardPos.x,1.0,discardPos.z-.72);pileLabel.scale.set(2.0,.44,1);objects.add(pileLabel);
+      }
+
+      const snapshot=maidSnapshot(payload,maid,own),previous=lastMaidSnapshot;
+      if(previous&&previous.key===snapshot.key&&motionAllowed()&&pendingMaidPickOrigin){
+        const added=(snapshot.ownIds||[]).find(id=>!(previous.ownIds||[]).includes(id)),pairMade=snapshot.discardCount>=previous.discardCount+2;
+        const from=pendingMaidPickOrigin.position?.clone?.()||new THREE.Vector3(0,TABLE_Y+.28,-.2);
+        if(added){
+          const visual=ownVisuals.get(added);
+          if(visual){
+            visual.mesh.visible=false;
+            queueCardFlight(cardMesh(null,{back:true}),from,visual.position,{duration:480,lift:.66,fromRot:pendingMaidPickOrigin.rotation||0,toRot:visual.rotation,bank:.13,roll:.10,fromScale:pendingMaidPickOrigin.scale||null,toScale:visual.scale,onDone:()=>{visual.mesh.visible=true}});
+          }
+        }else if(pairMade){
+          const handTarget=new THREE.Vector3(0,TABLE_Y+.28,2.18);
+          queueCardFlight(cardMesh(null,{back:true}),from,handTarget,{duration:390,lift:.56,fromRot:pendingMaidPickOrigin.rotation||0,toRot:0,bank:.12,roll:-.10,fromScale:pendingMaidPickOrigin.scale||null,toScale:new THREE.Vector3(.72,.72,.72)});
+          const pair=discard.slice(-2),finals=discardVisuals.slice(-2);
+          pair.forEach((card,i)=>{
+            if(finals[i]?.mesh)finals[i].mesh.visible=false;
+            queueCardFlight(cardMesh(card,{back:!!card?.hidden}),handTarget,finals[i]?.position||discardPos.clone().add(new THREE.Vector3(i*.05,0,-i*.03)),{duration:450+i*35,delay:390+i*70,lift:.52,fromRot:(i-.5)*.04,toRot:.04*(i-.5),bank:.10,roll:(i?-.08:.08),fromScale:new THREE.Vector3(.72,.72,.72),toScale:new THREE.Vector3(.66,.66,.66),onDone:()=>{if(finals[i]?.mesh)finals[i].mesh.visible=true}});
+          });
+        }
+        pendingMaidPickOrigin=null;
+      }
+      lastMaidSnapshot=snapshot;
+
       if(title)title.textContent='VUE 3D · POUILLEUX';
       if(status)status.textContent='Piochez chez '+(maid.targetName||'le joueur suivant')+' · '+count+' carte'+(count>1?'s':'');
-      if(help)help.textContent=payload.canInteract?'Touchez un dos de carte au centre · la paire éventuelle sera retirée par le moteur':(maid.pairs||0)+' paire'+((maid.pairs||0)>1?'s':'')+' déjà formée'+((maid.pairs||0)>1?'s':'');
+      if(help)help.textContent=payload.canInteract?'Touchez une carte ou glissez-la jusqu’à votre main · une paire part ensuite physiquement à la défausse':(maid.pairs||0)+' paire'+((maid.pairs||0)>1?'s':'')+' déjà formée'+((maid.pairs||0)>1?'s':'');
       return;
     }
 
@@ -1543,6 +1580,9 @@ export function createTable3DRenderer({onFatal}={}){
     }else if(d.kind==='rummi-draw'&&current?.gameId==='rummikub'){
       d.drawToRack=d.mesh.position.z>=1.65&&Math.abs(d.mesh.position.x)<=4.55;
       showDropMarkerAt(Math.max(-3.4,Math.min(3.4,d.mesh.position.x)),2.18,d.drawToRack);
+    }else if(d.kind==='maid-pick'&&current?.gameId==='pouilleux'){
+      d.maidToHand=d.mesh.position.z>=1.55&&Math.abs(d.mesh.position.x)<=4.55;
+      showDropMarkerAt(Math.max(-3.35,Math.min(3.35,d.mesh.position.x)),2.18,d.maidToHand);
     }
     draw();e.preventDefault();return true;
   }
@@ -1629,13 +1669,18 @@ export function createTable3DRenderer({onFatal}={}){
       if(d.kind==='rummi-draw'&&d.drawToRack){
         if(current?.interactions?.rummi?.('draw'))return;
       }
+      if(d.kind==='maid-pick'&&d.maidToHand){
+        pendingMaidPickOrigin={position:d.mesh.position.clone(),rotation:d.mesh.rotation.z,scale:d.mesh.scale.clone(),index:d.index};
+        if(current?.interactions?.specialCard?.('pick',d.index))return;
+        pendingMaidPickOrigin=null;
+      }
       if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d);return
     }
     if(d.loose&&(!d.tapEnabled||!current?.canInteract)){returnManipulatedCard(d,{snap:true});return}
     if(d.kind==='loose-card'){returnManipulatedCard(d,{snap:true});return}
     if(d.kind==='card-select'){current?.interactions?.cardSelect?.(d.cardId);return}
     if(d.kind==='special-select'){current?.interactions?.specialCard?.('select',d.cardId);return}
-    if(d.kind==='maid-pick'){if(tap)current?.interactions?.specialCard?.('pick',d.index);return}
+    if(d.kind==='maid-pick'){if(tap){pendingMaidPickOrigin={position:d.mesh.position.clone(),rotation:d.mesh.rotation.z,scale:d.mesh.scale.clone(),index:d.index};if(!current?.interactions?.specialCard?.('pick',d.index))pendingMaidPickOrigin=null}return}
     if(d.kind==='special-select'){if(tap)current?.interactions?.specialCard?.('select',d.cardId);return}
     if(d.kind==='battle-action'){if(tap)current?.interactions?.specialCard?.('battle');return}
     if(d.kind==='cactus-quick'){if(tap)current?.interactions?.cactus?.('quick',d.index);return}
