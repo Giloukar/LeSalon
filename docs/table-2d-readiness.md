@@ -428,3 +428,14 @@ Les sélections multiples ne se comportent plus comme une simple liste logique p
 Cette cohésion reste strictement locale et visuelle. Un seul geste de présence est émis et aucune information supplémentaire n'est envoyée sur le réseau. Au relâchement, les IDs réellement sélectionnés sont toujours récupérés par les adaptateurs autoritatifs existants ; la couche Three.js ne compose donc jamais elle-même un coup.
 
 Si le drag est annulé ou lâché hors d'une zone valide, chaque compagnon revient avec inertie vers sa propre position et sa propre échelle d'origine. Lors d'un dépôt accepté, les positions exactes de toutes les cartes/tuiles du groupe sont mémorisées dans le snapshot visuel précédent afin que l'animation confirmée reparte du paquet réellement tenu par l'utilisateur plutôt que de leurs anciens emplacements.
+
+
+## Rummikub — tour complet depuis la table 3D
+
+Le chantier Rummikub peut désormais être piloté sans revenir aux commandes 2D pour les opérations courantes. La tuile supérieure de la pioche est interactive : un toucher déclenche la pioche existante et un glissement jusqu'à la zone du chevalet exprime la même intention. Le moteur reste responsable d'annuler le chantier courant, de piocher réellement la tuile et de terminer le tour.
+
+La scène expose également les commandes autoritatives déjà existantes : **Valider le tour** lorsque le diagnostic du moteur est valide, **Annuler le dernier** lorsqu'un historique de déplacement existe, **Recommencer le tour** pour revenir au snapshot de début de tour, et **Passer** lorsque la pioche est vide.
+
+La projection 3D ne reçoit que deux informations supplémentaires du joueur actif : le nombre d'annulations disponibles et le booléen `canCommit`. Aucune information privée adverse n'est ajoutée. Tous les contrôles appellent `rummi('draw'|'commit'|'undoStep'|'undo')` ; aucune règle de combinaison, d'ouverture à 30 points ou de pendule n'est dupliquée dans Three.js.
+
+Cette couche est construite au-dessus de la manipulation groupée : sélectionner plusieurs tuiles puis saisir l'une d'elles continue de déplacer tout le groupe physique, tandis que la pioche reste un objet isolé qui ne rejoint jamais la sélection.

@@ -3366,6 +3366,7 @@ if(window.SalonTableView){
   if(S?.id==='rummikub'){
    const mine=!gate&&!net.spectator?player(S).hand:[];
    const oldIds=new Set(S.refTable.flat().map(t=>t.id));
+   const rummiDiag=canPlay()?rummiDiagnostic(S):null;
    data.rummi={
     hand:clone(mine),
     table:clone(S.table),
@@ -3376,7 +3377,9 @@ if(window.SalonTableView){
     refTableIds:[...oldIds],
     canMove:!!canPlay(),
     canMoveOld:!!player(S).opened,
-    diagnostic:canPlay()?rummiDiagnostic(S):null
+    undoCount:canPlay()?Number(S.rummiUndoCount??S.rummiHistory?.length??0):0,
+    canCommit:!!(canPlay()&&rummiDiag?.ok),
+    diagnostic:rummiDiag
    };
   }
   if(S&&TABLE_3D_CARD_GAMES.includes(S.id)){
