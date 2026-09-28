@@ -26,3 +26,9 @@ Le harness fige l’horloge et le hasard dans le navigateur de test, enregistre 
 Le scénario de pendule reste un diagnostic du comportement actuel. Les scénarios d’identité de siège sont désormais des contrats de régression. Les tests ne valident pas exhaustivement les règles, le drag, WebRTC réel, l’audio, le puff ou la qualité visuelle.
 
 Voir le diagnostic d’architecture dans docs/table-2d-readiness.md.
+
+`puff-model.test.mjs` vérifie aussi dans Chromium/WebGL le chargement du modèle
+commun sans capuchon, les quatre habillages et goûts conservés, la transparence,
+le socle argenté invariant, l’écran et les actions de tirage. Les modules Three.js
+0.169.0 sont servis localement par le test, sans dépendre du CDN. Pour conserver
+les quatre rendus de contrôle, définir `PUFF_SCREENSHOT_DIR` vers un dossier existant.

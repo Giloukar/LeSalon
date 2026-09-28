@@ -28,12 +28,13 @@ function smokeTexture() {
 }
 
 /* ---------- Skins ---------- */
-// "blackberry" = impression d'origine du modèle GLB ; les autres sont peints dans la même disposition UV
+// Les quatre habillages historiques partagent la nouvelle coque sans capuchon.
+// "blackberry" conserve son impression d’origine ; les autres gardent leurs décors peints.
 export const SKINS = {
-  blackberry: { name: "Blackberry", original: true },
-  falcon: { name: "Golden Falcon", flavor: ["MANGO", "PASSION FRUIT"], scene: "forest", sky: ["#0c3f3a", "#1c8676", "#45c9b4", "#b4f3e3"], splash: "#fff1c4", flavorColor: "#ff9f2e" },
-  cherry: { name: "Cherry Ice", flavor: ["CHERRY", "ICE"], scene: "sky", sky: ["#0b2f4f", "#1f6f9e", "#4fb0e0", "#bfe6f7"], splash: "#d8233f", flavorColor: "#ff5a6e" },
-  razz: { name: "Blue Razz", flavor: ["BLUE", "RAZZ"], scene: "dusk", sky: ["#140a33", "#3a1a66", "#b0418f", "#f59a6b"], splash: "#7fe8ff", flavorColor: "#7fe8ff" }
+  blackberry: { name: "Blackberry", original: true, cap: "#7e3cc7" },
+  falcon: { name: "Golden Falcon", cap: "#249b83", flavor: ["MANGO", "PASSION FRUIT"], scene: "forest", sky: ["#0c3f3a", "#1c8676", "#45c9b4", "#b4f3e3"], splash: "#fff1c4", flavorColor: "#ff9f2e" },
+  cherry: { name: "Cherry Ice", cap: "#ff314d", flavor: ["CHERRY", "ICE"], scene: "sky", sky: ["#0b2f4f", "#1f6f9e", "#4fb0e0", "#bfe6f7"], splash: "#d8233f", flavorColor: "#ff5a6e" },
+  razz: { name: "Blue Razz", cap: "#2a9ad0", flavor: ["BLUE", "RAZZ"], scene: "dusk", sky: ["#140a33", "#3a1a66", "#b0418f", "#f59a6b"], splash: "#7fe8ff", flavorColor: "#7fe8ff" }
 };
 // Photo réelle de buse à queue rousse en vol, détourée (Frank Schulenburg, Wikimedia Commons, CC BY-SA 4.0) — voir assets/puff/CREDITS.md
 const HAWK = new Image(), onHawk = [];
@@ -262,8 +263,8 @@ class Smoke {
   }
 }
 
-/* ---------- Modèle JNR (assets/puff/jnr.glb, fourni) ---------- */
-const GLB_URL = new URL("../assets/puff/jnr.glb?v=1", import.meta.url).href;
+/* ---------- Coque Falcon-X issue des photos, sans capuchon ---------- */
+const GLB_URL = new URL("../assets/puff/jnr-falcon-uncapped.glb?v=1", import.meta.url).href;
 async function loadPuff() {
   const gltf = await new GLTFLoader().loadAsync(GLB_URL);
   const root = gltf.scene, group = new THREE.Group();
@@ -271,30 +272,43 @@ async function loadPuff() {
   const K = 3.65 / size.y; // hauteur de la puff à l'écran ≈ 3,65 unités
   root.scale.setScalar(K); root.position.set(-(box.min.x + box.max.x) / 2 * K, -box.min.y * K - size.y * K / 2, -(box.min.z + box.max.z) / 2 * K);
   group.add(root);
-  let decorMat = null;
+  const decorMats = new Set(), flavorMats = new Set();
   root.traverse(o => {
     if (!o.isMesh) return;
     const m = o.material;
-    if (m.map) decorMat = m;
-    m.envMapIntensity = m.transmission ? .8 : .55; // reflets retenus : la puff ne doit pas "briller"
+    if (m.name === "Printed_wrap_original_Blackberry") decorMats.add(m);
+    if (m.name === "Flavor_colored_upper_housing") flavorMats.add(m);
+    m.envMapIntensity = m.transmission ? .35 : .55;
+    if (m.transmission) {
+      // Le widget est un canvas alpha, sans fond opaque : une coque transmissive
+      // opaque blanchirait le DOM derrière le col et masquerait l’afficheur.
+      m.transparent = true; m.opacity = .22; m.depthWrite = false;
+    }
   });
+  if (!decorMats.size) throw new Error("Puff: matériau d’habillage absent du modèle");
+  // Seul l’habillage change : le socle argenté et l’embout transparent restent fixes.
+  const decorMat = decorMats.values().next().value;
   // Texture de décor sur canevas : impression d'origine (chiffres imprimés effacés) ou skin peint
   const canvas = document.createElement("canvas"); canvas.width = TW; canvas.height = TH;
   const g = canvas.getContext("2d"), original = decorMat.map.image;
   const tex = new THREE.CanvasTexture(canvas);
   tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 8;
-  decorMat.map = tex; decorMat.emissiveMap = tex; decorMat.needsUpdate = true;
+  const oldTextures = new Set([...decorMats].flatMap(m => [m.map, m.emissiveMap]).filter(Boolean));
+  decorMats.forEach(m => { m.map = tex; m.emissiveMap = tex; m.needsUpdate = true; });
+  oldTextures.forEach(t => t.dispose());
 
   // Écran : plan collé sur la face avant, à l'emplacement des chiffres d'origine
   const dispCanvas = document.createElement("canvas"); paintDisplay(dispCanvas, 100);
   const dispTex = new THREE.CanvasTexture(dispCanvas); dispTex.colorSpace = THREE.SRGBColorSpace;
   const screenMat = new THREE.MeshBasicMaterial({ map: dispTex, transparent: true, toneMapped: false, depthWrite: false });
   const screen = new THREE.Mesh(new THREE.PlaneGeometry(.0235, .0088), screenMat);
-  screen.position.set(0, .0167, .01535); screen.name = "screen"; root.children[0].add(screen);
+  screen.position.set(0, .0152, .0163); screen.name = "screen"; root.add(screen);
 
   let current = "blackberry";
   function setSkin(id) {
-    const s = SKINS[id] || SKINS.blackberry; current = id;
+    current = Object.hasOwn(SKINS, id) ? id : "blackberry";
+    const s = SKINS[current];
+    flavorMats.forEach(m => m.color.set(s.cap));
     if (s.original) { g.drawImage(original, 0, 0, TW, TH); eraseDigits(g); } else paintSkin(g, s);
     tex.needsUpdate = true;
   }

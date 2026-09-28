@@ -7,9 +7,10 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test --test-concurrency=1 characterization.test.mjs"
+    "test": "node --test --test-concurrency=1 characterization.test.mjs puff-model.test.mjs"
   },
   "devDependencies": {
-    "playwright": "1.62.1"
+    "playwright": "1.62.1",
+    "three": "0.169.0"
   }
 }

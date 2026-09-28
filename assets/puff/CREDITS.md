@@ -14,3 +14,21 @@ Les autres sons (tirage, expiration, jingles) sont synthétisés en WebAudio dan
   Wikimedia Commons, licence [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
   Source : https://commons.wikimedia.org/wiki/File:Buteo_jamaicensis_calurus_in_flight,_Squaw_Valley,_California.jpg
   Cette image modifiée est redistribuée sous la même licence.
+
+# Modèle 3D de la puff
+
+- `jnr-falcon-uncapped.glb` — nouvelle géométrie reconstruite à partir des quatre
+  photographies fournies par Mathis le 28 septembre 2026 : corps ovale aplati,
+  socle argenté, coque et embout transparents, conduit creux, sans capuchon gris.
+  Dimensions estimées : 64 × 132,7 × 32 mm, axe Y vertical, face avant vers +Z.
+  Le dessous et les parties internes non photographiées sont approximatifs.
+- Les quatre habillages du site restent Blackberry / Red Raspberry,
+  Golden Falcon / Mango Passion Fruit, Cherry Ice et Blue Razz. L’impression
+  Blackberry embarquée provient du modèle `jnr.glb` déjà fourni ; les autres
+  décors conservent le générateur et l’image `hawk.webp` créditée ci-dessus.
+- Le matériau `Printed_wrap_original_Blackberry` reçoit seul la texture de goût ;
+  `Flavor_colored_upper_housing` reçoit la couleur assortie. Le socle métallique
+  et le polycarbonate transparent sont indépendants du choix de goût.
+- glTF 2.0 avec textures embarquées, unités en mètres, extensions de matériaux
+  transmission / volume / IOR / clearcoat. Le widget utilise GLTFLoader 0.169.0.
+  Le GLB source reste éditable avec des pièces nommées distinctes.
