@@ -520,6 +520,29 @@ test('manual local object rotation stays presentation-only on wheel and touch tw
  assert.doesNotMatch(source,/drag\.twist[^\n]*publishOnline\(/);
 });
 
+test('local face flipping persists locally and coexists with rotation, tosses and stack mode',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/function faceRotationX\(value\)/);
+ assert.match(source,/function flipLocalObject\(mesh\)/);
+ assert.match(source,/function flipDraggedObject\(\)/);
+ assert.match(source,/d\.stackMode\)return false/);
+ assert.match(source,/function onKeyDown\(e\)/);
+ assert.match(source,/String\(e\.key\|\|''\)\.toLowerCase\(\)!=='f'/);
+ assert.match(source,/manualFace:faceRotationX\(obj\.rotation\.x\)/);
+ assert.match(source,/faceX:faceRotationX\(item\.mesh\.rotation\.x\)/);
+ assert.match(source,/a\.mesh\.rotation\.x=\(a\.faceX\?\?-Math\.PI\/2\)/);
+ assert.match(source,/const tap=!d\.stackMode&&!d\.rotated&&!d\.flipped/);
+ assert.match(source,/twist=drag\.twist,quickTap=!twist\.turned/);
+ assert.match(source,/performance\.now\(\)-Number\(twist\.startedAt\|\|0\)<=260/);
+ assert.match(source,/if\(quickTap\)flipDraggedObject\(\)/);
+ assert.match(source,/mats=\[edgeMaterial,edgeMaterial,edgeMaterial,edgeMaterial,front,rummiBackMaterial\]/);
+ assert.match(source,/canvas\.addEventListener\('keydown',onKeyDown\)/);
+ assert.match(source,/canvas\?\.removeEventListener\('keydown',onKeyDown\)/);
+ assert.doesNotMatch(source,/flipLocalObject[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/flipDraggedObject[^\n]*onlineAct\(/);
+ assert.doesNotMatch(source,/onKeyDown[^\n]*publishOnline\(/);
+});
+
 test('local pose stacks can be moved as local-only packets without becoming game actions',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/function localStackCompanions\(mesh\)/);
