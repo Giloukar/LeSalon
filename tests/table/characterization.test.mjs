@@ -205,6 +205,8 @@ test('shared card-family physical cleanup remains snapshot-driven and presentati
  assert.match(source,/function exactLocalCardOrigin\(previous,id,index=0\)/);
  assert.match(source,/game==='president'&&\(previous\.centerIds\|\|\[\]\)\.length/);
  assert.match(source,/game==='plis'&&previous\.phase==='trickResult'&&currentSnapshot\.phase==='play'/);
+ assert.match(source,/const physicalEntries=Array\.isArray\(state\?\.trickCards\)/);
+ assert.match(source,/const physicalEntries=Array\.isArray\(s\?\.trickCards\)/);
  assert.match(source,/game==='encheres'&&previous\.bidRound&&currentSnapshot\.bidRound>previous\.bidRound/);
  assert.match(source,/previous\.ownIds\|\|\[\]\)\.filter\(id=>!\(currentSnapshot\.ownIds/);
  assert.doesNotMatch(source,/exactLocalCardOrigin[^\n]*dispatch\(/);
