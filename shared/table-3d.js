@@ -6,6 +6,7 @@ const RANK_NAME={1:'A',11:'V',12:'D',13:'R'};
 const CARD_W=1.22,CARD_H=1.78,CARD_D=.045;
 const TABLE_Y=.28;
 const LIVE_CARD_GAMES=new Set(['huit','president','menteur','suites','plis','encheres','quatrevingtdixneuf','cactus']);
+const TABLETOP_CARD_GAMES=new Set(['huit','president','menteur','suites','plis','encheres','quatrevingtdixneuf','pouilleux','vingtetun']);
 const visualHash=str=>{
   let h=2166136261;
   for(const ch of String(str)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}
@@ -87,8 +88,8 @@ export function createTable3DRenderer({onFatal}={}){
   let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='',cityFocusIndex=null;
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
-  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,cameraControl={yaw:0,pitch:0,zoom:1},cameraDrag=null,cameraGame='',lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,lastBattleSnapshot=null,pendingMaidPickOrigin=null,pendingBattleOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
-  const localPoses=new Map();let activePoseScope='',poseSeen=new Set(),localPoseOrder=0;
+  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,cameraControl={yaw:0,pitch:0,zoom:1},cameraDrag=null,cameraGame='',lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,lastBattleSnapshot=null,pendingMaidPickOrigin=null,pendingBattleOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map(),remoteTabletopCards=new Map(),remoteTabletopMeshes=new Map(),remoteTabletopScope='';
+  const localPoses=new Map(),localTabletopTokens=new Map();let activePoseScope='',poseSeen=new Set(),localPoseOrder=0,localTabletopCounter=0;
 
   function cameraViewChanged(){
     return Math.abs(cameraControl.yaw)>.001||Math.abs(cameraControl.pitch)>.001||Math.abs(cameraControl.zoom-1)>.001;
@@ -166,6 +167,99 @@ export function createTable3DRenderer({onFatal}={}){
     }
     display.position.y+=Math.min(.12,below*(kind==='tile'?.010:.014));return display;
   }
+  function tabletopScope(payload=current){
+    const state=payload?.state;return [payload?.gameId||'',state?.startedAt||''].join('~');
+  }
+  function localTabletopToken(key){
+    if(!key)return null;let token=localTabletopTokens.get(key);
+    if(!token){token=++localTabletopCounter;localTabletopTokens.set(key,token)}
+    return token;
+  }
+  function emitLocalTabletop(phase,{mesh=null,key=null,pose=null}={}){
+    const gameId=current?.gameId;if(!TABLETOP_CARD_GAMES.has(gameId))return false;
+    key=key||mesh?.userData?.localPoseKey;
+    if(phase==='reset'){
+      window.dispatchEvent(new CustomEvent('salon:local-card-tabletop',{detail:{gameId,phase:'reset'}}));return true;
+    }
+    const token=localTabletopToken(key);if(!token)return false;
+    if(phase==='remove'){
+      window.dispatchEvent(new CustomEvent('salon:local-card-tabletop',{detail:{gameId,phase:'remove',token}}));localTabletopTokens.delete(key);return true;
+    }
+    if(!mesh?.userData?.cardId)return false;
+    const floorY=Number(mesh.userData.localPoseFloorY??TABLE_Y+.12),p=pose||meshTransform(mesh);
+    window.dispatchEvent(new CustomEvent('salon:local-card-tabletop',{detail:{
+      gameId,phase:'pose',token,
+      x:clampMotion(p.position.x,-5.05,5.05),z:clampMotion(p.position.z,-3.08,3.08),
+      lift:clampMotion(mesh.position.y-floorY,0,1.35),rotation:Number(p.rotation.z)||0
+    }}));return true;
+  }
+  function hasActiveLocalCardPoses(){
+    if(!activePoseScope)return false;const prefix=activePoseScope+'|card|';
+    for(const key of localPoses.keys())if(key.startsWith(prefix))return true;
+    return false;
+  }
+  function hasActiveNonCardPoses(){
+    if(!activePoseScope)return false;const prefix=activePoseScope+'|',cardPrefix=activePoseScope+'|card|';
+    for(const key of localPoses.keys())if(key.startsWith(prefix)&&!key.startsWith(cardPrefix))return true;
+    return false;
+  }
+  function remoteTabletopKey(actor,token){return String(actor)+':'+String(token)}
+  function remoteTabletopCountFor(actor){
+    const scope=tabletopScope(current),game=current?.gameId;let count=0;
+    for(const entry of remoteTabletopCards.values())if(entry.scope===scope&&entry.gameId===game&&entry.actor===actor)count++;
+    return count;
+  }
+  function clearRemoteTabletopMeshes(){
+    for(const mesh of remoteTabletopMeshes.values())cardFx.remove(mesh);
+    remoteTabletopMeshes.clear();
+  }
+  function resetRemoteTabletopScope(payload=current){
+    const scope=tabletopScope(payload);if(remoteTabletopScope===scope)return;
+    remoteTabletopScope=scope;remoteTabletopCards.clear();clearRemoteTabletopMeshes();remoteCardGestures.clear();
+  }
+  function remoteTabletopTransform(entry,display=entry.display||entry.target){
+    const seat=currentCardOpponentSeat(entry.actor);if(!seat||!display)return null;
+    return{
+      x:seat.x-Number(display.x||0),
+      z:seat.z+(2.45-Number(display.z||0)),
+      y:TABLE_Y+.12+clampMotion(display.lift,0,1.35),
+      rotation:(Number(display.rotation)||0)+Math.PI
+    };
+  }
+  function ensureRemoteTabletopMesh(key,entry){
+    let mesh=remoteTabletopMeshes.get(key);
+    if(!mesh){mesh=cardMesh(null,{back:true});mesh.scale.setScalar(.78);cardFx.add(mesh);remoteTabletopMeshes.set(key,mesh)}
+    const tr=remoteTabletopTransform(entry);if(tr){mesh.position.set(tr.x,tr.y,tr.z);mesh.rotation.set(-Math.PI/2,0,tr.rotation)}
+    return mesh;
+  }
+  function renderRemoteTabletopCards(){
+    const scope=tabletopScope(current),game=current?.gameId,viewer=Number.isInteger(current?.privateIndex)?current.privateIndex:0;
+    clearRemoteTabletopMeshes();
+    for(const [key,entry] of remoteTabletopCards){
+      if(entry.scope!==scope||entry.gameId!==game||entry.actor===viewer)continue;
+      ensureRemoteTabletopMesh(key,entry);
+    }
+  }
+  function onRemoteCardTabletop(event){
+    const d=event?.detail||{},game=current?.gameId,scope=tabletopScope(current),actor=Number(d.actor);
+    if(!active||!TABLETOP_CARD_GAMES.has(game)||(d.gameId&&d.gameId!==game)||!Number.isInteger(actor)||actor===(Number.isInteger(current?.privateIndex)?current.privateIndex:0))return;
+    if(d.phase==='reset'){
+      for(const [key,entry] of [...remoteTabletopCards])if(entry.scope===scope&&entry.gameId===game&&entry.actor===actor){remoteTabletopCards.delete(key);const mesh=remoteTabletopMeshes.get(key);if(mesh)cardFx.remove(mesh);remoteTabletopMeshes.delete(key)}
+      draw();return;
+    }
+    const token=Number(d.token);if(!Number.isInteger(token)||token<1)return;const key=remoteTabletopKey(actor,token);
+    if(d.phase==='remove'){
+      remoteTabletopCards.delete(key);const mesh=remoteTabletopMeshes.get(key);if(mesh)cardFx.remove(mesh);remoteTabletopMeshes.delete(key);draw();return;
+    }
+    if(d.phase!=='pose')return;
+    const target={x:clampMotion(d.x,-5.05,5.05),z:clampMotion(d.z,-3.08,3.08),lift:clampMotion(d.lift,0,1.35),rotation:Number(d.rotation)||0};
+    let entry=remoteTabletopCards.get(key);
+    if(!entry||entry.scope!==scope||entry.gameId!==game){entry={scope,gameId:game,actor,token,target:{...target},display:{...target}};remoteTabletopCards.set(key,entry)}
+    else entry.target={...target};
+    ensureRemoteTabletopMesh(key,entry);
+    if(motionAllowed())startMotion();else{entry.display={...target};ensureRemoteTabletopMesh(key,entry);draw()}
+  }
+
   function applyLocalPose(mesh,{floorY=null}={}){
     if(!mesh)return null;
     mesh.userData.home??=meshTransform(mesh);
@@ -186,7 +280,7 @@ export function createTable3DRenderer({onFatal}={}){
     const pose=freePoseForMesh(mesh,home);if(!pose)return null;
     pose.order=Number.isFinite(order)?order:++localPoseOrder;if(Number.isFinite(order))localPoseOrder=Math.max(localPoseOrder,order);
     localPoses.set(key,cloneTransform(pose));poseSeen.add(key);
-    const display=localPoseDisplay(key,pose);mesh.userData.home=cloneTransform(display);return display;
+    const display=localPoseDisplay(key,pose);mesh.userData.home=cloneTransform(display);if(mesh.userData?.cardId)emitLocalTabletop('pose',{mesh,key,pose:display});return display;
   }
   function hasActiveLocalPoses(){
     if(!activePoseScope)return false;const prefix=activePoseScope+'|';
@@ -194,18 +288,26 @@ export function createTable3DRenderer({onFatal}={}){
     return false;
   }
   function updateLocalPoseResetButton(){
-    const button=host?.querySelector?.('[data-table-3d-reset-poses]');if(button)button.hidden=!hasActiveLocalPoses();
+    const cards=hasActiveLocalCardPoses(),button=host?.querySelector?.('[data-table-3d-reset-poses]'),hand=host?.querySelector?.('[data-table-3d-reset-hand]');
+    if(button)button.hidden=!hasActiveNonCardPoses();
+    if(hand)hand.hidden=!cards;
+  }
+  function resetActiveLocalCardPoses(){
+    if(!activePoseScope)return false;const prefix=activePoseScope+'|card|';let changed=false;
+    for(const key of [...localPoses.keys()])if(key.startsWith(prefix)){localPoses.delete(key);localTabletopTokens.delete(key);changed=true}
+    if(!changed)return false;
+    emitLocalTabletop('reset');poseSeen=new Set();if(current){syncCurrent(current);pruneLocalPoses();renderRemoteTabletopCards()}updateLocalPoseResetButton();draw();return true;
   }
   function resetActiveLocalPoses(){
-    if(!activePoseScope)return false;const prefix=activePoseScope+'|';let changed=false;
-    for(const key of [...localPoses.keys()])if(key.startsWith(prefix)){localPoses.delete(key);changed=true}
+    if(!activePoseScope)return false;const prefix=activePoseScope+'|';let changed=false,hadCards=false;
+    for(const key of [...localPoses.keys()])if(key.startsWith(prefix)){hadCards=hadCards||key.startsWith(activePoseScope+'|card|');localPoses.delete(key);localTabletopTokens.delete(key);changed=true}
     if(!changed)return false;
-    poseSeen=new Set();if(current){syncCurrent(current);pruneLocalPoses()}updateLocalPoseResetButton();draw();return true;
+    if(hadCards)emitLocalTabletop('reset');poseSeen=new Set();if(current){syncCurrent(current);pruneLocalPoses();renderRemoteTabletopCards()}updateLocalPoseResetButton();draw();return true;
   }
   function pruneLocalPoses(){
     if(!activePoseScope)return;
     const prefix=activePoseScope+'|';
-    for(const key of [...localPoses.keys()])if(key.startsWith(prefix)&&!poseSeen.has(key))localPoses.delete(key);
+    for(const key of [...localPoses.keys()])if(key.startsWith(prefix)&&!poseSeen.has(key)){if(key.startsWith(activePoseScope+'|card|'))emitLocalTabletop('remove',{key});localPoses.delete(key)}
   }
   function makeLooseManipulable(mesh,{kind=mesh.userData.kind,tapEnabled=false,persistPose=false,poseFloorY=null,...data}={}){
     mesh.userData={...mesh.userData,...data,kind,interactive:true,looseManip:true,tapEnabled:!!tapEnabled};
@@ -262,6 +364,7 @@ export function createTable3DRenderer({onFatal}={}){
     canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();onFatal?.(new Error('Contexte WebGL perdu'));});
     window.addEventListener('blur',onWindowBlur);
     window.addEventListener('salon:remote-card-gesture',onRemoteCardGesture);
+    window.addEventListener('salon:remote-card-tabletop',onRemoteCardTabletop);
     document.addEventListener('visibilitychange',onVisibilityChange);
     assetUnsubscribe??=externalAssets?.subscribe?.(()=>{if(active&&current){syncCurrent(current);draw()}})||null;
   }
@@ -269,9 +372,10 @@ export function createTable3DRenderer({onFatal}={}){
     const column=document.querySelector('.table-column');if(!column)return null;
     if(!host?.isConnected){
       host=document.createElement('section');host.className='table-3d-host';host.setAttribute('aria-label','Vue 3D de la table');
-      host.innerHTML='<div class="table-3d-window-controls" aria-label="Affichage 3D"><button type="button" class="table-3d-window-button table-3d-reset" data-table-3d-reset-poses hidden aria-label="Ranger mes objets selon la disposition du jeu" title="Ranger mes objets · local uniquement">↺</button><button type="button" class="table-3d-window-button table-3d-camera-reset" data-table-3d-reset-camera hidden aria-label="Recentrer la caméra 3D" title="Recentrer la caméra">◎</button><button type="button" class="table-3d-window-button table-3d-minimize" data-table-3d-window="embedded" aria-label="Réduire la vue 3D dans la page" title="Réduire la vue 3D">↙</button><button type="button" class="table-3d-window-button table-3d-expand" data-table-3d-window="full" aria-label="Agrandir la vue 3D" title="Plein écran">⛶</button><button type="button" class="table-3d-window-button table-3d-close" data-table-view-mode="2d" aria-label="Revenir à la vue 2D" title="Revenir à la vue 2D">×</button></div><div class="table-3d-hud"><span class="table-3d-accent" data-table-3d-title>VUE 3D</span><span data-table-3d-status>Table synchronisée</span></div><div class="table-3d-help" data-table-3d-help>Glissez le tapis pour tourner la vue · molette sur le tapis pour zoomer</div>';
+      host.innerHTML='<div class="table-3d-window-controls" aria-label="Affichage 3D"><button type="button" class="table-3d-window-button table-3d-reset" data-table-3d-reset-poses hidden aria-label="Ranger mes objets selon la disposition du jeu" title="Ranger mes objets · local uniquement">↺</button><button type="button" class="table-3d-window-button table-3d-camera-reset" data-table-3d-reset-camera hidden aria-label="Recentrer la caméra 3D" title="Recentrer la caméra">◎</button><button type="button" class="table-3d-window-button table-3d-minimize" data-table-3d-window="embedded" aria-label="Réduire la vue 3D dans la page" title="Réduire la vue 3D">↙</button><button type="button" class="table-3d-window-button table-3d-expand" data-table-3d-window="full" aria-label="Agrandir la vue 3D" title="Plein écran">⛶</button><button type="button" class="table-3d-window-button table-3d-close" data-table-view-mode="2d" aria-label="Revenir à la vue 2D" title="Revenir à la vue 2D">×</button></div><button type="button" class="table-3d-hand-reset" data-table-3d-reset-hand hidden>Ranger ma main</button><div class="table-3d-hud"><span class="table-3d-accent" data-table-3d-title>VUE 3D</span><span data-table-3d-status>Table synchronisée</span></div><div class="table-3d-help" data-table-3d-help>Glissez le tapis pour tourner la vue · molette sur le tapis pour zoomer</div>';
       host.querySelectorAll('[data-table-3d-window]').forEach(button=>button.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.dispatchEvent(new CustomEvent('salon:table-3d-window',{detail:{mode:button.getAttribute('data-table-3d-window')}}))}));
       host.querySelector('[data-table-3d-reset-poses]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();resetActiveLocalPoses()});
+      host.querySelector('[data-table-3d-reset-hand]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();resetActiveLocalCardPoses()});
       host.querySelector('[data-table-3d-reset-camera]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();resetCameraView()});
       const banner=column.querySelector('.turn-banner');banner?.after(host);if(!banner)column.prepend(host);
       host.append(canvas);
@@ -293,7 +397,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
     for(const child of [...objects.children]){objects.remove(child);disposeTemporaryTree(child)}
     for(const child of [...cardFx.children]){cardFx.remove(child);disposeTemporaryTree(child)}
-    remoteCardGestures.clear();
+    remoteCardGestures.clear();remoteTabletopMeshes.clear();
   }
   function placeCard(mesh,x,z,y=TABLE_Y+.07,rot=0,scale=1){
     mesh.position.set(x,y,z);mesh.rotation.set(-Math.PI/2,0,rot);mesh.scale.setScalar(scale);objects.add(mesh);return mesh;
@@ -1814,8 +1918,8 @@ export function createTable3DRenderer({onFatal}={}){
       document.documentElement.removeAttribute('data-table-3d-game');document.documentElement.removeAttribute('data-table-3d-phase');return;
     }
     ensureHost();document.documentElement.dataset.table3dGame=payload.gameId||'';document.documentElement.dataset.table3dPhase=payload.state?.phase||'';
-    activePoseScope=poseScope(payload);poseSeen=new Set();
-    syncCurrent(payload);pruneLocalPoses();updateLocalPoseResetButton();updateCameraResetButton();draw();
+    resetRemoteTabletopScope(payload);activePoseScope=poseScope(payload);poseSeen=new Set();
+    syncCurrent(payload);pruneLocalPoses();renderRemoteTabletopCards();updateLocalPoseResetButton();updateCameraResetButton();draw();
   }
   function draw(){if(active&&renderer&&scene&&camera)renderer.render(scene,camera)}
   function updatePointer(e){
@@ -2317,10 +2421,10 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function destroy(){
     deactivate();clearObjects();
-    canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);canvas?.removeEventListener('lostpointercapture',onLostPointerCapture);canvas?.removeEventListener('wheel',onWheel);canvas?.removeEventListener('keydown',onKeyDown);window.removeEventListener('blur',onWindowBlur);window.removeEventListener('salon:remote-card-gesture',onRemoteCardGesture);document.removeEventListener('visibilitychange',onVisibilityChange);assetUnsubscribe?.();assetUnsubscribe=null;
+    canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);canvas?.removeEventListener('lostpointercapture',onLostPointerCapture);canvas?.removeEventListener('wheel',onWheel);canvas?.removeEventListener('keydown',onKeyDown);window.removeEventListener('blur',onWindowBlur);window.removeEventListener('salon:remote-card-gesture',onRemoteCardGesture);window.removeEventListener('salon:remote-card-tabletop',onRemoteCardTabletop);document.removeEventListener('visibilitychange',onVisibilityChange);assetUnsubscribe?.();assetUnsubscribe=null;
     cardGeometry.dispose();tileGeometry.dispose();pawnGeometry.dispose();dieGeometry.dispose();rummiTileGeometry.dispose();grainGeometry.dispose();heldPadGeometry.dispose();codeGemGeometry.dispose();intrusDotGeometry.dispose();balloonGeometry.dispose();golfBallGeometry.dispose();cityTileGeometry.dispose();cityHouseGeometry.dispose();cityPegGeometry.dispose();edgeMaterial.dispose();backMaterial.dispose();for(const m of frontMaterials.values())m.dispose();for(const m of tileMaterials.values())m.dispose();for(const m of rummiTileMaterials.values())m.dispose();for(const m of pawnMaterials.values())m.dispose();for(const m of dieFaceMaterials.values())m.dispose();for(const m of cellLabelMaterials.values())m.dispose();for(const m of boxTileMaterials.values())m.dispose();neutralDieMaterial.dispose();rummiBackMaterial.dispose();for(const t of disposableTextures)t.dispose();for(const t of cellLabelTextures)t.dispose();
     tableMesh?.geometry?.dispose();tableMesh?.material?.dispose();dropMarker?.geometry?.dispose();dropMarker?.material?.dispose();renderer?.dispose();
-    localPoses.clear();poseSeen.clear();activePoseScope='';localPoseOrder=0;cameraPose=null;cameraControl={yaw:0,pitch:0,zoom:1};cameraDrag=null;cameraGame='';
+    localPoses.clear();localTabletopTokens.clear();remoteTabletopCards.clear();remoteTabletopMeshes.clear();poseSeen.clear();activePoseScope='';localPoseOrder=0;localTabletopCounter=0;remoteTabletopScope='';cameraPose=null;cameraControl={yaw:0,pitch:0,zoom:1};cameraDrag=null;cameraGame='';
     renderer=scene=camera=canvas=null;current=null;
   }
   return{activate,render,deactivate,destroy};
