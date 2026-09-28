@@ -1886,7 +1886,7 @@ export function createTable3DRenderer({onFatal}={}){
       const rawWorld=new THREE.Vector3(p.x-(d.lastWorld?.x??d.mesh.position.x),0,p.z-(d.lastWorld?.z??d.mesh.position.z)).multiplyScalar(16.67/dt);
       d.worldVelocity??=new THREE.Vector3();d.worldVelocity.lerp(rawWorld,.46);d.lastWorld?.set?.(p.x,1.05,p.z);
       d.mesh.position.set(p.x,1.05,p.z);
-      const lean=clampMotion((e.clientX-d.lastX)*.0018,-.08,.08);
+      const lean=clampMotion(d.velocityX*.010,-.08,.08);
       d.mesh.rotation.set(-Math.PI/2,clampMotion(-d.velocityY*.012,-.20,.20),(Number.isFinite(d.manualRotation)?d.manualRotation:d.home.rotation.z)+lean);
       d.mesh.scale.copy(d.home.scale).multiplyScalar(1.045);
       (d.companions||[]).forEach((c,i)=>{
@@ -1982,7 +1982,7 @@ export function createTable3DRenderer({onFatal}={}){
     const now=performance.now(),dt=Math.max(8,now-(drag.lastAt||now)),dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;if(!drag.moved&&Math.hypot(dx,dy)>6)drag.moved=true;
     if(!drag.moved)return;
     drag.velocityX=(e.clientX-drag.lastX)/dt*16.67;drag.velocityY=(e.clientY-drag.lastY)/dt*16.67;drag.lastX=e.clientX;drag.lastY=e.clientY;drag.lastAt=now;
-    updatePointer(e);const p=new THREE.Vector3();if(raycaster.ray.intersectPlane(dragPlane,p)){const rawWorld=new THREE.Vector3(p.x-(drag.lastWorld?.x??drag.mesh.position.x),0,p.z-(drag.lastWorld?.z??drag.mesh.position.z)).multiplyScalar(16.67/dt);drag.worldVelocity??=new THREE.Vector3();drag.worldVelocity.lerp(rawWorld,.46);drag.lastWorld?.set?.(p.x,1.02,p.z);drag.mesh.position.set(p.x,1.02,p.z);const lean=clampMotion((e.clientX-drag.lastX)*.0016,-.07,.07);drag.mesh.rotation.set(-Math.PI/2,clampMotion(-drag.velocityY*.010,-.16,.16),(Number.isFinite(drag.manualRotation)?drag.manualRotation:drag.home.rotation.z)+lean);}
+    updatePointer(e);const p=new THREE.Vector3();if(raycaster.ray.intersectPlane(dragPlane,p)){const rawWorld=new THREE.Vector3(p.x-(drag.lastWorld?.x??drag.mesh.position.x),0,p.z-(drag.lastWorld?.z??drag.mesh.position.z)).multiplyScalar(16.67/dt);drag.worldVelocity??=new THREE.Vector3();drag.worldVelocity.lerp(rawWorld,.46);drag.lastWorld?.set?.(p.x,1.02,p.z);drag.mesh.position.set(p.x,1.02,p.z);const lean=clampMotion(drag.velocityX*.009,-.07,.07);drag.mesh.rotation.set(-Math.PI/2,clampMotion(-drag.velocityY*.010,-.16,.16),(Number.isFinite(drag.manualRotation)?drag.manualRotation:drag.home.rotation.z)+lean);}
     const near=drag.canPlay&&Math.hypot(drag.mesh.position.x-1.25,drag.mesh.position.z-.05)<cardDropRadius(drag);drag.overDrop=near;dropMarker.material.opacity=near ? .82 : .2;
     if(drag.canPlay){const gesture=eightGestureCoordinates(drag.mesh,drag.gestureHome);emitLocalCardGesture('move',gesture.progress,gesture.lateral)}draw();e.preventDefault();
   }
