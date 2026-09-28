@@ -83,7 +83,7 @@ export function createTable3DRenderer({onFatal}={}){
   let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='';
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
-  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,pendingMaidPickOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
+  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,lastBattleSnapshot=null,pendingMaidPickOrigin=null,pendingBattleOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
 
   function applyCameraFit(){
     if(!camera||!cameraPose)return;
@@ -466,11 +466,29 @@ export function createTable3DRenderer({onFatal}={}){
       dealer:(bj?.dealer||[]).map(visualCardSnapshot).filter(Boolean)
     };
   }
-  function queueCardFlight(mesh,from,to,{duration=620,delay=0,lift=.8,onDone=null,fromRot=0,toRot=0,bank=.10,roll=.08,fromScale=null,toScale=null}={}){
+  function battleSeat(count,index,radius=3.25){
+    const angle=(Math.PI*2*index/Math.max(1,count))-Math.PI/2;
+    return{angle,x:Math.cos(angle)*radius,z:Math.sin(angle)*2.25};
+  }
+  function battleRevealSlot(count,reveal,index){
+    const owner=Math.max(0,Number(reveal?.owner)||0),seat=battleSeat(count,owner,1.1),offset=(index%4)*.18;
+    return{angle:seat.angle,x:Math.cos(seat.angle)*(1.1+offset),z:Math.sin(seat.angle)*(.82+offset)};
+  }
+  function battleSnapshot(payload,battle){
+    const s=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0;
+    return{
+      key:[s?.startedAt||'',viewer,(s?.players||[]).map(p=>p?.name||'').join('|')].join('~'),
+      viewer,turn:Number(s?.turn??0),number:Number(battle?.number||0),winner:Number.isInteger(battle?.winner)?battle.winner:-1,pot:Number(battle?.pot||0),
+      counts:[...(battle?.counts||[])],
+      reveals:(battle?.reveals||[]).map(r=>r?.hidden?{owner:r.owner,hidden:true}:{owner:r.owner,hidden:false,card:visualCardSnapshot(r.card)})
+    };
+  }
+  function queueCardFlight(mesh,from,to,{duration=620,delay=0,lift=.8,onStart=null,onDone=null,hideUntilStart=false,fromRot=0,toRot=0,bank=.10,roll=.08,fromScale=null,toScale=null}={}){
     mesh.position.copy(from);mesh.rotation.set(-Math.PI/2,0,fromRot);
     if(fromScale)mesh.scale.copy(fromScale);
+    if(hideUntilStart)mesh.visible=false;
     cardFx.add(mesh);
-    cardAnimations.push({mesh,from:from.clone(),to:to.clone(),start:performance.now(),duration,delay,lift,onDone,fromRot,toRot,bank,roll,fromScale:fromScale?.clone?.()||null,toScale:toScale?.clone?.()||null,done:false});startMotion();
+    cardAnimations.push({mesh,from:from.clone(),to:to.clone(),start:performance.now(),duration,delay,lift,onStart,onDone,hideUntilStart,started:false,fromRot,toRot,bank,roll,fromScale:fromScale?.clone?.()||null,toScale:toScale?.clone?.()||null,done:false});startMotion();
   }
   function tileMaterial(kind='normal',highlight=false){
     const key=kind+(highlight?'-hot':'');if(tileMaterials.has(key))return tileMaterials.get(key);
@@ -564,6 +582,7 @@ export function createTable3DRenderer({onFatal}={}){
       if(a.done)continue;
       const elapsed=now-a.start-(a.delay||0);
       if(elapsed<0){running=true;continue}
+      if(!a.started){a.started=true;if(a.hideUntilStart)a.mesh.visible=true;a.onStart?.()}
       const t=Math.min(1,Math.max(0,elapsed/a.duration)),ease=1-Math.pow(1-t,3);
       a.mesh.position.lerpVectors(a.from,a.to,ease);a.mesh.position.y+=Math.sin(t*Math.PI)*(a.lift??.8);
       const arc=Math.sin(t*Math.PI);
