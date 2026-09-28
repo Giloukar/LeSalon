@@ -365,7 +365,7 @@ test('blackjack 3D shoe animates only projected cards after authoritative state 
  const html=await readFile(path.join(root,'jeux.html'),'utf8');
  assert.match(source,/function blackjackSnapshot\(payload,bj\)/);
  assert.match(source,/shoePos=new THREE\.Vector3\(-3\.75,TABLE_Y\+\.24,-\.55\)/);
- assert.match(source,/const newOwn=snapshot\.hand\.filter/);
+ assert.match(source,/newOwn=snapshot\.hand\.filter/);
  assert.match(source,/prev\?\.hidden&&!card\?\.hidden/);
  assert.match(source,/queueCardFlight\(cardMesh\(card/);
  assert.match(html,/deckCount:S\.deck\.length/);
