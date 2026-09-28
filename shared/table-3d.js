@@ -6,7 +6,7 @@ const RANK_NAME={1:'A',11:'V',12:'D',13:'R'};
 const CARD_W=1.22,CARD_H=1.78,CARD_D=.045;
 const TABLE_Y=.28;
 const LIVE_CARD_GAMES=new Set(['huit','president','menteur','suites','plis','encheres','quatrevingtdixneuf','cactus']);
-const TABLETOP_CARD_GAMES=new Set(['huit','president','menteur','suites','plis','encheres','quatrevingtdixneuf','pouilleux','vingtetun']);
+const TABLETOP_CARD_GAMES=new Set(['huit','president','menteur','suites','plis','encheres','quatrevingtdixneuf','vingtetun']);
 const visualHash=str=>{
   let h=2166136261;
   for(const ch of String(str)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}
@@ -190,7 +190,7 @@ export function createTable3DRenderer({onFatal}={}){
     window.dispatchEvent(new CustomEvent('salon:local-card-tabletop',{detail:{
       gameId,phase:'pose',token,
       x:clampMotion(p.position.x,-5.05,5.05),z:clampMotion(p.position.z,-3.08,3.08),
-      lift:clampMotion(mesh.position.y-floorY,0,1.35),rotation:Number(p.rotation.z)||0
+      lift:clampMotion(p.position.y-floorY,0,1.35),rotation:Number(p.rotation.z)||0
     }}));return true;
   }
   function hasActiveLocalCardPoses(){
@@ -1017,7 +1017,7 @@ export function createTable3DRenderer({onFatal}={}){
         placeCard(mesh,slot.x,slot.z,TABLE_Y+.11+slot.yOffset,slot.fan,slot.scale);makeLooseManipulable(mesh,{kind:'loose-card',cardId:card.id,persistPose:true});
         if(card?.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
       });
-      const maid=data.maid||{},count=Math.max(0,(Number(maid.targetCount)||0)-remoteTabletopCountFor(Number(maid.target))),visible=Math.min(24,count);
+      const maid=data.maid||{},count=Number(maid.targetCount)||0,visible=Math.min(24,count);
       for(let i=0;i<visible;i++){
         const slot=pickCardSlot(visible,i),mesh=cardMesh(null,{back:true});placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.rot,slot.scale);
         if(payload.canInteract){mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'maid-pick',tapEnabled:true,index:i})}
