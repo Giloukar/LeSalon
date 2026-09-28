@@ -84,7 +84,7 @@ export function createTable3DRenderer({onFatal}={}){
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
   let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,lastBattleSnapshot=null,pendingMaidPickOrigin=null,pendingBattleOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
-  const localPoses=new Map();let activePoseScope='',poseSeen=new Set();
+  const localPoses=new Map();let activePoseScope='',poseSeen=new Set(),localPoseOrder=0;
 
   function applyCameraFit(){
     if(!camera||!cameraPose)return;
@@ -126,7 +126,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(interactiveCard)interactive.push(mesh);
     return mesh;
   }
-  function cloneTransform(t){return{position:t.position.clone(),rotation:t.rotation.clone(),scale:t.scale.clone()}}
+  function cloneTransform(t){const out={position:t.position.clone(),rotation:t.rotation.clone(),scale:t.scale.clone()};if(Number.isFinite(t.order))out.order=t.order;return out}
   function meshTransform(mesh){return{position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()}}
   function poseScope(payload=current){
     const state=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0;
@@ -137,6 +137,16 @@ export function createTable3DRenderer({onFatal}={}){
     const tileId=mesh.userData?.tileId,cardId=mesh.userData?.cardId,id=tileId||cardId;
     return id?activePoseScope+'|'+(tileId?'tile':'card')+'|'+id:null;
   }
+  function localPoseDisplay(key,pose){
+    const display=cloneTransform(pose),prefix=activePoseScope+'|',kind=key.slice(prefix.length).split('|')[0];
+    let below=0;
+    for(const [otherKey,other] of localPoses){
+      if(otherKey===key||!otherKey.startsWith(prefix)||otherKey.slice(prefix.length).split('|')[0]!==kind)continue;
+      if(!Number.isFinite(other.order)||!Number.isFinite(pose.order)||other.order>=pose.order)continue;
+      if(Math.abs(other.position.x-pose.position.x)<.58&&Math.abs(other.position.z-pose.position.z)<.78)below++;
+    }
+    display.position.y+=Math.min(.12,below*(kind==='tile'?.010:.014));return display;
+  }
   function applyLocalPose(mesh,{floorY=null}={}){
     if(!mesh)return null;
     mesh.userData.home??=meshTransform(mesh);
@@ -144,7 +154,7 @@ export function createTable3DRenderer({onFatal}={}){
     mesh.userData.persistLocalPose=true;mesh.userData.localPoseKey=key;mesh.userData.localPoseFloorY=Number.isFinite(floorY)?floorY:(mesh.userData.tileId?TABLE_Y+.37:TABLE_Y+.12);
     poseSeen.add(key);
     const saved=localPoses.get(key);
-    if(saved){mesh.position.copy(saved.position);mesh.rotation.copy(saved.rotation);mesh.scale.copy(saved.scale);mesh.userData.home=cloneTransform(saved)}
+    if(saved){const display=localPoseDisplay(key,saved);mesh.position.copy(display.position);mesh.rotation.copy(display.rotation);mesh.scale.copy(display.scale);mesh.userData.home=cloneTransform(display)}
     return key;
   }
   function freePoseForMesh(mesh,home=mesh?.userData?.home){
@@ -155,7 +165,22 @@ export function createTable3DRenderer({onFatal}={}){
   function saveLocalPose(mesh,home=mesh?.userData?.home){
     const key=mesh?.userData?.localPoseKey;if(!key)return null;
     const pose=freePoseForMesh(mesh,home);if(!pose)return null;
-    localPoses.set(key,cloneTransform(pose));poseSeen.add(key);mesh.userData.home=cloneTransform(pose);return pose;
+    pose.order=++localPoseOrder;localPoses.set(key,cloneTransform(pose));poseSeen.add(key);
+    const display=localPoseDisplay(key,pose);mesh.userData.home=cloneTransform(display);return display;
+  }
+  function hasActiveLocalPoses(){
+    if(!activePoseScope)return false;const prefix=activePoseScope+'|';
+    for(const key of localPoses.keys())if(key.startsWith(prefix))return true;
+    return false;
+  }
+  function updateLocalPoseResetButton(){
+    const button=host?.querySelector?.('[data-table-3d-reset-poses]');if(button)button.hidden=!hasActiveLocalPoses();
+  }
+  function resetActiveLocalPoses(){
+    if(!activePoseScope)return false;const prefix=activePoseScope+'|';let changed=false;
+    for(const key of [...localPoses.keys()])if(key.startsWith(prefix)){localPoses.delete(key);changed=true}
+    if(!changed)return false;
+    poseSeen=new Set();if(current){syncCurrent(current);pruneLocalPoses()}updateLocalPoseResetButton();draw();return true;
   }
   function pruneLocalPoses(){
     if(!activePoseScope)return;
