@@ -506,3 +506,14 @@ Les objets librement posés utilisent maintenant un ordre local de dépôt. Lors
 Un contrôle **↺ Ranger mes objets** apparaît dans les commandes de la fenêtre 3D dès que le joueur courant possède au moins une pose libre. Ce bouton supprime uniquement les poses visuelles du joueur et reconstruit immédiatement la scène depuis le layout logique du moteur. Il n'est ni un undo, ni un nouveau tour, ni une action réseau.
 
 Le bouton reste masqué lorsqu'aucune pose locale n'existe. Les poses des autres joueurs locaux ou d'une autre partie ne sont pas touchées par le rangement courant.
+
+
+## Rotation manuelle locale des objets
+
+Les objets manipulables peuvent maintenant être orientés volontairement sur la table, indépendamment de la petite inclinaison produite par leur mouvement. Sur ordinateur, la molette fait pivoter l'objet tenu par pas de 10 degrés ; lorsqu'aucun drag n'est actif, la même molette au-dessus d'une carte ou d'une tuile possédant une pose locale la tourne directement sur place.
+
+Sur écran tactile, un second doigt pendant le drag active une rotation à deux doigts. L'angle entre le pointeur principal et le second pointeur est suivi continûment, ce qui permet de tourner une carte ou une tuile sans interrompre son déplacement. Relâcher le second doigt conserve le drag principal.
+
+Une rotation volontaire annule le comportement de simple « tap » : tourner une carte ne déclenche donc pas accidentellement une sélection ou un coup. Au relâchement, l'angle choisi est stocké avec la pose locale ; la légère inclinaison visuelle liée à la vitesse du drag n'est pas conservée comme orientation permanente.
+
+Cette rotation n'est jamais une action de jeu. Aucun angle n'est envoyé au réseau, aucune révision n'est créée et les dépôts autoritatifs conservent leur priorité. Le bouton **↺ Ranger mes objets** réinitialise aussi ces orientations avec les autres poses locales.
