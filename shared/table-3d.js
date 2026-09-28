@@ -77,7 +77,7 @@ export function createTable3DRenderer({onFatal}={}){
   const tileMaterials=new Map(),rummiTileMaterials=new Map(),pawnMaterials=new Map(),dieFaceMaterials=new Map(),cellLabelMaterials=new Map(),boxTileMaterials=new Map(),cellLabelTextures=[];
   const neutralDieMaterial=new THREE.MeshStandardMaterial({color:0xd8d3c4,roughness:.82,metalness:0});
   const rummiBackMaterial=new THREE.MeshStandardMaterial({color:0x46574b,roughness:.86,metalness:.01});
-  let animationRaf=0,diceAnimations=[],pawnAnimations=[],cardAnimations=[],manipAnimations=[],lastDiceKey='',lastMoveKey='';
+  let animationRaf=0,diceAnimations=[],pawnAnimations=[],cardAnimations=[],manipAnimations=[],tossAnimations=[],lastDiceKey='',lastMoveKey='';
   let wordSelection=[],wordDraftKey='';
   let codeDraft=[0,1,2],codeDraftKey='';
   let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='';
@@ -198,7 +198,7 @@ export function createTable3DRenderer({onFatal}={}){
     renderer.setSize(w,h,false);camera.aspect=aspect;applyCameraFit();draw();
   }
   function clearObjects(){
-    interactive.length=0;diceAnimations.length=0;pawnAnimations.length=0;cardAnimations.length=0;manipAnimations.length=0;
+    interactive.length=0;diceAnimations.length=0;pawnAnimations.length=0;cardAnimations.length=0;manipAnimations.length=0;tossAnimations.length=0;
     if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
     for(const child of [...objects.children]){
       objects.remove(child);
@@ -637,6 +637,29 @@ export function createTable3DRenderer({onFatal}={}){
       if(t<1)running=true;else{a.mesh.position.copy(a.to);a.mesh.rotation.copy(a.toRot);a.mesh.scale.copy(a.toScale);a.done=true}
     }
     if(manipAnimations.some(a=>a.done))manipAnimations=manipAnimations.filter(a=>!a.done);
+    for(const a of tossAnimations){
+      if(a.done)continue;
+      const dt=Math.max(.25,Math.min(2,(now-(a.lastAt||now))/16.67));a.lastAt=now;
+      const drag=Math.pow(.925,dt),spinDrag=Math.pow(.91,dt);
+      a.velocity.multiplyScalar(drag);a.spin*=spinDrag;
+      a.mesh.position.x+=a.velocity.x*dt;a.mesh.position.z+=a.velocity.z*dt;
+      const floorY=TABLE_Y+.12;
+      a.mesh.position.y=floorY+Math.sin(Math.min(1,(now-a.start)/Math.max(220,a.duration*.46))*Math.PI)*Math.min(.28,.06+a.speed*.09);
+      a.mesh.rotation.x=-Math.PI/2+clampMotion(-a.velocity.z*.055,-.16,.16);
+      a.mesh.rotation.y=clampMotion(a.velocity.x*.045,-.14,.14);
+      a.mesh.rotation.z+=a.spin*dt;
+      const xLimit=5.05,zLimit=3.08;
+      if(a.mesh.position.x>xLimit){a.mesh.position.x=xLimit;a.velocity.x=-Math.abs(a.velocity.x)*.54;a.spin+=.012}
+      else if(a.mesh.position.x<-xLimit){a.mesh.position.x=-xLimit;a.velocity.x=Math.abs(a.velocity.x)*.54;a.spin-=.012}
+      if(a.mesh.position.z>zLimit){a.mesh.position.z=zLimit;a.velocity.z=-Math.abs(a.velocity.z)*.54;a.spin-=.010}
+      else if(a.mesh.position.z<-zLimit){a.mesh.position.z=-zLimit;a.velocity.z=Math.abs(a.velocity.z)*.54;a.spin+=.010}
+      const speed=a.velocity.length(),age=now-a.start;
+      if((speed<.012&&age>260)||age>a.duration){
+        a.done=true;a.mesh.position.y=floorY;a.mesh.rotation.x=-Math.PI/2;a.mesh.rotation.y=0;
+        restoreManipulatedMesh(a.mesh,a.home,{velocityX:0,velocityY:0},{index:a.index||0});
+      }else running=true;
+    }
+    if(tossAnimations.some(a=>a.done))tossAnimations=tossAnimations.filter(a=>!a.done);
     for(const [actor,g] of remoteCardGestures){
       const age=now-g.lastAt;if(age>950&&!g.committed){g.target=0;g.targetLateral=0;g.returning=true}
       g.progress+=(g.target-g.progress)*.24;g.lateral+=(g.targetLateral-g.lateral)*.22;
@@ -1914,6 +1937,7 @@ export function createTable3DRenderer({onFatal}={}){
   function deactivate(){
     cancelActiveDrag();active=false;hovered=null;wordSelection=[];wordDraftKey='';codeDraft=[0,1,2];codeDraftKey='';golfAim={angle:0,power:50};golfAimKey='';lastGolfKey='';diceAnimations.length=0;pawnAnimations.length=0;manipAnimations.length=0;
     if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
+    tossAnimations.length=0;
     resizeObserver?.disconnect();resizeObserver=null;host?.remove();host=null;
     document.documentElement.removeAttribute('data-table-3d-game');document.documentElement.removeAttribute('data-table-3d-phase');
   }
