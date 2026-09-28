@@ -1620,7 +1620,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(hovered===mesh)return;
     if(hovered&&!drag){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale);}
     hovered=mesh;
-    if(hovered&&!drag&&['card','card-select','maid-pick','special-select','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-draw','rummi-dest','intrus-spot','code-cycle'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
+    if(hovered&&!drag&&['card','card-select','maid-pick','battle-card','special-select','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-draw','rummi-dest','intrus-spot','code-cycle'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
     draw();
   }
   function capturePointer(id){try{canvas?.setPointerCapture?.(id)}catch(_){}}
@@ -1702,6 +1702,10 @@ export function createTable3DRenderer({onFatal}={}){
     }else if(d.kind==='maid-pick'&&current?.gameId==='pouilleux'){
       d.maidToHand=d.mesh.position.z>=1.55&&Math.abs(d.mesh.position.x)<=4.55;
       showDropMarkerAt(Math.max(-3.35,Math.min(3.35,d.mesh.position.x)),2.18,d.maidToHand);
+    }else if(d.kind==='battle-card'&&current?.gameId==='bataille'){
+      const radius=d.pointerType==='touch'||matchMedia('(pointer: coarse)').matches?2.15:1.8;
+      d.battleToCenter=Math.hypot(d.mesh.position.x,d.mesh.position.z)<=radius;
+      showDropMarkerAt(0,0,d.battleToCenter);
     }
     draw();e.preventDefault();return true;
   }
@@ -1793,6 +1797,11 @@ export function createTable3DRenderer({onFatal}={}){
         if(current?.interactions?.specialCard?.('pick',d.index))return;
         pendingMaidPickOrigin=null;
       }
+      if(d.kind==='battle-card'&&d.battleToCenter){
+        pendingBattleOrigin={position:d.mesh.position.clone(),rotation:d.mesh.rotation.z,scale:d.mesh.scale.clone()};
+        if(current?.interactions?.specialCard?.('battle'))return;
+        pendingBattleOrigin=null;
+      }
       if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d);return
     }
     if(d.loose&&(!d.tapEnabled||!current?.canInteract)){returnManipulatedCard(d,{snap:true});return}
@@ -1801,6 +1810,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='special-select'){current?.interactions?.specialCard?.('select',d.cardId);return}
     if(d.kind==='maid-pick'){if(tap){pendingMaidPickOrigin={position:d.mesh.position.clone(),rotation:d.mesh.rotation.z,scale:d.mesh.scale.clone(),index:d.index};if(!current?.interactions?.specialCard?.('pick',d.index))pendingMaidPickOrigin=null}return}
     if(d.kind==='special-select'){if(tap)current?.interactions?.specialCard?.('select',d.cardId);return}
+    if(d.kind==='battle-card'){if(tap){pendingBattleOrigin={position:d.mesh.position.clone(),rotation:d.mesh.rotation.z,scale:d.mesh.scale.clone()};if(!current?.interactions?.specialCard?.('battle'))pendingBattleOrigin=null}return}
     if(d.kind==='battle-action'){if(tap)current?.interactions?.specialCard?.('battle');return}
     if(d.kind==='cactus-quick'){if(tap)current?.interactions?.cactus?.('quick',d.index);return}
     if(d.kind==='cactus-swap'){if(tap)current?.interactions?.cactus?.('swap',d.index);return}
