@@ -299,8 +299,9 @@ export function createTable3DRenderer({onFatal}={}){
       base.backCount=Number(center.backCount)||0;base.centerIds=(center.cards||[]).map(c=>c?.id).filter(Boolean);
     }else if(game==='suites')base.centerIds=Object.values(center.lanes||{}).flat().map(c=>c?.id).filter(Boolean);
     else if(game==='plis'){
-      base.centerIds=(center.entries||[]).map(e=>e?.card?.id).filter(Boolean);
-      base.entries=(center.entries||[]).map(e=>({owner:e.owner,card:visualCardSnapshot(e.card)})).filter(e=>e.card);
+      const physicalEntries=Array.isArray(state?.trickCards)&&state.trickCards.length?(center.entries||[]):(['trickResult','over'].includes(String(state?.phase||''))?(center.entries||[]):[]);
+      base.centerIds=physicalEntries.map(e=>e?.card?.id).filter(Boolean);
+      base.entries=physicalEntries.map(e=>({owner:e.owner,card:visualCardSnapshot(e.card)})).filter(e=>e.card);
       base.dealNumber=Number(center.dealNumber)||0;base.completedTricks=Number(center.completedTricks)||0;
     }else if(game==='encheres'){
       base.bidIds=(center.bids||[]).map(c=>c?.id||null);base.bidCards=(center.bids||[]).map(visualCardSnapshot);
@@ -352,9 +353,8 @@ export function createTable3DRenderer({onFatal}={}){
     if(game==='plis'&&previous.phase==='trickResult'&&currentSnapshot.phase==='play'&&previous.entries?.length){
       const target=cardFamilyOrigin(previous.turn,viewer,opponentVisuals);
       previous.entries.forEach((entry,i)=>{
-        const visual=centerVisuals.get(entry.card.id),count=previous.entries.length,a=(Math.PI*2*i/Math.max(1,count))-Math.PI/2;
-        const from=visual?.position?.clone?.()||new THREE.Vector3(Math.cos(a)*1.45,TABLE_Y+.26,Math.sin(a)*1.1);
-        if(visual?.mesh)visual.mesh.visible=false;
+        const count=previous.entries.length,a=(Math.PI*2*i/Math.max(1,count))-Math.PI/2;
+        const from=new THREE.Vector3(Math.cos(a)*1.45,TABLE_Y+.26,Math.sin(a)*1.1);
         const mesh=cardMesh(entry.card,{back:!!entry.card.hidden});
         queueCardFlight(mesh,from,target.clone().add(new THREE.Vector3((i-(count-1)/2)*.08,0,0)),{duration:500+i*35,delay:i*45,lift:.66,fromRot:i*.06,toRot:0,bank:.13,roll:(i%2?-.10:.10)});
       });
@@ -856,8 +856,9 @@ export function createTable3DRenderer({onFatal}={}){
         const label=makeLabel((SUIT_NAME[suit]||suit).toUpperCase(),['H','D'].includes(suit)?'#eab3ad':'#dbea9e');label.scale.set(1.6,.42,1);label.position.set(-4.65,.92,(row-1.5)*1.25);objects.add(label);
       });
     }else if(game==='plis'){
-      (center.entries||[]).forEach((entry,i)=>{
-        const a=(Math.PI*2*i/Math.max(1,center.entries.length))-Math.PI/2,x=Math.cos(a)*1.45,z=Math.sin(a)*1.1,mesh=cardMesh(entry.card,{back:!!entry.card?.hidden});
+      const physicalEntries=Array.isArray(s?.trickCards)&&s.trickCards.length?(center.entries||[]):(['trickResult','over'].includes(String(s?.phase||''))?(center.entries||[]):[]);
+      physicalEntries.forEach((entry,i)=>{
+        const a=(Math.PI*2*i/Math.max(1,physicalEntries.length))-Math.PI/2,x=Math.cos(a)*1.45,z=Math.sin(a)*1.1,mesh=cardMesh(entry.card,{back:!!entry.card?.hidden});
         placeCard(mesh,x,z,TABLE_Y+.16,i*.06,.78);if(entry.card?.id)centerVisuals.set(entry.card.id,{mesh,card:entry.card,position:new THREE.Vector3(x,TABLE_Y+.26,z)});
       });
     }else if(game==='encheres'){
