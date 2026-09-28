@@ -417,6 +417,26 @@ test('completed trick cards drag as one physical group and collect through the e
 
 test('physical trick collection still uses the authoritative collect action',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'plis','online');const r=await t.page.evaluate(async()=>{net.gameId='plis';net.state.phase='trickResult';net.state.turn=0;net.state.completedTricks=1;net.state.trickCards=[{owner:0,card:{id:'trick-a',rank:10,suit:'S'}},{owner:1,card:{id:'trick-b',rank:9,suit:'S'}}];net.state.lastTrick=[];net.state.discard=[];S=projectGame(net.state,0);let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const before={moves:net.state.moves,discard:net.state.discard.length,revision:net.revision};const collected=seen.interactions.cardAction('collect');return{collected,before,after:{moves:net.state.moves,discard:net.state.discard.map(c=>c.id),phase:net.state.phase,trick:net.state.trickCards.length,revision:net.revision}};});assert.equal(r.collected,true);assert.equal(r.after.moves,r.before.moves+1);assert.deepEqual(r.after.discard,['trick-a','trick-b']);assert.equal(r.after.phase,'play');assert.equal(r.after.trick,0);assert.equal(r.after.revision,r.before.revision+1);}finally{await browser.close();}});
 
+test('Cactus swap gestures stay presentation-only until the existing swap interaction accepts them',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ const html=await readFile(path.join(root,'jeux.html'),'utf8');
+ assert.match(source,/function cactusCardSlot\(viewer,count,owner,index/);
+ assert.match(source,/function cactusSwapDropTarget\(position\)/);
+ assert.match(source,/makeLooseManipulable\(drawnMesh,\{kind:'cactus-drawn',tapEnabled:false,owner:viewer\}\)/);
+ assert.match(source,/d\.kind==='cactus-swap'&&current\?\.gameId==='cactus'/);
+ assert.match(source,/d\.kind==='cactus-drawn'&&current\?\.gameId==='cactus'/);
+ assert.match(source,/pendingCactusSwap=\{index:d\.index/);
+ assert.match(source,/current\?\.interactions\?\.cactus\?\.\('swap',target\.index\)/);
+ assert.match(source,/const swap=snapshot\.lastSwap,swapConfirmed=/);
+ assert.match(source,/data\.source==='take'\?data\.drawn:null/);
+ assert.match(source,/back:data\.source!=='take'/);
+ assert.match(html,/lastSwap:S\.lastSwap\?\{owner:S\.lastSwap\.owner,index:S\.lastSwap\.index,source:S\.lastSwap\.source,serial:S\.lastSwap\.serial\}:null/);
+ assert.doesNotMatch(source,/cactusSwapDropTarget[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/cactusToDrawn[^\n]*onlineAct\(/);
+});
+
+test('Cactus authoritative swap emits only privacy-safe transition metadata',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'cactus','online');const r=await t.page.evaluate(async()=>{net.gameId='cactus';net.state.phase='swap';net.state.turn=0;net.state.lastSwap=null;const incoming=net.state.deck.pop()||{id:'cactus-swap-in',rank:2,suit:'H'};net.state.drawn=incoming;net.state.source='draw';const index=1,outgoing=net.state.players[0].hand[index];S=projectGame(net.state,0);let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const before={moves:net.state.moves,revision:net.revision};const swapped=seen.interactions.cactus('swap',index);const publicSwap=projectGame(net.state,1).lastSwap;return{swapped,incoming:incoming.id,outgoing:outgoing.id,before,after:{moves:net.state.moves,revision:net.revision,slot:net.state.players[0].hand[index]?.id,discard:net.state.discard.at(-1)?.id,drawn:net.state.drawn,lastSwap:clone(net.state.lastSwap),publicSwap:clone(publicSwap)}};});assert.equal(r.swapped,true);assert.equal(r.after.slot,r.incoming);assert.equal(r.after.discard,r.outgoing);assert.equal(r.after.drawn,null);assert.equal(r.after.moves,r.before.moves+1);assert.equal(r.after.revision,r.before.revision+1);assert.deepEqual(Object.keys(r.after.lastSwap).sort(),['index','owner','serial','source']);assert.deepEqual(r.after.publicSwap,r.after.lastSwap);assert.deepEqual(r.after.lastSwap,{owner:0,index:1,source:'draw',serial:r.after.moves});}finally{await browser.close();}});
+
 test('free 3D tabletop manipulation stays presentation-only until an explicit valid action',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/manipAnimations=\[\]/);
