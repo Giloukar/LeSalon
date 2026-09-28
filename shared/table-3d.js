@@ -869,6 +869,7 @@ export function createTable3DRenderer({onFatal}={}){
       a.mesh.rotation.x=(a.faceX??-Math.PI/2)+clampMotion(-a.velocity.z*.055,-.16,.16);
       a.mesh.rotation.y=clampMotion(a.velocity.x*.045,-.14,.14);
       a.mesh.rotation.z+=a.spin*dt;
+      if(a.tabletop&&now-Number(a.lastTabletopAt||0)>=70){a.lastTabletopAt=now;emitLocalTabletop('pose',{mesh:a.mesh})}
       const xLimit=5.05,zLimit=3.08;
       if(a.mesh.position.x>xLimit){a.mesh.position.x=xLimit;a.velocity.x=-Math.abs(a.velocity.x)*.54;a.spin+=.012}
       else if(a.mesh.position.x<-xLimit){a.mesh.position.x=-xLimit;a.velocity.x=Math.abs(a.velocity.x)*.54;a.spin-=.012}
@@ -895,6 +896,13 @@ export function createTable3DRenderer({onFatal}={}){
       if(g.returning&&p<.018&&Math.abs(g.target-g.progress)<.02){cardFx.remove(g.mesh);remoteCardGestures.delete(actor);continue}
       if(g.committed&&p>.985&&age>420){cardFx.remove(g.mesh);remoteCardGestures.delete(actor);continue}
       running=true;
+    }
+    for(const [key,entry] of remoteTabletopCards){
+      const mesh=remoteTabletopMeshes.get(key);if(!mesh)continue;
+      const target=entry.target,display=entry.display||(entry.display={...target});
+      const delta=Math.abs(display.x-target.x)+Math.abs(display.z-target.z)+Math.abs(display.lift-target.lift)+Math.abs(display.rotation-target.rotation);
+      display.x+=(target.x-display.x)*.34;display.z+=(target.z-display.z)*.34;display.lift+=(target.lift-display.lift)*.32;display.rotation+=(target.rotation-display.rotation)*.30;
+      ensureRemoteTabletopMesh(key,entry);if(delta>.004)running=true;
     }
     draw();if(running)animationRaf=requestAnimationFrame(motionFrame);
   }
@@ -1009,7 +1017,7 @@ export function createTable3DRenderer({onFatal}={}){
         placeCard(mesh,slot.x,slot.z,TABLE_Y+.11+slot.yOffset,slot.fan,slot.scale);makeLooseManipulable(mesh,{kind:'loose-card',cardId:card.id,persistPose:true});
         if(card?.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
       });
-      const maid=data.maid||{},count=Number(maid.targetCount)||0,visible=Math.min(24,count);
+      const maid=data.maid||{},count=Math.max(0,(Number(maid.targetCount)||0)-remoteTabletopCountFor(Number(maid.target))),visible=Math.min(24,count);
       for(let i=0;i<visible;i++){
         const slot=pickCardSlot(visible,i),mesh=cardMesh(null,{back:true});placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.rot,slot.scale);
         if(payload.canInteract){mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'maid-pick',tapEnabled:true,index:i})}
@@ -1073,7 +1081,7 @@ export function createTable3DRenderer({onFatal}={}){
 
       const opponents=s.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer&&!x.p.out),opponentVisuals=new Map();
       opponents.forEach(({p,i},k)=>{
-        const seat=eightOpponentSeat(opponents.length,k),count=p.hand?.length||0,total=Math.min(5,count),span=total<=1?0:Math.min(2.2,(total-1)*.36),meshes=[];
+        const seat=eightOpponentSeat(opponents.length,k),count=Math.max(0,(p.hand?.length||0)-remoteTabletopCountFor(i)),total=Math.min(5,count),span=total<=1?0:Math.min(2.2,(total-1)*.36),meshes=[];
         for(let c=0;c<total;c++){const t=total<=1?.5:c/(total-1),mesh=cardMesh(null,{back:true});placeCard(mesh,seat.x+(t-.5)*span,seat.z+Math.abs(t-.5)*.08,TABLE_Y+.15+c*.006,(t-.5)*-.13,.64);meshes.push(mesh)}
         const label=makeLabel((p.name||'Joueur')+' · '+count+' carte'+(count>1?'s':''),i===s.turn?'#dbea9e':'#d8ded9');label.position.set(seat.x,1.0,seat.z-.68);label.scale.set(2.5,.52,1);objects.add(label);
         opponentVisuals.set(i,{...seat,meshes,count});
@@ -1285,7 +1293,7 @@ export function createTable3DRenderer({onFatal}={}){
     });
     const opponents=s.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer),opponentVisuals=new Map();
     opponents.forEach(({p,i},k)=>{
-      const count=p.hand?.length||0,total=Math.min(8,count),seat=eightOpponentSeat(opponents.length,k),span=total<=1?0:Math.min(2.8,(total-1)*.40);
+      const count=Math.max(0,(p.hand?.length||0)-remoteTabletopCountFor(i)),total=Math.min(8,count),seat=eightOpponentSeat(opponents.length,k),span=total<=1?0:Math.min(2.8,(total-1)*.40);
       for(let c=0;c<total;c++){const t=total<=1?.5:c/(total-1),mesh=cardMesh(null,{back:true});placeCard(mesh,seat.x+(t-.5)*span,seat.z+Math.abs(t-.5)*.09,TABLE_Y+.15+c*.006,(t-.5)*-.16,.70)}
       const label=makeLabel((p.name||'Joueur')+' · '+count+' carte'+(count>1?'s':''),i===s.turn?'#dbea9e':'#eef2e8');label.position.set(seat.x,1.12,seat.z-.70);label.scale.set(3.0,.62,1);objects.add(label);
       opponentVisuals.set(i,{...seat,count});
@@ -1386,7 +1394,7 @@ export function createTable3DRenderer({onFatal}={}){
 
     const opponents=s.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer),opponentVisuals=new Map();
     opponents.forEach(({p,i},k)=>{
-      const count=p.hand?.length||0,total=Math.min(8,count),seat=eightOpponentSeat(opponents.length,k),span=total<=1?0:Math.min(3.0,(total-1)*.42),meshes=[];
+      const count=Math.max(0,(p.hand?.length||0)-remoteTabletopCountFor(i)),total=Math.min(8,count),seat=eightOpponentSeat(opponents.length,k),span=total<=1?0:Math.min(3.0,(total-1)*.42),meshes=[];
       for(let c=0;c<total;c++){
         const t=total<=1?.5:c/(total-1),x=seat.x+(t-.5)*span,mesh=cardMesh(null,{back:true});
         placeCard(mesh,x,seat.z+Math.abs(t-.5)*.10,TABLE_Y+.16+c*.006,(t-.5)*-.18,.74);meshes.push(mesh);
@@ -2005,12 +2013,15 @@ export function createTable3DRenderer({onFatal}={}){
       const side=(item.index%2?1:-1)*Math.floor((item.index+1)/2)*.012,velocity=base.clone();
       velocity.x+=side;velocity.z-=side*.7;
       const poseOrder=d.stackMode?localPoses.get(item.mesh.userData?.localPoseKey)?.order:null;
+      const tabletop=!!(item.mesh.userData?.persistLocalPose&&item.mesh.userData?.cardId&&TABLETOP_CARD_GAMES.has(current?.gameId));
       tossAnimations.push({
         mesh:item.mesh,home:item.home,index:item.index,poseOrder,faceX:faceRotationX(item.mesh.rotation.x),
         velocity,spin:spinBase+(item.index-(items.length-1)/2)*.012,
         speed:velocity.length(),start:now+item.index*10,lastAt:now+item.index*10,
-        startY:item.mesh.position.y,duration:1050+Math.round(Math.min(1,speed/.5)*260)+item.index*25,done:false
+        startY:item.mesh.position.y,duration:1050+Math.round(Math.min(1,speed/.5)*260)+item.index*25,done:false,
+        tabletop,lastTabletopAt:0
       });
+      if(tabletop)emitLocalTabletop('pose',{mesh:item.mesh});
     }
     startMotion();return true;
   }
