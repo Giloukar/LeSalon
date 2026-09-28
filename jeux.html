@@ -2670,7 +2670,7 @@ function legacyCactusInit(s,old){
  s.turn=s.peekers[0]!==undefined?s.peekers[0]:s.cactusStart;
  s.phase=s.peekers.length?'peek':'draw';
  s.caller=null;s.left=0;s.drawn=null;s.source=null;s.power=null;s.reveal=null;s.swapFirst=null;
- s.cactusMatchOver=false;s.cactusGains=null;s.totals=null;s.lastQuick=null;
+ s.cactusMatchOver=false;s.cactusGains=null;s.totals=null;s.lastQuick=null;s.lastSwap=null;
  say(s,'Quatre cartes chacun. Regardez les deux cartes du bas, puis faites confiance à votre mémoire.');
  return s;
 }
@@ -2772,7 +2772,8 @@ function legacyCactusAct(s,a){
  if(s.phase==='swap'){
   if(a.type==='swap'){
    if(!Number.isInteger(a.index)||!p.hand[a.index]||!s.drawn)return false;
-   const out=p.hand[a.index],incoming=s.drawn;p.hand[a.index]=incoming;p.known[a.index]=clone(incoming);s.discard.push(out);
+   const out=p.hand[a.index],incoming=s.drawn,swapSource=s.source;p.hand[a.index]=incoming;p.known[a.index]=clone(incoming);s.discard.push(out);
+   s.lastSwap={owner:i,index:a.index,source:swapSource==='take'?'take':'draw',serial:(s.moves||0)+1};
    say(s,p.name+' échange une carte et rejette '+rankName(out.rank)+SYMBOLS[out.suit]+'.');
    return legacyCactusEndTurn(s,i);
   }
@@ -3267,6 +3268,7 @@ if(window.SalonTableView){
     discard:S.discard.at(-1)||null,
     drawn:canPlay()&&S.drawn?S.drawn:null,
     source:canPlay()?S.source:null,
+    lastSwap:S.lastSwap?{owner:S.lastSwap.owner,index:S.lastSwap.index,source:S.lastSwap.source,serial:S.lastSwap.serial}:null,
     reveal:S.reveal?{owner:S.reveal.owner,index:S.reveal.index}:null,
     players:S.players.map((p,i)=>({name:p.name,score:p.cactusScore,hand:p.hand.map((c,index)=>c?clone(c):null),quick:legacyCactusOwnQuickAllowed(i)&&!((i===S.turn)&&['swap','power','reveal','peek'].includes(S.phase))}))
    };
