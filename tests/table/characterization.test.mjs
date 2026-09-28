@@ -548,7 +548,7 @@ test('free thrown cards are shared anonymously and can be arranged back into han
  assert.match(source,/window\.addEventListener\('salon:remote-tabletop-card',onRemoteTabletopCard\)/);
  assert.match(source,/socialCards=new THREE\.Group\(\)/);
  assert.match(html,/type:'card-tabletop'/);
- assert.match(html,/action:\['throw','arrange'\]/);
+ assert.match(html,/\['throw','arrange'\]\.includes/);
  assert.doesNotMatch(html,/card-tabletop[^\n]*(cardId|rank|suit)/);
 });
 
