@@ -497,3 +497,12 @@ La pose est indexée par partie, joueur et identifiant d'objet. Elle survit donc
 Les actions confirmées tiennent compte de cette position purement visuelle : une carte laissée sur le bord de la table puis jouée part visuellement de cet endroit vers la pile de jeu. Le 8 américain, le 99, Cactus et les jeux de cartes partagés utilisent cette origine lorsqu'elle existe. Les cartes du Vingt-et-un volontairement posées ailleurs ne sont pas recentrées de force lorsqu'une nouvelle carte est tirée.
 
 Les poses ne sont jamais envoyées aux autres joueurs, ne changent aucun état sauvegardé et ne remplacent pas les règles. Une zone de dépôt légale garde toujours la priorité sur le placement libre. Le changement de partie ou de joueur utilise un espace de poses distinct, ce qui empêche toute fuite visuelle entre mains privées.
+
+
+## Empilement et rangement des poses locales
+
+Les objets librement posés utilisent maintenant un ordre local de dépôt. Lorsque plusieurs cartes ou plusieurs tuiles sont laissées presque au même endroit, les poses antérieures restent légèrement plus basses et la dernière pose est rendue au-dessus. Le décalage vertical est faible et plafonné : il supprime le scintillement des surfaces coplanaires sans transformer une pile de cartes en tour artificielle.
+
+Un contrôle **↺ Ranger mes objets** apparaît dans les commandes de la fenêtre 3D dès que le joueur courant possède au moins une pose libre. Ce bouton supprime uniquement les poses visuelles du joueur et reconstruit immédiatement la scène depuis le layout logique du moteur. Il n'est ni un undo, ni un nouveau tour, ni une action réseau.
+
+Le bouton reste masqué lorsqu'aucune pose locale n'existe. Les poses des autres joueurs locaux ou d'une autre partie ne sont pas touchées par le rangement courant.
