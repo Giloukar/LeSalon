@@ -1336,7 +1336,13 @@ export function createTable3DRenderer({onFatal}={}){
     }
     let discardMesh=null,drawnMesh=null;
     if(data.discard){discardMesh=cardMesh(data.discard,{interactiveCard:payload.canInteract&&data.phase==='draw'});discardMesh.userData.kind=payload.canInteract&&data.phase==='draw'?'cactus-take':'cactus-card';discardMesh.userData.interactive=payload.canInteract&&data.phase==='draw';placeCard(discardMesh,0,.1,TABLE_Y+.12,(visualHash(data.discard.id)-.5)*.12,.82)}
-    if(data.drawn){drawnMesh=cardMesh(data.drawn);drawnMesh.userData.kind='cactus-drawn';placeCard(drawnMesh,1.35,.1,TABLE_Y+.14,0,.88)}
+    if(data.drawn){
+      drawnMesh=cardMesh(data.drawn);drawnMesh.userData.kind='cactus-drawn';placeCard(drawnMesh,1.35,.1,TABLE_Y+.14,0,.88);
+      if(payload.canInteract&&data.phase==='swap'&&data.turn===viewer){
+        drawnMesh.userData.home={position:drawnMesh.position.clone(),rotation:drawnMesh.rotation.clone(),scale:drawnMesh.scale.clone()};
+        makeLooseManipulable(drawnMesh,{kind:'cactus-drawn',tapEnabled:false,owner:viewer});
+      }
+    }
 
     const snapshot=cactusSnapshot(payload,data);
     if(previous&&previous.key===snapshot.key&&motionAllowed()){
@@ -1344,11 +1350,32 @@ export function createTable3DRenderer({onFatal}={}){
       const drawnAppeared=!!snapshot.drawnId&&snapshot.drawnId!==previous.drawnId;
       const actorLoss=snapshot.handCounts.map((n,i)=>({i,delta:(previous.handCounts?.[i]??n)-n})).find(x=>x.delta>0)?.i;
 
-      if(drawnAppeared&&drawnMesh){
+      const swap=snapshot.lastSwap,swapConfirmed=!!(swap?.serial&&swap.serial!==previous.lastSwap?.serial);
+      if(swapConfirmed&&discardMesh&&Number.isInteger(swap.owner)&&Number.isInteger(swap.index)){
+        const owner=swap.owner,index=swap.index,slot=cactusCardSlot(viewer,count,owner,index,TABLE_Y+.25),targetVisual=playerVisuals.get(owner)?.meshes?.[index]||null;
+        const pending=owner===viewer&&pendingCactusSwap?.index===index?pendingCactusSwap:null;
+        const incomingCard=previous.drawn||(swap.source==='take'?previous.discard:null);
+        const incomingBack=!incomingCard;
+        const incomingFrom=pending?.incomingFrom?.clone?.()||(owner===viewer&&previous.drawn?new THREE.Vector3(1.35,TABLE_Y+.25,.1):(swap.source==='take'?new THREE.Vector3(0,TABLE_Y+.24,.1):new THREE.Vector3(-1.35,TABLE_Y+.25,.1)));
+        const outgoingFrom=pending?.outgoingFrom?.clone?.()||new THREE.Vector3(slot.x,slot.y,slot.z),incomingTo=new THREE.Vector3(slot.x,slot.y,slot.z),discardTo=new THREE.Vector3(0,TABLE_Y+.24,.1);
+        if(targetVisual)targetVisual.visible=false;
+        discardMesh.visible=false;
+        queueCardFlight(cardMesh(incomingBack?null:incomingCard,{back:incomingBack}),incomingFrom,incomingTo,{
+          duration:500,lift:.64,fromRot:pending?.incomingRot??(swap.source==='take'&&previous.discardId?(visualHash(previous.discardId)-.5)*.12:-.03),toRot:slot.rotation,bank:.13,roll:.11,
+          fromScale:pending?.incomingScale||new THREE.Vector3(swap.source==='take'?.82:.82,swap.source==='take'?.82:.82,swap.source==='take'?.82:.82),toScale:new THREE.Vector3(slot.scale,slot.scale,slot.scale),
+          onDone:()=>{if(targetVisual)targetVisual.visible=true}
+        });
+        queueCardFlight(cardMesh(data.discard,{back:false}),outgoingFrom,discardTo,{
+          duration:500,delay:70,lift:.60,fromRot:pending?.outgoingRot??slot.rotation,toRot:(visualHash(data.discard.id)-.5)*.12,bank:.13,roll:-.11,
+          fromScale:pending?.outgoingScale||new THREE.Vector3(slot.scale,slot.scale,slot.scale),toScale:new THREE.Vector3(.82,.82,.82),
+          onDone:()=>{discardMesh.visible=true}
+        });
+        pendingCactusSwap=null;
+      }else if(drawnAppeared&&drawnMesh){
         drawnMesh.visible=false;
-        const from=data.source==='discard'?new THREE.Vector3(0,TABLE_Y+.25,.1):new THREE.Vector3(-1.35,TABLE_Y+.25,.1),to=new THREE.Vector3(1.35,TABLE_Y+.25,.1);
-        const flight=cardMesh(data.source==='discard'?data.drawn:null,{back:data.source!=='discard'});
-        queueCardFlight(flight,from,to,{duration:500,lift:.58,fromRot:data.source==='discard'?(visualHash(data.drawn.id)-.5)*.12:-.03,toRot:0,bank:.13,roll:.11,onDone:()=>{drawnMesh.visible=true}});
+        const from=data.source==='take'?new THREE.Vector3(0,TABLE_Y+.25,.1):new THREE.Vector3(-1.35,TABLE_Y+.25,.1),to=new THREE.Vector3(1.35,TABLE_Y+.25,.1);
+        const flight=cardMesh(data.source==='take'?data.drawn:null,{back:data.source!=='discard'});
+        queueCardFlight(flight,from,to,{duration:500,lift:.58,fromRot:data.source==='take'?(visualHash(data.drawn.id)-.5)*.12:-.03,toRot:0,bank:.13,roll:.11,onDone:()=>{drawnMesh.visible=true}});
       }else if(discardChanged&&previous.drawnId&&snapshot.discardId===previous.drawnId&&discardMesh){
         discardMesh.visible=false;
         const flight=cardMesh(data.discard),from=new THREE.Vector3(1.35,TABLE_Y+.25,.1),to=new THREE.Vector3(0,TABLE_Y+.24,.1);
