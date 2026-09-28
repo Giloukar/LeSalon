@@ -83,20 +83,35 @@ export function createTable3DRenderer({onFatal}={}){
   let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='',cityFocusIndex=null;
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
-  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,lastBattleSnapshot=null,pendingMaidPickOrigin=null,pendingBattleOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
+  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,cameraControl={yaw:0,pitch:0,zoom:1},cameraDrag=null,cameraGame='',lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,lastBattleSnapshot=null,pendingMaidPickOrigin=null,pendingBattleOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
   const localPoses=new Map();let activePoseScope='',poseSeen=new Set(),localPoseOrder=0;
 
+  function cameraViewChanged(){
+    return Math.abs(cameraControl.yaw)>.001||Math.abs(cameraControl.pitch)>.001||Math.abs(cameraControl.zoom-1)>.001;
+  }
+  function updateCameraResetButton(){
+    const button=host?.querySelector?.('[data-table-3d-reset-camera]');if(button)button.hidden=!cameraViewChanged();
+  }
   function applyCameraFit(){
     if(!camera||!cameraPose)return;
     const aspect=Math.max(.32,Number(camera.aspect)||1),portraitBoost=aspect<.82?Math.min(1.95,.82/aspect):1;
     const {px,py,pz,lx,ly,lz}=cameraPose,dx=px-lx,dy=py-ly,dz=pz-lz;
-    camera.position.set(lx+dx*portraitBoost,ly+dy*portraitBoost,lz+dz*portraitBoost);
+    const baseRadius=Math.max(.1,Math.hypot(dx,dy,dz))*portraitBoost,cameraRadius=baseRadius*clampMotion(cameraControl.zoom,.62,1.72);
+    const theta=Math.atan2(dx,dz)+cameraControl.yaw,basePhi=Math.atan2(Math.hypot(dx,dz),dy),phi=clampMotion(basePhi+cameraControl.pitch,.42,1.38),sinPhi=Math.sin(phi);
+    camera.position.set(lx+cameraRadius*sinPhi*Math.sin(theta),ly+cameraRadius*Math.cos(phi),lz+cameraRadius*sinPhi*Math.cos(theta));
     camera.lookAt(lx,ly,lz);
     camera.fov=aspect<.62?42:aspect<.82?40:aspect<.95?39:aspect>1.8?37:39;
-    camera.updateProjectionMatrix();
+    camera.updateProjectionMatrix();updateCameraResetButton();
   }
   function setCameraPose(px,py,pz,lx,ly,lz){
     cameraPose={px,py,pz,lx,ly,lz};applyCameraFit();
+  }
+  function resetCameraView(){
+    cameraControl={yaw:0,pitch:0,zoom:1};cancelCameraDrag();applyCameraFit();updateCameraResetButton();draw();return true;
+  }
+  function resetCameraForGame(gameId){
+    const key=String(gameId||'');if(cameraGame===key)return false;
+    cameraGame=key;cameraControl={yaw:0,pitch:0,zoom:1};cancelCameraDrag();return true;
   }
 
   function frontMaterial(card){
@@ -249,9 +264,10 @@ export function createTable3DRenderer({onFatal}={}){
     const column=document.querySelector('.table-column');if(!column)return null;
     if(!host?.isConnected){
       host=document.createElement('section');host.className='table-3d-host';host.setAttribute('aria-label','Vue 3D de la table');
-      host.innerHTML='<div class="table-3d-window-controls" aria-label="Affichage 3D"><button type="button" class="table-3d-window-button table-3d-reset" data-table-3d-reset-poses hidden aria-label="Ranger mes objets selon la disposition du jeu" title="Ranger mes objets · local uniquement">↺</button><button type="button" class="table-3d-window-button table-3d-minimize" data-table-3d-window="embedded" aria-label="Réduire la vue 3D dans la page" title="Réduire la vue 3D">↙</button><button type="button" class="table-3d-window-button table-3d-expand" data-table-3d-window="full" aria-label="Agrandir la vue 3D" title="Plein écran">⛶</button><button type="button" class="table-3d-window-button table-3d-close" data-table-view-mode="2d" aria-label="Revenir à la vue 2D" title="Revenir à la vue 2D">×</button></div><div class="table-3d-hud"><span class="table-3d-accent" data-table-3d-title>VUE 3D</span><span data-table-3d-status>Table synchronisée</span></div><div class="table-3d-help" data-table-3d-help>Vue immersive synchronisée avec la partie</div>';
+      host.innerHTML='<div class="table-3d-window-controls" aria-label="Affichage 3D"><button type="button" class="table-3d-window-button table-3d-reset" data-table-3d-reset-poses hidden aria-label="Ranger mes objets selon la disposition du jeu" title="Ranger mes objets · local uniquement">↺</button><button type="button" class="table-3d-window-button table-3d-camera-reset" data-table-3d-reset-camera hidden aria-label="Recentrer la caméra 3D" title="Recentrer la caméra">◎</button><button type="button" class="table-3d-window-button table-3d-minimize" data-table-3d-window="embedded" aria-label="Réduire la vue 3D dans la page" title="Réduire la vue 3D">↙</button><button type="button" class="table-3d-window-button table-3d-expand" data-table-3d-window="full" aria-label="Agrandir la vue 3D" title="Plein écran">⛶</button><button type="button" class="table-3d-window-button table-3d-close" data-table-view-mode="2d" aria-label="Revenir à la vue 2D" title="Revenir à la vue 2D">×</button></div><div class="table-3d-hud"><span class="table-3d-accent" data-table-3d-title>VUE 3D</span><span data-table-3d-status>Table synchronisée</span></div><div class="table-3d-help" data-table-3d-help>Glissez le tapis pour tourner la vue · molette sur le tapis pour zoomer</div>';
       host.querySelectorAll('[data-table-3d-window]').forEach(button=>button.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.dispatchEvent(new CustomEvent('salon:table-3d-window',{detail:{mode:button.dataset.table3dWindow}}))}));
       host.querySelector('[data-table-3d-reset-poses]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();resetActiveLocalPoses()});
+      host.querySelector('[data-table-3d-reset-camera]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();resetCameraView()});
       const banner=column.querySelector('.turn-banner');banner?.after(host);if(!banner)column.prepend(host);
       host.append(canvas);
       resizeObserver?.disconnect();resizeObserver=new ResizeObserver(resize);resizeObserver.observe(host);resize();
@@ -1764,14 +1780,14 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function render(payload){
     current=payload;if(!active)return;
-    init();
+    init();resetCameraForGame(payload?.gameId);
     if(payload.gated){
       resizeObserver?.disconnect();resizeObserver=null;host?.remove();host=null;
       document.documentElement.removeAttribute('data-table-3d-game');document.documentElement.removeAttribute('data-table-3d-phase');return;
     }
     ensureHost();document.documentElement.dataset.table3dGame=payload.gameId||'';document.documentElement.dataset.table3dPhase=payload.state?.phase||'';
     activePoseScope=poseScope(payload);poseSeen=new Set();
-    syncCurrent(payload);pruneLocalPoses();updateLocalPoseResetButton();draw();
+    syncCurrent(payload);pruneLocalPoses();updateLocalPoseResetButton();updateCameraResetButton();draw();
   }
   function draw(){if(active&&renderer&&scene&&camera)renderer.render(scene,camera)}
   function updatePointer(e){
@@ -1914,17 +1930,66 @@ export function createTable3DRenderer({onFatal}={}){
     (d.companions||[]).forEach((c,i)=>{c.mesh.rotation.z=d.manualRotation+(i-(d.companions.length-1)/2)*.018});
     draw();return true;
   }
+  function zoomCamera(delta){
+    const amount=Number(delta)||0;if(!amount)return false;
+    cameraControl.zoom=clampMotion(cameraControl.zoom*Math.exp(Math.sign(amount)*.085),.62,1.72);applyCameraFit();draw();return true;
+  }
   function onWheel(e){
     if(!active)return;
     if(drag?.mesh){
       const direction=Math.sign(e.deltaY||e.deltaX||0);if(!direction)return;
       if(rotateDraggedObject(direction*-Math.PI/18)){e.preventDefault();return}
     }
-    const obj=hit(e);if(!obj?.userData?.persistLocalPose)return;
-    stopTossForMesh(obj);
-    const direction=Math.sign(e.deltaY||e.deltaX||0);if(!direction)return;
-    obj.rotation.z+=direction*-Math.PI/18;
-    const home=obj.userData.home||meshTransform(obj);saveLocalPose(obj,home);updateLocalPoseResetButton();draw();e.preventDefault();
+    const obj=hit(e);
+    if(obj?.userData?.persistLocalPose){
+      stopTossForMesh(obj);
+      const direction=Math.sign(e.deltaY||e.deltaX||0);if(!direction)return;
+      obj.rotation.z+=direction*-Math.PI/18;
+      const home=obj.userData.home||meshTransform(obj);saveLocalPose(obj,home);updateLocalPoseResetButton();draw();e.preventDefault();return;
+    }
+    if(obj)return;
+    if(zoomCamera(e.deltaY||e.deltaX))e.preventDefault();
+  }
+  function cameraDragCentroid(points=cameraDrag?.points){
+    if(!points?.size)return null;let x=0,y=0,n=0;for(const p of points.values()){x+=p.x;y+=p.y;n++}return{x:x/n,y:y/n};
+  }
+  function cameraDragDistance(points=cameraDrag?.points){
+    if(!points||points.size<2)return 0;const pts=[...points.values()],a=pts[0],b=pts[1];return Math.hypot(a.x-b.x,a.y-b.y);
+  }
+  function beginCameraDrag(e){
+    if(cameraDrag||drag)return false;
+    cameraDrag={points:new Map([[e.pointerId,{x:e.clientX,y:e.clientY}]]),lastCentroid:{x:e.clientX,y:e.clientY},pinchDistance:0,pinchZoom:cameraControl.zoom};
+    host?.classList.add('is-camera-dragging');capturePointer(e.pointerId);e.preventDefault();return true;
+  }
+  function addCameraPointer(e){
+    if(!cameraDrag||e.pointerType!=='touch'||cameraDrag.points.has(e.pointerId)||cameraDrag.points.size>=2)return false;
+    cameraDrag.points.set(e.pointerId,{x:e.clientX,y:e.clientY});cameraDrag.lastCentroid=cameraDragCentroid();cameraDrag.pinchDistance=cameraDragDistance();cameraDrag.pinchZoom=cameraControl.zoom;capturePointer(e.pointerId);e.preventDefault();return true;
+  }
+  function moveCameraDrag(e){
+    if(!cameraDrag?.points?.has(e.pointerId))return false;
+    cameraDrag.points.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    const center=cameraDragCentroid();if(!center)return false;
+    if(cameraDrag.points.size>=2){
+      const distance=Math.max(12,cameraDragDistance());
+      if(!cameraDrag.pinchDistance){cameraDrag.pinchDistance=distance;cameraDrag.pinchZoom=cameraControl.zoom}
+      cameraControl.zoom=clampMotion(cameraDrag.pinchZoom*(cameraDrag.pinchDistance/distance),.62,1.72);
+      const dx=center.x-(cameraDrag.lastCentroid?.x??center.x),dy=center.y-(cameraDrag.lastCentroid?.y??center.y);
+      cameraControl.yaw-=dx*.0045;cameraControl.pitch=clampMotion(cameraControl.pitch+dy*.0034,-.42,.48);
+    }else{
+      const dx=center.x-(cameraDrag.lastCentroid?.x??center.x),dy=center.y-(cameraDrag.lastCentroid?.y??center.y);
+      cameraControl.yaw-=dx*.0062;cameraControl.pitch=clampMotion(cameraControl.pitch+dy*.0047,-.42,.48);
+      cameraDrag.pinchDistance=0;cameraDrag.pinchZoom=cameraControl.zoom;
+    }
+    cameraDrag.lastCentroid=center;applyCameraFit();draw();e.preventDefault();return true;
+  }
+  function releaseCameraPointer(e){
+    if(!cameraDrag?.points?.has(e.pointerId))return false;
+    cameraDrag.points.delete(e.pointerId);
+    if(!cameraDrag.points.size){cameraDrag=null;host?.classList.remove('is-camera-dragging');updateCameraResetButton();return true}
+    cameraDrag.lastCentroid=cameraDragCentroid();cameraDrag.pinchDistance=0;cameraDrag.pinchZoom=cameraControl.zoom;return true;
+  }
+  function cancelCameraDrag(){
+    if(!cameraDrag)return false;cameraDrag=null;host?.classList.remove('is-camera-dragging');updateCameraResetButton();return true;
   }
   function localStackCompanions(mesh){
     const key=mesh?.userData?.localPoseKey,pose=key?localPoses.get(key):null;if(!key||!pose)return[];
@@ -2049,7 +2114,9 @@ export function createTable3DRenderer({onFatal}={}){
       const angle=Math.atan2(e.clientY-drag.lastY,e.clientX-drag.lastX);
       drag.twist={pointerId:e.pointerId,lastAngle:angle,startedAt:performance.now(),turned:false};capturePointer(e.pointerId);e.preventDefault();return;
     }
-    const obj=hit(e);setHover(obj);if(!obj)return;
+    if(cameraDrag&&e.pointerType==='touch'){if(addCameraPointer(e))return}
+    const obj=hit(e);setHover(obj);
+    if(!obj){if(e.pointerType==='touch'||e.button===0)beginCameraDrag(e);return}
     if(!current?.canInteract&&!obj.userData.looseManip)return;
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'deck',startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
     if(obj.userData.looseManip&&obj.userData.kind!=='card'){beginLooseCardDrag(obj,e,obj.userData.kind);return}
@@ -2065,6 +2132,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function onPointerMove(e){
     if(!active)return;
+    if(cameraDrag?.points?.has(e.pointerId)){moveCameraDrag(e);return}
     if(!drag){setHover(hit(e));return}
     if(drag.twist?.pointerId===e.pointerId){
       const angle=Math.atan2(e.clientY-drag.lastY,e.clientX-drag.lastX),delta=normalizeAngleDelta(angle-drag.twist.lastAngle);
@@ -2206,15 +2274,15 @@ export function createTable3DRenderer({onFatal}={}){
     const twist=drag.twist,quickTap=allowFlip&&!twist.turned&&performance.now()-Number(twist.startedAt||0)<=260;
     drag.twist=null;if(quickTap)flipDraggedObject();return true;
   }
-  function onPointerUp(e){if(releaseTwistPointer(e,{allowFlip:true}))return;finishDrag(e,false)}
-  function onPointerCancel(e){if(releaseTwistPointer(e))return;cancelActiveDrag(e.pointerId)}
-  function onLostPointerCapture(e){if(releaseTwistPointer(e))return;cancelActiveDrag(e.pointerId)}
-  function onWindowBlur(){cancelActiveDrag()}
+  function onPointerUp(e){if(releaseCameraPointer(e))return;if(releaseTwistPointer(e,{allowFlip:true}))return;finishDrag(e,false)}
+  function onPointerCancel(e){if(releaseCameraPointer(e))return;if(releaseTwistPointer(e))return;cancelActiveDrag(e.pointerId)}
+  function onLostPointerCapture(e){if(releaseCameraPointer(e))return;if(releaseTwistPointer(e))return;cancelActiveDrag(e.pointerId)}
+  function onWindowBlur(){cancelCameraDrag();cancelActiveDrag()}
   function onVisibilityChange(){if(document.hidden)cancelActiveDrag()}
 
   function activate(){active=true;init()}
   function deactivate(){
-    cancelActiveDrag();active=false;hovered=null;wordSelection=[];wordDraftKey='';codeDraft=[0,1,2];codeDraftKey='';golfAim={angle:0,power:50};golfAimKey='';lastGolfKey='';cityFocusIndex=null;diceAnimations.length=0;pawnAnimations.length=0;manipAnimations.length=0;
+    cancelCameraDrag();cancelActiveDrag();active=false;hovered=null;wordSelection=[];wordDraftKey='';codeDraft=[0,1,2];codeDraftKey='';golfAim={angle:0,power:50};golfAimKey='';lastGolfKey='';cityFocusIndex=null;diceAnimations.length=0;pawnAnimations.length=0;manipAnimations.length=0;
     if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
     tossAnimations.length=0;
     resizeObserver?.disconnect();resizeObserver=null;host?.remove();host=null;
@@ -2225,7 +2293,7 @@ export function createTable3DRenderer({onFatal}={}){
     canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);canvas?.removeEventListener('lostpointercapture',onLostPointerCapture);canvas?.removeEventListener('wheel',onWheel);canvas?.removeEventListener('keydown',onKeyDown);window.removeEventListener('blur',onWindowBlur);window.removeEventListener('salon:remote-card-gesture',onRemoteCardGesture);document.removeEventListener('visibilitychange',onVisibilityChange);assetUnsubscribe?.();assetUnsubscribe=null;
     cardGeometry.dispose();tileGeometry.dispose();pawnGeometry.dispose();dieGeometry.dispose();rummiTileGeometry.dispose();grainGeometry.dispose();heldPadGeometry.dispose();codeGemGeometry.dispose();intrusDotGeometry.dispose();balloonGeometry.dispose();golfBallGeometry.dispose();cityTileGeometry.dispose();cityHouseGeometry.dispose();cityPegGeometry.dispose();edgeMaterial.dispose();backMaterial.dispose();for(const m of frontMaterials.values())m.dispose();for(const m of tileMaterials.values())m.dispose();for(const m of rummiTileMaterials.values())m.dispose();for(const m of pawnMaterials.values())m.dispose();for(const m of dieFaceMaterials.values())m.dispose();for(const m of cellLabelMaterials.values())m.dispose();for(const m of boxTileMaterials.values())m.dispose();neutralDieMaterial.dispose();rummiBackMaterial.dispose();for(const t of disposableTextures)t.dispose();for(const t of cellLabelTextures)t.dispose();
     tableMesh?.geometry?.dispose();tableMesh?.material?.dispose();dropMarker?.geometry?.dispose();dropMarker?.material?.dispose();renderer?.dispose();
-    localPoses.clear();poseSeen.clear();activePoseScope='';localPoseOrder=0;
+    localPoses.clear();poseSeen.clear();activePoseScope='';localPoseOrder=0;cameraPose=null;cameraControl={yaw:0,pitch:0,zoom:1};cameraDrag=null;cameraGame='';
     renderer=scene=camera=canvas=null;current=null;
   }
   return{activate,render,deactivate,destroy};

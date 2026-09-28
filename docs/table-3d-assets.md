@@ -123,3 +123,12 @@ Les cartes et tuiles possédant une pose locale peuvent être retournées sans a
 Le côté visible est conservé dans la pose locale, y compris après un lancer inertiel. Les tuiles Rummikub procédurales disposent maintenant d'un vrai matériau de dos afin que le retournement soit visuellement lisible avant même l'arrivée des modèles GLB définitifs.
 
 Le retournement est désactivé pendant le déplacement volontaire d'une pile complète afin de ne pas introduire une inversion implicite de l'ordre du paquet. Il ne déclenche ni dispatch, ni action en ligne, ni publication de présence.
+
+
+## Caméra libre de la table 3D
+
+La caméra peut maintenant être repositionnée sans modifier la disposition ou l'état du jeu. Un glisser sur une zone vide de la table fait orbiter la vue ; la molette au-dessus du tapis zoome. La molette conserve sa priorité historique lorsqu'elle est utilisée au-dessus d'une carte ou d'une tuile libre : elle tourne alors l'objet et ne déplace pas la caméra.
+
+Sur écran tactile, un doigt sur le tapis fait orbiter la caméra. Un second doigt transforme le geste en pincement pour zoomer, tout en permettant un léger déplacement orbital du centre du geste. Les gestes commencés sur un objet manipulable restent réservés à cet objet.
+
+Dès que la caméra quitte sa pose par défaut, un contrôle ◎ apparaît dans la fenêtre 3D pour recentrer immédiatement la vue spécifique au jeu courant. Le réglage caméra est local au renderer, survit aux rerenders d'une même partie et se réinitialise lors du passage à un autre jeu. Aucun angle, zoom ou geste caméra n'est envoyé au moteur ou au réseau.
