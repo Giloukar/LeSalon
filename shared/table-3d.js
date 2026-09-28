@@ -84,6 +84,7 @@ export function createTable3DRenderer({onFatal}={}){
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
   let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,lastBattleSnapshot=null,pendingMaidPickOrigin=null,pendingBattleOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
+  const localPoses=new Map();let activePoseScope='',poseSeen=new Set();
 
   function applyCameraFit(){
     if(!camera||!cameraPose)return;
@@ -125,8 +126,45 @@ export function createTable3DRenderer({onFatal}={}){
     if(interactiveCard)interactive.push(mesh);
     return mesh;
   }
-  function makeLooseManipulable(mesh,{kind=mesh.userData.kind,tapEnabled=false,...data}={}){
+  function cloneTransform(t){return{position:t.position.clone(),rotation:t.rotation.clone(),scale:t.scale.clone()}}
+  function meshTransform(mesh){return{position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()}}
+  function poseScope(payload=current){
+    const state=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0;
+    return [payload?.gameId||'',state?.startedAt||'',viewer].join('~');
+  }
+  function localPoseKey(mesh){
+    if(!activePoseScope||!mesh)return null;
+    const tileId=mesh.userData?.tileId,cardId=mesh.userData?.cardId,id=tileId||cardId;
+    return id?activePoseScope+'|'+(tileId?'tile':'card')+'|'+id:null;
+  }
+  function applyLocalPose(mesh,{floorY=null}={}){
+    if(!mesh)return null;
+    mesh.userData.home??=meshTransform(mesh);
+    const key=localPoseKey(mesh);if(!key)return null;
+    mesh.userData.persistLocalPose=true;mesh.userData.localPoseKey=key;mesh.userData.localPoseFloorY=Number.isFinite(floorY)?floorY:(mesh.userData.tileId?TABLE_Y+.37:TABLE_Y+.12);
+    poseSeen.add(key);
+    const saved=localPoses.get(key);
+    if(saved){mesh.position.copy(saved.position);mesh.rotation.copy(saved.rotation);mesh.scale.copy(saved.scale);mesh.userData.home=cloneTransform(saved)}
+    return key;
+  }
+  function freePoseForMesh(mesh,home=mesh?.userData?.home){
+    if(!mesh||!home)return null;
+    const y=Number(mesh.userData?.localPoseFloorY??TABLE_Y+.12),position=new THREE.Vector3(clampMotion(mesh.position.x,-5.05,5.05),y,clampMotion(mesh.position.z,-3.08,3.08));
+    return{position,rotation:new THREE.Euler(-Math.PI/2,0,mesh.rotation.z),scale:home.scale.clone()};
+  }
+  function saveLocalPose(mesh,home=mesh?.userData?.home){
+    const key=mesh?.userData?.localPoseKey;if(!key)return null;
+    const pose=freePoseForMesh(mesh,home);if(!pose)return null;
+    localPoses.set(key,cloneTransform(pose));poseSeen.add(key);mesh.userData.home=cloneTransform(pose);return pose;
+  }
+  function pruneLocalPoses(){
+    if(!activePoseScope)return;
+    const prefix=activePoseScope+'|';
+    for(const key of [...localPoses.keys()])if(key.startsWith(prefix)&&!poseSeen.has(key))localPoses.delete(key);
+  }
+  function makeLooseManipulable(mesh,{kind=mesh.userData.kind,tapEnabled=false,persistPose=false,poseFloorY=null,...data}={}){
     mesh.userData={...mesh.userData,...data,kind,interactive:true,looseManip:true,tapEnabled:!!tapEnabled};
+    if(persistPose)applyLocalPose(mesh,{floorY:poseFloorY});
     if(!interactive.includes(mesh))interactive.push(mesh);
     return mesh;
   }
@@ -316,8 +354,12 @@ export function createTable3DRenderer({onFatal}={}){
     if(actor===viewer)return new THREE.Vector3(0,TABLE_Y+.30,2.45);
     const seat=opponentVisuals.get(actor);return seat?new THREE.Vector3(seat.x,TABLE_Y+.30,seat.z+.08):new THREE.Vector3(0,TABLE_Y+.30,-2.25);
   }
+  function storedLocalPose(id,type='card'){
+    return id&&activePoseScope?localPoses.get(activePoseScope+'|'+type+'|'+id)||null:null;
+  }
   function exactLocalCardOrigin(previous,id,index=0){
     const direct=previous?.dragOrigins?.get?.(id);if(direct?.position)return direct.position.clone();
+    const posed=storedLocalPose(id);if(posed?.position)return posed.position.clone();
     const at=previous?.ownIds?.indexOf(id);if(at<0)return null;
     const slot=handCardSlot(previous.ownIds.length,at);return new THREE.Vector3(slot.x,TABLE_Y+.30+slot.yOffset,slot.z);
   }
@@ -644,7 +686,7 @@ export function createTable3DRenderer({onFatal}={}){
       const drag=Math.pow(.925,dt),spinDrag=Math.pow(.91,dt);
       a.velocity.multiplyScalar(drag);a.spin*=spinDrag;
       a.mesh.position.x+=a.velocity.x*dt;a.mesh.position.z+=a.velocity.z*dt;
-      const floorY=TABLE_Y+.12;
+      const floorY=Number(a.mesh.userData?.localPoseFloorY??TABLE_Y+.12);
       const ageY=Math.max(0,now-a.start),settle=Math.min(1,ageY/230),settleEase=1-Math.pow(1-settle,3);
       a.mesh.position.y=THREE.MathUtils.lerp(a.startY??floorY,floorY,settleEase)+Math.sin(Math.min(1,ageY/300)*Math.PI)*Math.min(.28,.06+a.speed*.09);
       a.mesh.rotation.x=-Math.PI/2+clampMotion(-a.velocity.z*.055,-.16,.16);
@@ -657,8 +699,11 @@ export function createTable3DRenderer({onFatal}={}){
       else if(a.mesh.position.z<-zLimit){a.mesh.position.z=-zLimit;a.velocity.z=Math.abs(a.velocity.z)*.54;a.spin+=.010}
       const speed=a.velocity.length(),age=now-a.start;
       if((speed<.012&&age>260)||age>a.duration){
-        a.done=true;a.mesh.position.y=floorY;a.mesh.rotation.x=-Math.PI/2;a.mesh.rotation.y=0;
-        restoreManipulatedMesh(a.mesh,a.home,{velocityX:0,velocityY:0},{index:a.index||0});running=true;
+        a.done=true;a.mesh.position.y=floorY;a.mesh.rotation.x=-Math.PI/2;a.mesh.rotation.y=0;a.mesh.scale.copy(a.home.scale);
+        if(a.mesh.userData?.persistLocalPose){
+          const pose=saveLocalPose(a.mesh,a.home);if(pose){a.mesh.position.copy(pose.position);a.mesh.rotation.copy(pose.rotation);a.mesh.scale.copy(pose.scale)}
+        }else restoreManipulatedMesh(a.mesh,a.home,{velocityX:0,velocityY:0},{index:a.index||0});
+        running=true;
       }else running=true;
     }
     if(tossAnimations.some(a=>a.done))tossAnimations=tossAnimations.filter(a=>!a.done);
@@ -784,7 +829,7 @@ export function createTable3DRenderer({onFatal}={}){
       const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,ownVisuals=new Map();
       own.forEach((card,i)=>{
         const slot=handCardSlot(n,i),mesh=cardMesh(card,{back:!!card.hidden});
-        placeCard(mesh,slot.x,slot.z,TABLE_Y+.11+slot.yOffset,slot.fan,slot.scale);makeLooseManipulable(mesh,{kind:'loose-card'});
+        placeCard(mesh,slot.x,slot.z,TABLE_Y+.11+slot.yOffset,slot.fan,slot.scale);makeLooseManipulable(mesh,{kind:'loose-card',cardId:card.id,persistPose:true});
         if(card?.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
       });
       const maid=data.maid||{},count=Number(maid.targetCount)||0,visible=Math.min(24,count);
@@ -837,7 +882,7 @@ export function createTable3DRenderer({onFatal}={}){
       own.forEach((card,i)=>{
         const slot=handCardSlot(n,i),chosen=selected.has(card.id),isLegal=legal.has(card.id),mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:selectable.has(card.id),playable:selectable.has(card.id)});
         mesh.userData.kind='special-select';mesh.userData.cardId=card.id;mesh.userData.home={position:new THREE.Vector3(slot.x,TABLE_Y+.12+slot.yOffset+(chosen?.25:isLegal?.08:0),slot.z),rotation:new THREE.Euler(-Math.PI/2,0,slot.fan),scale:new THREE.Vector3(1,1,1).multiplyScalar(slot.scale*(chosen?1.07:isLegal?1.025:.98))};
-        mesh.position.copy(mesh.userData.home.position);mesh.rotation.copy(mesh.userData.home.rotation);mesh.scale.copy(mesh.userData.home.scale);makeLooseManipulable(mesh,{kind:'special-select',tapEnabled:selectable.has(card.id),cardId:card.id});objects.add(mesh);
+        mesh.position.copy(mesh.userData.home.position);mesh.rotation.copy(mesh.userData.home.rotation);mesh.scale.copy(mesh.userData.home.scale);makeLooseManipulable(mesh,{kind:'special-select',tapEnabled:selectable.has(card.id),cardId:card.id,persistPose:true});objects.add(mesh);
         ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
       });
 
@@ -864,6 +909,7 @@ export function createTable3DRenderer({onFatal}={}){
         if(viewerActor){
           const removed=(previous.ownIds||[]).find(id=>!(snapshot.ownIds||[]).includes(id))||snapshot.lastId,direct=previous.dragOrigins?.get?.(removed);
           if(direct?.position)playFrom=direct.position.clone();
+          else if(storedLocalPose(removed)?.position)playFrom=storedLocalPose(removed).position.clone();
           else{const index=Math.max(0,(previous.ownIds||[]).indexOf(removed)),slot=handCardSlot(previous.ownIds.length,index);playFrom=new THREE.Vector3(slot.x,TABLE_Y+.28+slot.yOffset,slot.z)}
         }else{
           const visual=opponentVisuals.get(actor);playFrom=new THREE.Vector3(visual?.x||0,TABLE_Y+.29,(visual?.z||-2.2)+.08);
@@ -921,7 +967,7 @@ export function createTable3DRenderer({onFatal}={}){
       const dn=own.length;
       own.forEach((card,i)=>{
         const slot=handCardSlot(dn,i),mesh=cardMesh(card,{back:!!card.hidden});
-        placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.fan,slot.scale*.92);makeLooseManipulable(mesh,{kind:'loose-card'});
+        placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.fan,slot.scale*.92);makeLooseManipulable(mesh,{kind:'loose-card',cardId:card.id,persistPose:true});
         if(card?.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
       });
 
@@ -930,8 +976,8 @@ export function createTable3DRenderer({onFatal}={}){
         const previousOwn=previous.hand||[],previousDealer=previous.dealer||[],newOwn=snapshot.hand.filter(c=>!previousOwn.some(p=>p.id===c.id));
         own.forEach((card,i)=>{
           const visual=ownVisuals.get(card?.id);if(!visual)return;
-          const prevIndex=previousOwn.findIndex(p=>p.id===card.id);
-          if(prevIndex>=0&&previousOwn.length!==own.length){
+          const prevIndex=previousOwn.findIndex(p=>p.id===card.id),posed=!!storedLocalPose(card?.id);
+          if(prevIndex>=0&&previousOwn.length!==own.length&&!posed){
             const before=handCardSlot(previousOwn.length,prevIndex),from=new THREE.Vector3(before.x,TABLE_Y+.25+before.yOffset,before.z);
             if(from.distanceTo(visual.position)>.08){
               visual.mesh.visible=false;
@@ -1057,7 +1103,7 @@ export function createTable3DRenderer({onFatal}={}){
       const mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:canSelect,playable:canSelect});
       mesh.userData.kind='card-select';mesh.userData.cardId=card.id;mesh.userData.playable=canSelect;mesh.userData.legal=legal;
       mesh.position.set(slot.x,TABLE_Y+.12+slot.yOffset+(chosen?.26:legal?.09:0),slot.z);mesh.rotation.set(-Math.PI/2,0,slot.fan);mesh.scale.setScalar(slot.scale*(chosen?1.075:legal?1.025:.98));
-      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'card-select',tapEnabled:canSelect,cardId:card.id});objects.add(mesh);
+      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'card-select',tapEnabled:canSelect,cardId:card.id,persistPose:true});objects.add(mesh);
       if(card?.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
     });
     const opponents=s.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer),opponentVisuals=new Map();
@@ -1146,7 +1192,7 @@ export function createTable3DRenderer({onFatal}={}){
       const slot=handCardSlot(n,i),mesh=cardMesh(card,{id:card.id,interactiveCard:true,playable:playable.has(card.id)});
       const lift=playable.has(card.id)?.14:0,scale=slot.scale*(playable.has(card.id)?1.025:1);
       placeCard(mesh,slot.x,slot.z,TABLE_Y+.12+slot.yOffset+lift,slot.fan,scale);
-      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};mesh.userData.looseManip=true;
+      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'card',cardId:card.id,persistPose:true});
       ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale});
     });
 
@@ -1180,7 +1226,7 @@ export function createTable3DRenderer({onFatal}={}){
       const ownPlayed=discardChanged&&snapshot.handCounts[viewer]===previous.handCounts[viewer]-1&&previous.ownIds?.includes(top.id);
       const ownDrawnIds=snapshot.deckCount<previous.deckCount&&snapshot.handCounts[viewer]>previous.handCounts[viewer]?(snapshot.ownIds||[]).filter(id=>!(previous.ownIds||[]).includes(id)):[];
       if(ownPlayed){
-        const previousIndex=previous.ownIds.indexOf(top.id),slot=handCardSlot(previous.ownIds.length,Math.max(0,previousIndex)),from=new THREE.Vector3(slot.x,TABLE_Y+.28+slot.yOffset,slot.z),to=new THREE.Vector3(1.25,TABLE_Y+.23,.05),flight=cardMesh(top);
+        const previousIndex=previous.ownIds.indexOf(top.id),slot=handCardSlot(previous.ownIds.length,Math.max(0,previousIndex)),posed=storedLocalPose(top.id),from=posed?.position?.clone?.()||new THREE.Vector3(slot.x,TABLE_Y+.28+slot.yOffset,slot.z),to=new THREE.Vector3(1.25,TABLE_Y+.23,.05),flight=cardMesh(top);
         if(discardMesh)discardMesh.visible=false;
         queueCardFlight(flight,from,to,{duration:560,lift:.72,fromRot:slot.fan,toRot:(visualHash(top.id)-.5)*.18,bank:.14,roll:(visualHash(top.id+'roll')-.5)*.22,onDone:()=>{if(discardMesh)discardMesh.visible=true}});
       }else if(ownDrawnIds.length){
@@ -1262,7 +1308,7 @@ export function createTable3DRenderer({onFatal}={}){
     hand.forEach((tile,i)=>{
       const slot=rummiRackSlot(hand.length,i),mesh=rummiTileMesh(tile,selected.has(tile.id),!!data.canMove);
       mesh.position.set(slot.x,TABLE_Y+.42+slot.yOffset,slot.z);mesh.rotation.x=-Math.PI/2;mesh.scale.setScalar(slot.scale);
-      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'rummi-tile',tapEnabled:!!data.canMove,tileId:tile.id});objects.add(mesh);
+      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'rummi-tile',tapEnabled:!!data.canMove,tileId:tile.id,persistPose:true,poseFloorY:TABLE_Y+.37});objects.add(mesh);
       currentVisuals.set(tile.id,{mesh,tile,position:mesh.position.clone(),scale:mesh.scale.clone(),rotation:mesh.rotation.z,zone:'hand'});
     });
 
@@ -1331,7 +1377,7 @@ export function createTable3DRenderer({onFatal}={}){
         mesh.userData.index=index;mesh.userData.owner=i;mesh.userData.interactive=interactiveCard;
         placeCard(mesh,x,z,TABLE_Y+.11,(col-.5)*.035,mine?0.76:0.62);
         mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};
-        if(mine){makeLooseManipulable(mesh,{kind:mesh.userData.kind,tapEnabled:interactiveCard,index,owner:i});if(card.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z})}
+        if(mine){makeLooseManipulable(mesh,{kind:mesh.userData.kind,tapEnabled:interactiveCard,index,owner:i,cardId:card.id,persistPose:true});if(card.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z})}
         meshes.push(mesh);
       });
       playerVisuals.set(i,{...seat,meshes});
@@ -1368,7 +1414,7 @@ export function createTable3DRenderer({onFatal}={}){
         const visual=playerVisuals.get(actorLoss);let from;
         if(actorLoss===viewer&&previous.ownIds?.includes(snapshot.discardId)){
           const index=previous.ownIds.indexOf(snapshot.discardId),col=index%2,row=Math.floor(index/2),seat=cactusSeat(viewer,count,actorLoss);
-          from=new THREE.Vector3(seat.x+(col-.5)*1.02,TABLE_Y+.25,seat.z+(row-.5)*.78);
+          const posed=storedLocalPose(snapshot.discardId);from=posed?.position?.clone?.()||new THREE.Vector3(seat.x+(col-.5)*1.02,TABLE_Y+.25,seat.z+(row-.5)*.78);
         }else from=new THREE.Vector3(visual?.x||0,TABLE_Y+.28,(visual?.z||-2.1)+.08);
         const flight=cardMesh(data.discard),to=new THREE.Vector3(0,TABLE_Y+.24,.1);
         queueCardFlight(flight,from,to,{duration:520,lift:.72,fromRot:0,toRot:(visualHash(data.discard.id)-.5)*.12,bank:.15,roll:(actorLoss%2?-.12:.12),onDone:()=>{discardMesh.visible=true}});
@@ -1662,7 +1708,8 @@ export function createTable3DRenderer({onFatal}={}){
       document.documentElement.removeAttribute('data-table-3d-game');document.documentElement.removeAttribute('data-table-3d-phase');return;
     }
     ensureHost();document.documentElement.dataset.table3dGame=payload.gameId||'';document.documentElement.dataset.table3dPhase=payload.state?.phase||'';
-    syncCurrent(payload);draw();
+    activePoseScope=poseScope(payload);poseSeen=new Set();
+    syncCurrent(payload);pruneLocalPoses();draw();
   }
   function draw(){if(active&&renderer&&scene&&camera)renderer.render(scene,camera)}
   function updatePointer(e){
@@ -1754,6 +1801,24 @@ export function createTable3DRenderer({onFatal}={}){
         startY:item.mesh.position.y,duration:1050+Math.round(Math.min(1,speed/.5)*260)+item.index*25,done:false
       });
     }
+    startMotion();return true;
+  }
+  function settlePersistentPlacement(d){
+    const items=[{mesh:d?.mesh,home:d?.home,index:0},...(d?.companions||[]).map((c,i)=>({mesh:c.mesh,home:c.home,index:i+1}))];
+    if(!items.some(item=>item.mesh?.userData?.persistLocalPose))return false;
+    const now=performance.now();
+    items.forEach(item=>{
+      if(!item.mesh||!item.home)return;
+      if(!item.mesh.userData?.persistLocalPose){restoreManipulatedMesh(item.mesh,item.home,d,{index:item.index});return}
+      const from=meshTransform(item.mesh),pose=saveLocalPose(item.mesh,item.home);if(!pose)return;
+      manipAnimations.push({
+        mesh:item.mesh,from:from.position,
+        control:from.position.clone().lerp(pose.position,.5).add(new THREE.Vector3(0,.10+item.index*.012,0)),
+        to:pose.position.clone(),fromRot:from.rotation,toRot:pose.rotation.clone(),
+        fromScale:from.scale,toScale:pose.scale.clone(),
+        start:now+item.index*12,duration:185+item.index*10,done:false
+      });
+    });
     startMotion();return true;
   }
   function beginLooseCardDrag(obj,e,kind){
@@ -1904,6 +1969,7 @@ export function createTable3DRenderer({onFatal}={}){
       }
       if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);
       if(startFreeToss(d))return;
+      if(settlePersistentPlacement(d))return;
       returnManipulatedCard(d);return
     }
     if(d.loose&&(!d.tapEnabled||!current?.canInteract)){returnManipulatedCard(d,{snap:true});return}
@@ -1959,6 +2025,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.canPlay&&(!d.moved||near)){emitLocalCardGesture('commit',1,0);current?.interactions?.playCard?.(d.cardId);return}
     if(d.canPlay)emitLocalCardGesture('cancel',0,0);
     if(startFreeToss(d))return;
+    if(settlePersistentPlacement(d))return;
     returnManipulatedCard(d);
   }
   function cancelActiveDrag(pointerId=null){
@@ -1985,6 +2052,7 @@ export function createTable3DRenderer({onFatal}={}){
     canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);canvas?.removeEventListener('lostpointercapture',onLostPointerCapture);window.removeEventListener('blur',onWindowBlur);window.removeEventListener('salon:remote-card-gesture',onRemoteCardGesture);document.removeEventListener('visibilitychange',onVisibilityChange);assetUnsubscribe?.();assetUnsubscribe=null;
     cardGeometry.dispose();tileGeometry.dispose();pawnGeometry.dispose();dieGeometry.dispose();rummiTileGeometry.dispose();grainGeometry.dispose();heldPadGeometry.dispose();codeGemGeometry.dispose();intrusDotGeometry.dispose();balloonGeometry.dispose();golfBallGeometry.dispose();cityTileGeometry.dispose();cityHouseGeometry.dispose();cityPegGeometry.dispose();edgeMaterial.dispose();backMaterial.dispose();for(const m of frontMaterials.values())m.dispose();for(const m of tileMaterials.values())m.dispose();for(const m of rummiTileMaterials.values())m.dispose();for(const m of pawnMaterials.values())m.dispose();for(const m of dieFaceMaterials.values())m.dispose();for(const m of cellLabelMaterials.values())m.dispose();for(const m of boxTileMaterials.values())m.dispose();neutralDieMaterial.dispose();rummiBackMaterial.dispose();for(const t of disposableTextures)t.dispose();for(const t of cellLabelTextures)t.dispose();
     tableMesh?.geometry?.dispose();tableMesh?.material?.dispose();dropMarker?.geometry?.dispose();dropMarker?.material?.dispose();renderer?.dispose();
+    localPoses.clear();poseSeen.clear();activePoseScope='';
     renderer=scene=camera=canvas=null;current=null;
   }
   return{activate,render,deactivate,destroy};
