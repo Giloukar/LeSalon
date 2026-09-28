@@ -83,7 +83,7 @@ export function createTable3DRenderer({onFatal}={}){
   let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='';
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
-  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,pendingMaidPickOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
+  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,lastBattleSnapshot=null,pendingMaidPickOrigin=null,pendingBattleOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
 
   function applyCameraFit(){
     if(!camera||!cameraPose)return;
@@ -466,11 +466,29 @@ export function createTable3DRenderer({onFatal}={}){
       dealer:(bj?.dealer||[]).map(visualCardSnapshot).filter(Boolean)
     };
   }
-  function queueCardFlight(mesh,from,to,{duration=620,delay=0,lift=.8,onDone=null,fromRot=0,toRot=0,bank=.10,roll=.08,fromScale=null,toScale=null}={}){
+  function battleSeat(count,index,radius=3.25){
+    const angle=(Math.PI*2*index/Math.max(1,count))-Math.PI/2;
+    return{angle,x:Math.cos(angle)*radius,z:Math.sin(angle)*2.25};
+  }
+  function battleRevealSlot(count,reveal,index){
+    const owner=Math.max(0,Number(reveal?.owner)||0),seat=battleSeat(count,owner,1.1),offset=(index%4)*.18;
+    return{angle:seat.angle,x:Math.cos(seat.angle)*(1.1+offset),z:Math.sin(seat.angle)*(.82+offset)};
+  }
+  function battleSnapshot(payload,battle){
+    const s=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0;
+    return{
+      key:[s?.startedAt||'',viewer,(s?.players||[]).map(p=>p?.name||'').join('|')].join('~'),
+      viewer,turn:Number(s?.turn??0),number:Number(battle?.number||0),winner:Number.isInteger(battle?.winner)?battle.winner:-1,pot:Number(battle?.pot||0),
+      counts:[...(battle?.counts||[])],
+      reveals:(battle?.reveals||[]).map(r=>r?.hidden?{owner:r.owner,hidden:true}:{owner:r.owner,hidden:false,card:visualCardSnapshot(r.card)})
+    };
+  }
+  function queueCardFlight(mesh,from,to,{duration=620,delay=0,lift=.8,onStart=null,onDone=null,hideUntilStart=false,fromRot=0,toRot=0,bank=.10,roll=.08,fromScale=null,toScale=null}={}){
     mesh.position.copy(from);mesh.rotation.set(-Math.PI/2,0,fromRot);
     if(fromScale)mesh.scale.copy(fromScale);
+    if(hideUntilStart)mesh.visible=false;
     cardFx.add(mesh);
-    cardAnimations.push({mesh,from:from.clone(),to:to.clone(),start:performance.now(),duration,delay,lift,onDone,fromRot,toRot,bank,roll,fromScale:fromScale?.clone?.()||null,toScale:toScale?.clone?.()||null,done:false});startMotion();
+    cardAnimations.push({mesh,from:from.clone(),to:to.clone(),start:performance.now(),duration,delay,lift,onStart,onDone,hideUntilStart,started:false,fromRot,toRot,bank,roll,fromScale:fromScale?.clone?.()||null,toScale:toScale?.clone?.()||null,done:false});startMotion();
   }
   function tileMaterial(kind='normal',highlight=false){
     const key=kind+(highlight?'-hot':'');if(tileMaterials.has(key))return tileMaterials.get(key);
@@ -564,6 +582,7 @@ export function createTable3DRenderer({onFatal}={}){
       if(a.done)continue;
       const elapsed=now-a.start-(a.delay||0);
       if(elapsed<0){running=true;continue}
+      if(!a.started){a.started=true;if(a.hideUntilStart)a.mesh.visible=true;a.onStart?.()}
       const t=Math.min(1,Math.max(0,elapsed/a.duration)),ease=1-Math.pow(1-t,3);
       a.mesh.position.lerpVectors(a.from,a.to,ease);a.mesh.position.y+=Math.sin(t*Math.PI)*(a.lift??.8);
       const arc=Math.sin(t*Math.PI);
@@ -909,21 +928,67 @@ export function createTable3DRenderer({onFatal}={}){
     }
 
     if(game==='bataille'){
-      const battle=data.battle||{},counts=battle.counts||[],players=s.players||[],radius=3.25;
+      const battle=data.battle||{},counts=battle.counts||[],players=s.players||[],radius=3.25,deckVisuals=new Map();
       players.forEach((p,i)=>{
-        const angle=(Math.PI*2*i/Math.max(1,players.length))-Math.PI/2,x=Math.cos(angle)*radius,z=Math.sin(angle)*2.25,count=counts[i]??p.hand?.length??0,total=Math.min(5,count);
-        for(let c=0;c<total;c++){const mesh=cardMesh(null,{back:true});placeCard(mesh,x+c*.025,z-c*.025,TABLE_Y+.11+c*.025,angle+.08,.58)}
-        const label=makeLabel((p.name||'Joueur')+' · '+count,i===s.turn?'#dbea9e':'#d8ded9');label.scale.set(2.2,.48,1);label.position.set(x,.95,z+(z>0 ? .65 : -.65));objects.add(label);
+        const seat=battleSeat(players.length,i,radius),count=counts[i]??p.hand?.length??0,total=Math.min(5,count),meshes=[];
+        for(let c=0;c<total;c++){
+          const top=c===total-1,mesh=cardMesh(null,{back:true});
+          placeCard(mesh,seat.x+c*.025,seat.z-c*.025,TABLE_Y+.11+c*.025,seat.angle+.08,.58);
+          if(top&&payload.canInteract&&i===s.turn&&i===viewer){
+            mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};
+            makeLooseManipulable(mesh,{kind:'battle-card',tapEnabled:true,owner:i});
+          }
+          meshes.push(mesh);
+        }
+        deckVisuals.set(i,{...seat,count,meshes,top:meshes.at(-1)||null});
+        const label=makeLabel((p.name||'Joueur')+' · '+count,i===s.turn?'#dbea9e':'#d8ded9');label.scale.set(2.2,.48,1);label.position.set(seat.x,.95,seat.z+(seat.z>0 ? .65 : -.65));objects.add(label);
       });
-      const reveals=battle.reveals||[];
+
+      const reveals=battle.reveals||[],revealVisuals=[];
       reveals.forEach((r,i)=>{
-        const ownerIndex=Math.max(0,players.findIndex((_,k)=>k===r.owner)),angle=(Math.PI*2*ownerIndex/Math.max(1,players.length))-Math.PI/2,offset=(i%4)*.18;
-        const mesh=cardMesh(r.card||null,{back:!!r.hidden});placeCard(mesh,Math.cos(angle)*(1.1+offset),Math.sin(angle)*(.82+offset),TABLE_Y+.16+i*.01,angle,.64);
+        const slot=battleRevealSlot(players.length,r,i),mesh=cardMesh(r.hidden?null:r.card,{back:!!r.hidden});
+        placeCard(mesh,slot.x,slot.z,TABLE_Y+.16+i*.01,slot.angle,.64);
+        revealVisuals.push({mesh,reveal:r,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone(),owner:r.owner});
       });
+
+      const snapshot=battleSnapshot(payload,battle),previous=lastBattleSnapshot;
+      if(previous&&previous.key===snapshot.key&&snapshot.number>previous.number&&motionAllowed()&&revealVisuals.length){
+        const revealCount=Math.min(24,revealVisuals.length),actor=previous.turn;
+        let usedPending=false;
+        revealVisuals.slice(0,revealCount).forEach((visual,i)=>{
+          const owner=Math.max(0,Number(visual.owner)||0),seat=battleSeat(players.length,owner,radius),direct=!usedPending&&owner===actor&&pendingBattleOrigin?.position?pendingBattleOrigin:null;
+          if(direct)usedPending=true;
+          const from=direct?.position?.clone?.()||new THREE.Vector3(seat.x,TABLE_Y+.29,seat.z),fromRot=direct?.rotation??seat.angle+.08,fromScale=direct?.scale?.clone?.()||new THREE.Vector3(.58,.58,.58);
+          visual.mesh.visible=false;
+          const flight=cardMesh(visual.reveal.hidden?null:visual.reveal.card,{back:!!visual.reveal.hidden});
+          queueCardFlight(flight,from,visual.position,{
+            duration:440+Math.min(100,i*12),delay:i*82,lift:.62,
+            fromRot,toRot:visual.rotation,bank:.12,roll:(i%2?-.10:.10),
+            fromScale,toScale:visual.scale,hideUntilStart:true,
+            onDone:()=>{visual.mesh.visible=true}
+          });
+        });
+
+        if(snapshot.winner>=0){
+          const winner=battleSeat(players.length,snapshot.winner,radius),gatherDelay=revealCount*82+620,targetBase=new THREE.Vector3(winner.x,TABLE_Y+.29,winner.z);
+          revealVisuals.slice(0,revealCount).forEach((visual,i)=>{
+            const gather=cardMesh(visual.reveal.hidden?null:visual.reveal.card,{back:!!visual.reveal.hidden}),target=targetBase.clone().add(new THREE.Vector3((i-(revealCount-1)/2)*.018,i*.004,-i*.012));
+            queueCardFlight(gather,visual.position,target,{
+              duration:430+Math.min(90,i*8),delay:gatherDelay+i*28,lift:.48,
+              fromRot:visual.rotation,toRot:winner.angle+.08,bank:.09,roll:(i%2?-.075:.075),
+              fromScale:visual.scale,toScale:new THREE.Vector3(.58,.58,.58),hideUntilStart:true,
+              onStart:()=>{visual.mesh.visible=false}
+            });
+          });
+        }
+      }
+      if(previous&&snapshot.number>previous.number)pendingBattleOrigin=null;
+      lastBattleSnapshot=snapshot;
+
       if(payload.canInteract){const action=actionSprite('RETOURNER LE PLI','battle-action');action.position.set(0,1.02,2.45);objects.add(action)}
       if(title)title.textContent='VUE 3D · BATAILLE';
       if(status)status.textContent='Pli '+(Number(battle.number||0)+1)+' / 200'+(battle.winner>=0?' · '+(players[battle.winner]?.name||'')+' gagne':'');
-      if(help)help.textContent=payload.canInteract?'Touchez « Retourner le pli » ou utilisez le bouton dessous':'Les paquets restent face cachée';
+      if(help)help.textContent=payload.canInteract?'Touchez la carte supérieure ou glissez-la vers le centre · le moteur retourne tout le pli':'Les paquets restent face cachée · le pli confirmé se joue au centre';
     }
   }
 
@@ -1555,7 +1620,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(hovered===mesh)return;
     if(hovered&&!drag){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale);}
     hovered=mesh;
-    if(hovered&&!drag&&['card','card-select','maid-pick','special-select','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-draw','rummi-dest','intrus-spot','code-cycle'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
+    if(hovered&&!drag&&['card','card-select','maid-pick','battle-card','special-select','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-draw','rummi-dest','intrus-spot','code-cycle'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
     draw();
   }
   function capturePointer(id){try{canvas?.setPointerCapture?.(id)}catch(_){}}
@@ -1637,6 +1702,10 @@ export function createTable3DRenderer({onFatal}={}){
     }else if(d.kind==='maid-pick'&&current?.gameId==='pouilleux'){
       d.maidToHand=d.mesh.position.z>=1.55&&Math.abs(d.mesh.position.x)<=4.55;
       showDropMarkerAt(Math.max(-3.35,Math.min(3.35,d.mesh.position.x)),2.18,d.maidToHand);
+    }else if(d.kind==='battle-card'&&current?.gameId==='bataille'){
+      const radius=d.pointerType==='touch'||matchMedia('(pointer: coarse)').matches?2.15:1.8;
+      d.battleToCenter=Math.hypot(d.mesh.position.x,d.mesh.position.z)<=radius;
+      showDropMarkerAt(0,0,d.battleToCenter);
     }
     draw();e.preventDefault();return true;
   }
@@ -1728,6 +1797,11 @@ export function createTable3DRenderer({onFatal}={}){
         if(current?.interactions?.specialCard?.('pick',d.index))return;
         pendingMaidPickOrigin=null;
       }
+      if(d.kind==='battle-card'&&d.battleToCenter){
+        pendingBattleOrigin={position:d.mesh.position.clone(),rotation:d.mesh.rotation.z,scale:d.mesh.scale.clone()};
+        if(current?.interactions?.specialCard?.('battle'))return;
+        pendingBattleOrigin=null;
+      }
       if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d);return
     }
     if(d.loose&&(!d.tapEnabled||!current?.canInteract)){returnManipulatedCard(d,{snap:true});return}
@@ -1736,6 +1810,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='special-select'){current?.interactions?.specialCard?.('select',d.cardId);return}
     if(d.kind==='maid-pick'){if(tap){pendingMaidPickOrigin={position:d.mesh.position.clone(),rotation:d.mesh.rotation.z,scale:d.mesh.scale.clone(),index:d.index};if(!current?.interactions?.specialCard?.('pick',d.index))pendingMaidPickOrigin=null}return}
     if(d.kind==='special-select'){if(tap)current?.interactions?.specialCard?.('select',d.cardId);return}
+    if(d.kind==='battle-card'){if(tap){pendingBattleOrigin={position:d.mesh.position.clone(),rotation:d.mesh.rotation.z,scale:d.mesh.scale.clone()};if(!current?.interactions?.specialCard?.('battle'))pendingBattleOrigin=null}return}
     if(d.kind==='battle-action'){if(tap)current?.interactions?.specialCard?.('battle');return}
     if(d.kind==='cactus-quick'){if(tap)current?.interactions?.cactus?.('quick',d.index);return}
     if(d.kind==='cactus-swap'){if(tap)current?.interactions?.cactus?.('swap',d.index);return}
