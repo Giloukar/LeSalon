@@ -3251,7 +3251,9 @@ if(window.SalonTableView){
    data.specialCells={bridge:6,inn:19,well:31,maze:42,prison:52,skull:58,goal:63};data.playerColors=COLORS.slice();
   }
   if(S?.id==='yam'){
-   data.yamDice=[...S.dice];data.yamHeld=[...S.held];data.yamRolls=S.rolls;data.yamTurn=S.yamTurn;
+   const yp=player(S);
+   data.yamDice=[...S.dice];data.yamHeld=[...S.held];data.yamRolls=S.rolls;data.yamTurn=S.yamTurn;data.yamPlayerScore=Number(yp?.score)||0;
+   data.yamCategories=YAM_CATEGORIES.map(c=>({id:c.id,name:c.name,rule:c.rule,max:c.max,filled:yp?.yamSheet?.[c.id]!==null,score:yp?.yamSheet?.[c.id]??null,preview:S.rolls?yamScore(S.dice,c.id):null}));
   }
   if(S?.id==='boite'){
    data.boxDice=[...S.boxDice];data.boxNumbers=[...S.boxNumbers];data.boxStage=S.boxStage;data.boxSelected=[...selection].map(Number);data.boxCanOne=S.boxNumbers.every(n=>n<7);
@@ -3469,7 +3471,13 @@ if(window.SalonTableView){
     playCard(id){if(!S||S.id!=='huit'||!canPlay())return false;const c=player(S).hand.find(c=>c.id===id);if(!c)return false;eightPlayCardUI(c);return true},
     draw(){if(!S||S.id!=='huit'||!canPlay())return false;dispatch({type:'draw'});return true},
     goose(type,steps){if(!S||S.id!=='oie'||!canPlay())return false;dispatch(type==='choose'?{type:'gooseChoose',steps}: {type});return true},
-    yam(type,index){if(!S||S.id!=='yam'||!canPlay())return false;dispatch(type==='hold'?{type:'hold',index}:{type:'roll'});return true},
+    yam(type,value){
+     if(!S||S.id!=='yam'||!canPlay())return false;
+     if(type==='hold'&&Number.isInteger(value)&&value>=0&&value<=4){dispatch({type:'hold',index:value});return true}
+     if(type==='roll'){dispatch({type:'roll'});return true}
+     if(type==='score'&&S.rolls>0&&typeof value==='string'&&YAM_CATEGORIES.some(c=>c.id===value)&&player(S).yamSheet[value]===null){dispatch({type:'score',category:value});return true}
+     return false;
+    },
     rummi(type,value){
      if(!S||S.id!=='rummikub'||!canPlay())return false;
      if(type==='select'){
