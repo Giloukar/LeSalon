@@ -19,7 +19,10 @@ view.register('3d',{
     modulePromise??=import(new URL('./table-3d.js?v=48',SRC).href);
     const mod=await modulePromise;
     renderer??=mod.createTable3DRenderer({
-      onFatal(error){view.fallback('webgl-failed',error)}
+      onFatal(error){
+        const failed=renderer;view.fallback('webgl-failed',error);
+        queueMicrotask(()=>{if(renderer===failed){try{failed?.destroy?.()}catch(_){}renderer=null}});
+      }
     });
     return renderer;
   },
