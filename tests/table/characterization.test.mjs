@@ -469,7 +469,7 @@ test('owned cards and rack tiles can keep local free poses without changing game
  assert.match(source,/if\(a\.mesh\.userData\?\.persistLocalPose\)/);
  assert.match(source,/function storedLocalPose\(id,type='card'\)/);
  assert.match(source,/activePoseScope=poseScope\(payload\);poseSeen=new Set\(\)/);
- assert.match(source,/syncCurrent\(payload\);pruneLocalPoses\(\);updateLocalPoseResetButton\(\);draw\(\)/);
+ assert.match(source,/syncCurrent\(payload\);pruneLocalPoses\(\);updateLocalPoseResetButton\(\);updateCameraResetButton\(\);draw\(\)/);
  assert.doesNotMatch(source,/saveLocalPose[^\n]*dispatch\(/);
  assert.doesNotMatch(source,/settlePersistentPlacement[^\n]*onlineAct\(/);
  assert.doesNotMatch(source,/localPoses[^\n]*publishOnline\(/);
@@ -557,7 +557,7 @@ test('local face flipping persists locally and coexists with rotation, tosses an
  assert.match(source,/a\.mesh\.rotation\.x=\(a\.faceX\?\?-Math\.PI\/2\)/);
  assert.match(source,/const tap=!d\.stackMode&&!d\.rotated&&!d\.flipped/);
  assert.match(source,/twist=drag\.twist,quickTap=allowFlip&&!twist\.turned/);
- assert.match(source,/function onPointerUp\(e\)\{if\(releaseTwistPointer\(e,\{allowFlip:true\}\)\)return/);
+ assert.match(source,/function onPointerUp\(e\)\{if\(releaseCameraPointer\(e\)\)return;if\(releaseTwistPointer\(e,\{allowFlip:true\}\)\)return/);
  assert.match(source,/performance\.now\(\)-Number\(twist\.startedAt\|\|0\)<=260/);
  assert.match(source,/if\(quickTap\)flipDraggedObject\(\)/);
  assert.match(source,/mats=\[edgeMaterial,edgeMaterial,edgeMaterial,edgeMaterial,front,rummiBackMaterial\]/);
