@@ -241,6 +241,29 @@ test('shared live card presence remains presentation-only in renderer and protoc
  assert.doesNotMatch(html,/card-gesture[^\n]*(cardId|suit|rank)/);
 });
 
+test('free 3D card toss presence is anonymous, face-down remotely and explicitly resettable',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ const html=await readFile(path.join(root,'jeux.html'),'utf8');
+ const css=await readFile(path.join(root,'shared/table-3d.css'),'utf8');
+ assert.match(source,/const TABLETOP_CARD_GAMES=new Set/);
+ assert.match(source,/function emitLocalTabletop\(phase/);
+ assert.match(source,/function onRemoteCardTabletop\(event\)/);
+ assert.match(source,/function ensureRemoteTabletopMesh\(key,entry\)[\s\S]*?cardMesh\(null,\{back:true\}\)/);
+ assert.match(source,/if\(tabletop\)emitLocalTabletop\('pose'/);
+ assert.match(source,/a\.tabletop&&now-Number\(a\.lastTabletopAt\|\|0\)>=70/);
+ assert.match(source,/data-table-3d-reset-hand hidden>Ranger ma main/);
+ assert.match(source,/function resetActiveLocalCardPoses\(\)/);
+ assert.match(css,/\.table-3d-hand-reset\{/);
+ assert.match(html,/const CARD_TABLETOP_GAMES=new Set/);
+ assert.match(html,/salon:local-card-tabletop/);
+ assert.match(html,/salon:remote-card-tabletop/);
+ assert.doesNotMatch(html,/card-tabletop[^\n]*(cardId|suit|rank)/);
+});
+
+test('free card tabletop packets expose geometry but never card identity or game state changes',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'president','online');const r=await t.page.evaluate(()=>{net.gameId='president';S.turn=1;net.state.turn=1;__test.packets.length=0;cardTabletopLastAt=0;const before={view:clone(S),host:clone(net.state),revision:net.revision,random:__test.random};window.dispatchEvent(new CustomEvent('salon:local-card-tabletop',{detail:{gameId:'president',phase:'pose',token:17,x:1.2,z:.3,lift:.22,rotation:.44,cardId:'0-H-13',rank:13,suit:'H'}}));const packets=clone(__test.packets).filter(p=>p.type==='card-tabletop');return{before,after:{view:clone(S),host:clone(net.state),revision:net.revision,random:__test.random},packets};});assert.deepEqual(r.after,r.before);assert.equal(r.packets.length>=1,true);for(const p of r.packets){assert.equal(p.gameId,'president');assert.equal(p.actor,0);assert.equal(p.token,17);assert.equal(p.x,1.2);assert.equal(p.z,.3);assert.equal('cardId'in p,false);assert.equal('rank'in p,false);assert.equal('suit'in p,false);assert.equal('state'in p,false);}}finally{await browser.close();}});
+
+test('host relays out-of-turn tabletop card poses with bounded anonymous geometry',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'president','online');const r=await t.page.evaluate(()=>{net.gameId='president';net.state.turn=0;S.turn=0;let seen=null;window.addEventListener('salon:remote-card-tabletop',e=>seen=clone(e.detail),{once:true});const before={state:clone(net.state),revision:net.revision,random:__test.random},conn=net.seats[2].conn;const handled=receiveSocial({type:'card-tabletop',gameId:'president',matchId:net.matchId,phase:'pose',token:9,x:99,z:-99,lift:8,rotation:999,cardId:'secret',rank:12,suit:'D'},2,conn);return{handled,seen,before,after:{state:clone(net.state),revision:net.revision,random:__test.random}};});assert.equal(r.handled,true);assert.deepEqual(r.after,r.before);assert.equal(r.seen.actor,2);assert.equal(r.seen.token,9);assert.equal(r.seen.x,5.05);assert.equal(r.seen.z,-3.08);assert.equal(r.seen.lift,1.35);assert.equal('cardId'in r.seen,false);assert.equal('rank'in r.seen,false);assert.equal('suit'in r.seen,false);}finally{await browser.close();}});
+
 test('Cactus quick-drag presence is allowed out of turn without leaking the card',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'cactus','online');const r=await t.page.evaluate(()=>{net.gameId='cactus';net.state.phase='draw';net.state.turn=1;S.phase='draw';S.turn=1;__test.packets.length=0;const before={view:clone(S),host:clone(net.state),revision:net.revision,random:__test.random};window.dispatchEvent(new CustomEvent('salon:local-card-gesture',{detail:{gameId:'cactus',phase:'start',progress:0,lateral:0}}));window.dispatchEvent(new CustomEvent('salon:local-card-gesture',{detail:{gameId:'cactus',phase:'move',progress:.63,lateral:.18}}));window.dispatchEvent(new CustomEvent('salon:local-card-gesture',{detail:{gameId:'cactus',phase:'cancel',progress:0,lateral:0}}));return{before,after:{view:clone(S),host:clone(net.state),revision:net.revision,random:__test.random},packets:clone(__test.packets).filter(p=>p.type==='card-gesture')};});assert.deepEqual(r.after,r.before);assert.equal(r.packets.length>=2,true);for(const p of r.packets){assert.equal(p.gameId,'cactus');assert.equal(p.actor,0);assert.equal('cardId'in p,false);assert.equal('suit'in p,false);assert.equal('rank'in p,false);}}finally{await browser.close();}});
 
 test('host relays out-of-turn Cactus quick presence but blocks the active protected phase',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'cactus','online');const r=await t.page.evaluate(()=>{net.gameId='cactus';net.state.phase='draw';net.state.turn=0;S.phase='draw';S.turn=0;const seen=[];window.addEventListener('salon:remote-card-gesture',e=>seen.push(clone(e.detail)));const before={state:clone(net.state),revision:net.revision,random:__test.random},conn=net.seats[2].conn;const good=receiveSocial({type:'card-gesture',gameId:'cactus',matchId:net.matchId,revision:net.revision,gesture:21,phase:'move',progress:.52,lateral:-.11},2,conn);net.state.phase='swap';net.state.turn=2;S.phase='swap';S.turn=2;const blocked=receiveSocial({type:'card-gesture',gameId:'cactus',matchId:net.matchId,revision:net.revision,gesture:22,phase:'move',progress:.72,lateral:0},2,conn);return{good,blocked,seen,before,after:{state:{...clone(net.state),phase:'draw',turn:0},revision:net.revision,random:__test.random}};});assert.equal(r.good,true);assert.equal(r.blocked,true);assert.equal(r.seen.length,1);assert.equal(r.seen[0].actor,2);assert.equal(r.seen[0].gameId,'cactus');assert.equal(r.after.revision,r.before.revision);assert.equal(r.after.random,r.before.random);assert.deepEqual(r.after.state,r.before.state);}finally{await browser.close();}});
@@ -505,7 +528,7 @@ test('owned cards and rack tiles can keep local free poses without changing game
  assert.match(source,/if\(a\.mesh\.userData\?\.persistLocalPose\)/);
  assert.match(source,/function storedLocalPose\(id,type='card'\)/);
  assert.match(source,/activePoseScope=poseScope\(payload\);poseSeen=new Set\(\)/);
- assert.match(source,/syncCurrent\(payload\);pruneLocalPoses\(\);updateLocalPoseResetButton\(\);updateCameraResetButton\(\);draw\(\)/);
+ assert.match(source,/syncCurrent\(payload\);pruneLocalPoses\(\);renderRemoteTabletopCards\(\);updateLocalPoseResetButton\(\);updateCameraResetButton\(\);draw\(\)/);
  assert.doesNotMatch(source,/saveLocalPose[^\n]*dispatch\(/);
  assert.doesNotMatch(source,/settlePersistentPlacement[^\n]*onlineAct\(/);
  assert.doesNotMatch(source,/localPoses[^\n]*publishOnline\(/);
