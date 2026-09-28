@@ -3348,6 +3348,21 @@ if(window.SalonTableView){
    };
   }
   if(S?.id==='metropole'){
+   const cityP=player(S),cityActive=!!canPlay(),cityManage=CITY_BOARD.map((c,i)=>{
+    if(!cityActive||c.type!=='property'||S.owners[i]!==S.turn||!['roll','buy','end','debt'].includes(S.phase))return null;
+    const group=cityGroup(S,c.group),max=group.length?Math.max(...group.map(k=>S.houses[k])):0,min=group.length?Math.min(...group.map(k=>S.houses[k])):0,redeemCost=Math.ceil(Math.floor(c.price/2)*1.1);
+    return{
+     index:i,
+     mortgageGain:Math.floor(c.price/2),
+     redeemCost,
+     buildCost:c.build,
+     sellGain:Math.floor(c.build/2),
+     canMortgage:!S.mortgaged[i]&&!group.some(k=>S.houses[k]),
+     canRedeem:!!(S.mortgaged[i]&&cityP.cash>=redeemCost&&S.phase!=='debt'),
+     canBuild:!!(S.phase!=='debt'&&cityOwnsGroup(S,i,S.turn)&&S.houses[i]<3&&cityP.cash>=c.build&&S.houses[i]<=min),
+     canSell:!!(S.houses[i]>0&&S.houses[i]>=max)
+    };
+   });
    data.city={
     board:CITY_BOARD.map((c,i)=>({name:c.name,type:c.type,group:c.group??-1,price:c.price??0,rent:c.type==='property'&&S.owners[i]>=0?cityRent(S,i):0})),
     colors:CITY_COLORS.slice(),
@@ -3360,6 +3375,15 @@ if(window.SalonTableView){
     phase:S.phase,
     offer:S.offer??null,
     debt:S.debt?{amount:S.debt.amount,reason:S.debt.reason}:null,
+    manage:cityManage,
+    canRoll:!!(cityActive&&S.phase==='roll'),
+    canBail:!!(cityActive&&S.phase==='roll'&&cityP.jailed&&cityP.cash>=50),
+    canBuy:!!(cityActive&&S.phase==='buy'&&Number.isInteger(S.offer)&&S.owners[S.offer]<0&&cityP.cash>=(CITY_BOARD[S.offer]?.price||Infinity)),
+    canDecline:!!(cityActive&&S.phase==='buy'),
+    canEndTurn:!!(cityActive&&S.phase==='end'),
+    canPay:!!(cityActive&&S.phase==='debt'&&S.debt&&cityP.cash>=S.debt.amount),
+    canBankrupt:!!(cityActive&&S.phase==='debt'&&S.debt&&cityP.cash<S.debt.amount),
+    canContinue:!!(cityActive&&S.phase==='jailMove'),
     players:S.players.map(p=>({name:p.name,cash:p.cash,pos:p.pos,jailed:p.jailed,out:p.out}))
    };
   }
@@ -3577,9 +3601,17 @@ if(window.SalonTableView){
      if(type==='continue'&&S.phase==='result'){dispatch({type:'continue'});return true}
      return false;
     },
-    city(type){
+    city(type,value){
      if(!S||S.id!=='metropole'||!canPlay())return false;
      if(type==='roll'&&S.phase==='roll'){dispatch({type:'roll'});return true}
+     if(type==='bail'&&S.phase==='roll'&&player(S).jailed&&player(S).cash>=50){dispatch({type:'bail'});return true}
+     if(type==='buy'&&S.phase==='buy'){dispatch({type:'buy'});return true}
+     if(type==='decline'&&S.phase==='buy'){dispatch({type:'decline'});return true}
+     if(type==='endTurn'&&S.phase==='end'){dispatch({type:'endTurn'});return true}
+     if(type==='pay'&&S.phase==='debt'&&S.debt&&player(S).cash>=S.debt.amount){dispatch({type:'pay'});return true}
+     if(type==='bankrupt'&&S.phase==='debt'&&S.debt&&player(S).cash<S.debt.amount){dispatch({type:'bankrupt'});return true}
+     if(type==='continue'&&S.phase==='jailMove'){dispatch({type:'continue'});return true}
+     if(['mortgage','redeem','build','sellHouse'].includes(type)&&Number.isInteger(value)&&value>=0&&value<CITY_BOARD.length){dispatch({type,index:value});return true}
      return false;
     },
     specialCard(type,value){
