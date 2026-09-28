@@ -509,10 +509,10 @@ test('manual local object rotation stays presentation-only on wheel and touch tw
  assert.match(source,/function onWheel\(e\)/);
  assert.match(source,/direction\*-Math\.PI\/18/);
  assert.match(source,/e\.pointerType==='touch'/);
- assert.match(source,/drag\.twist=\{pointerId:e\.pointerId,lastAngle:angle\}/);
+ assert.match(source,/drag\.twist=\{pointerId:e\.pointerId,lastAngle:angle,startedAt:performance\.now\(\),turned:false\}/);
  assert.match(source,/drag\.twist\?\.pointerId===e\.pointerId/);
  assert.match(source,/rotateDraggedObject\(delta\)/);
- assert.match(source,/const tap=!d\.stackMode&&!d\.rotated&&/);
+ assert.match(source,/const tap=!d\.stackMode&&!d\.rotated&&!d\.flipped&&/);
  assert.match(source,/saveLocalPose\(obj,home\)/);
  assert.match(source,/canvas\?\.removeEventListener\('wheel',onWheel\)/);
  assert.doesNotMatch(source,/rotateDraggedObject[^\n]*dispatch\(/);
