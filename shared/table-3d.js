@@ -354,8 +354,12 @@ export function createTable3DRenderer({onFatal}={}){
     if(actor===viewer)return new THREE.Vector3(0,TABLE_Y+.30,2.45);
     const seat=opponentVisuals.get(actor);return seat?new THREE.Vector3(seat.x,TABLE_Y+.30,seat.z+.08):new THREE.Vector3(0,TABLE_Y+.30,-2.25);
   }
+  function storedLocalPose(id,type='card'){
+    return id&&activePoseScope?localPoses.get(activePoseScope+'|'+type+'|'+id)||null:null;
+  }
   function exactLocalCardOrigin(previous,id,index=0){
     const direct=previous?.dragOrigins?.get?.(id);if(direct?.position)return direct.position.clone();
+    const posed=storedLocalPose(id);if(posed?.position)return posed.position.clone();
     const at=previous?.ownIds?.indexOf(id);if(at<0)return null;
     const slot=handCardSlot(previous.ownIds.length,at);return new THREE.Vector3(slot.x,TABLE_Y+.30+slot.yOffset,slot.z);
   }
@@ -905,6 +909,7 @@ export function createTable3DRenderer({onFatal}={}){
         if(viewerActor){
           const removed=(previous.ownIds||[]).find(id=>!(snapshot.ownIds||[]).includes(id))||snapshot.lastId,direct=previous.dragOrigins?.get?.(removed);
           if(direct?.position)playFrom=direct.position.clone();
+          else if(storedLocalPose(removed)?.position)playFrom=storedLocalPose(removed).position.clone();
           else{const index=Math.max(0,(previous.ownIds||[]).indexOf(removed)),slot=handCardSlot(previous.ownIds.length,index);playFrom=new THREE.Vector3(slot.x,TABLE_Y+.28+slot.yOffset,slot.z)}
         }else{
           const visual=opponentVisuals.get(actor);playFrom=new THREE.Vector3(visual?.x||0,TABLE_Y+.29,(visual?.z||-2.2)+.08);
@@ -971,8 +976,8 @@ export function createTable3DRenderer({onFatal}={}){
         const previousOwn=previous.hand||[],previousDealer=previous.dealer||[],newOwn=snapshot.hand.filter(c=>!previousOwn.some(p=>p.id===c.id));
         own.forEach((card,i)=>{
           const visual=ownVisuals.get(card?.id);if(!visual)return;
-          const prevIndex=previousOwn.findIndex(p=>p.id===card.id);
-          if(prevIndex>=0&&previousOwn.length!==own.length){
+          const prevIndex=previousOwn.findIndex(p=>p.id===card.id),posed=!!storedLocalPose(card?.id);
+          if(prevIndex>=0&&previousOwn.length!==own.length&&!posed){
             const before=handCardSlot(previousOwn.length,prevIndex),from=new THREE.Vector3(before.x,TABLE_Y+.25+before.yOffset,before.z);
             if(from.distanceTo(visual.position)>.08){
               visual.mesh.visible=false;
@@ -1221,7 +1226,7 @@ export function createTable3DRenderer({onFatal}={}){
       const ownPlayed=discardChanged&&snapshot.handCounts[viewer]===previous.handCounts[viewer]-1&&previous.ownIds?.includes(top.id);
       const ownDrawnIds=snapshot.deckCount<previous.deckCount&&snapshot.handCounts[viewer]>previous.handCounts[viewer]?(snapshot.ownIds||[]).filter(id=>!(previous.ownIds||[]).includes(id)):[];
       if(ownPlayed){
-        const previousIndex=previous.ownIds.indexOf(top.id),slot=handCardSlot(previous.ownIds.length,Math.max(0,previousIndex)),from=new THREE.Vector3(slot.x,TABLE_Y+.28+slot.yOffset,slot.z),to=new THREE.Vector3(1.25,TABLE_Y+.23,.05),flight=cardMesh(top);
+        const previousIndex=previous.ownIds.indexOf(top.id),slot=handCardSlot(previous.ownIds.length,Math.max(0,previousIndex)),posed=storedLocalPose(top.id),from=posed?.position?.clone?.()||new THREE.Vector3(slot.x,TABLE_Y+.28+slot.yOffset,slot.z),to=new THREE.Vector3(1.25,TABLE_Y+.23,.05),flight=cardMesh(top);
         if(discardMesh)discardMesh.visible=false;
         queueCardFlight(flight,from,to,{duration:560,lift:.72,fromRot:slot.fan,toRot:(visualHash(top.id)-.5)*.18,bank:.14,roll:(visualHash(top.id+'roll')-.5)*.22,onDone:()=>{if(discardMesh)discardMesh.visible=true}});
       }else if(ownDrawnIds.length){
@@ -1409,7 +1414,7 @@ export function createTable3DRenderer({onFatal}={}){
         const visual=playerVisuals.get(actorLoss);let from;
         if(actorLoss===viewer&&previous.ownIds?.includes(snapshot.discardId)){
           const index=previous.ownIds.indexOf(snapshot.discardId),col=index%2,row=Math.floor(index/2),seat=cactusSeat(viewer,count,actorLoss);
-          from=new THREE.Vector3(seat.x+(col-.5)*1.02,TABLE_Y+.25,seat.z+(row-.5)*.78);
+          const posed=storedLocalPose(snapshot.discardId);from=posed?.position?.clone?.()||new THREE.Vector3(seat.x+(col-.5)*1.02,TABLE_Y+.25,seat.z+(row-.5)*.78);
         }else from=new THREE.Vector3(visual?.x||0,TABLE_Y+.28,(visual?.z||-2.1)+.08);
         const flight=cardMesh(data.discard),to=new THREE.Vector3(0,TABLE_Y+.24,.1);
         queueCardFlight(flight,from,to,{duration:520,lift:.72,fromRot:0,toRot:(visualHash(data.discard.id)-.5)*.12,bank:.15,roll:(actorLoss%2?-.12:.12),onDone:()=>{discardMesh.visible=true}});
