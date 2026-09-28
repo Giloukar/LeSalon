@@ -1733,7 +1733,8 @@ export function createTable3DRenderer({onFatal}={}){
     if(manipAnimations.length)manipAnimations=manipAnimations.filter(a=>a.mesh!==mesh);
   }
   function freeTossVelocity(d){
-    const v=d?.worldVelocity?.clone?.()||new THREE.Vector3();
+    const v=d?.worldVelocity?.clone?.()||new THREE.Vector3(),idle=Math.max(0,performance.now()-Number(d?.lastAt||0)),release=Math.max(0,Math.min(1,1-idle/150));
+    v.multiplyScalar(release);
     const max=.66,speed=v.length();if(speed>max)v.multiplyScalar(max/speed);
     return v;
   }
