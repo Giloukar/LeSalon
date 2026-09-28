@@ -3137,6 +3137,7 @@ playSceneAction=function(ctx){
 
 /* Présence cartes : gestes réseau temporaires, sans mutation de l'état autoritatif. */
 const CARD_GESTURE_GAMES=new Set(['huit','president','menteur','suites','plis','encheres','quatrevingtdixneuf','cactus']);
+const TABLETOP_CARD_GAMES=new Set([...CARD_GESTURE_GAMES,'pouilleux','vingtetun']);
 function cardGestureActorAllowed(gameId,actor,state){
  if(!state||!Number.isInteger(actor)||actor<0||actor>=state.players?.length)return false;
  if(gameId==='cactus')return state.phase!=='over'&&!(actor===state.turn&&['swap','power','reveal','peek'].includes(state.phase));
@@ -3180,9 +3181,9 @@ window.addEventListener('salon:local-card-gesture',e=>cardGestureSend(e.detail))
 
 /* Cartes jetées librement : présence visuelle uniquement. Aucune identité de carte ne traverse le réseau. */
 let tabletopCardCounter=0;
-function tabletopCardActorAllowed(gameId,actor,state){return !!(state&&CARD_GESTURE_GAMES.has(gameId)&&Number.isInteger(actor)&&actor>=0&&actor<state.players?.length&&state.phase!=='over')}
+function tabletopCardActorAllowed(gameId,actor,state){return !!(state&&TABLETOP_CARD_GAMES.has(gameId)&&Number.isInteger(actor)&&actor>=0&&actor<state.players?.length&&state.phase!=='over')}
 function tabletopCardClean(data,actor){
- const gameId=cardGestureGameId();if(!data||data.type!=='card-tabletop'||data.matchId!==net.matchId||data.revision!==net.revision||!CARD_GESTURE_GAMES.has(gameId))return null;
+ const gameId=cardGestureGameId();if(!data||data.type!=='card-tabletop'||data.matchId!==net.matchId||data.revision!==net.revision||!TABLETOP_CARD_GAMES.has(gameId))return null;
  if(data.gameId&&data.gameId!==gameId||!tabletopCardActorAllowed(gameId,actor,net.role==='host'?net.state:S))return null;
  const action=['throw','arrange'].includes(data.action)?data.action:null;if(!action)return null;
  if(action==='arrange')return{type:'card-tabletop',matchId:net.matchId,revision:net.revision,gameId,actor,action};
@@ -3192,7 +3193,7 @@ function tabletopCardClean(data,actor){
 function tabletopCardDeliver(packet){if(!packet||packet.actor===net.me)return;window.dispatchEvent(new CustomEvent('salon:remote-tabletop-card',{detail:packet}))}
 function tabletopCardBroadcast(packet,exclude=null){if(net.role!=='host')return;for(let i=1;i<(net.seats?.length||0);i++){const c=net.seats[i]?.conn;if(c?.open&&c!==exclude)netSend(packet,c)}for(const c of net.spectators?.keys?.()||[]){if(c?.open&&c!==exclude)netSend(packet,c)}}
 function tabletopCardSend(detail){
- const gameId=S?.id;if(!isOnline()||!CARD_GESTURE_GAMES.has(gameId)||!net.active||!net.connected||net.spectator||netPaused()||!tabletopCardActorAllowed(gameId,net.me,S))return;
+ const gameId=S?.id;if(!isOnline()||!TABLETOP_CARD_GAMES.has(gameId)||!net.active||!net.connected||net.spectator||netPaused()||!tabletopCardActorAllowed(gameId,net.me,S))return;
  const action=['throw','arrange'].includes(detail?.action)?detail.action:null;if(!action)return;
  const packet={type:'card-tabletop',matchId:net.matchId,revision:net.revision,gameId,action};
  if(action==='throw'){packet.token=++tabletopCardCounter;packet.lateral=Math.max(-1,Math.min(1,Number(detail.lateral)||0));packet.forward=Math.max(0,Math.min(1,Number(detail.forward)||0));packet.rotation=Math.max(-Math.PI,Math.min(Math.PI,Number(detail.rotation)||0));packet.speed=Math.max(0,Math.min(1,Number(detail.speed)||0));}
