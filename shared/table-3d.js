@@ -297,6 +297,9 @@ export function createTable3DRenderer({onFatal}={}){
       base.centerIds=(center.cards||[]).map(c=>c?.id).filter(Boolean);base.centerCards=(center.cards||[]).map(visualCardSnapshot).filter(Boolean);
     }else if(game==='menteur'){
       base.backCount=Number(center.backCount)||0;base.centerIds=(center.cards||[]).map(c=>c?.id).filter(Boolean);
+      base.centerCards=(center.cards||[]).map(visualCardSnapshot).filter(Boolean);
+      base.claimOwner=Number.isInteger(center.claim?.owner)?center.claim.owner:null;
+      base.claimCount=Number(center.claim?.count)||0;
     }else if(game==='suites')base.centerIds=Object.values(center.lanes||{}).flat().map(c=>c?.id).filter(Boolean);
     else if(game==='plis'){
       const physicalEntries=Array.isArray(state?.trickCards)&&state.trickCards.length?(center.entries||[]):(['trickResult','over'].includes(String(state?.phase||''))?(center.entries||[]):[]);
@@ -341,6 +344,22 @@ export function createTable3DRenderer({onFatal}={}){
   function animateCardFamilyConfirmed(game,payload,center,previous,currentSnapshot,opponentVisuals,centerVisuals){
     if(!previous||previous.key!==currentSnapshot.key||!motionAllowed())return;
     const viewer=currentSnapshot.viewer,discardCorner=new THREE.Vector3(4.35,TABLE_Y+.24,-1.85);
+
+    if(game==='menteur'&&previous.phase==='challenge'&&currentSnapshot.phase==='play'&&previous.backCount>0&&currentSnapshot.backCount===0){
+      const receivers=currentSnapshot.handCounts.map((count,i)=>({i,delta:count-(previous.handCounts?.[i]??count)})).filter(x=>x.delta>0).sort((a,b)=>b.delta-a.delta);
+      const receiver=receivers[0]?.i;
+      if(Number.isInteger(receiver)){
+        const target=cardFamilyOrigin(receiver,viewer,opponentVisuals),visibleCards=currentSnapshot.centerCards||[],pileCount=Math.min(12,Math.max(previous.backCount,visibleCards.length));
+        for(let i=0;i<pileCount;i++){
+          const publicIndex=i-(pileCount-visibleCards.length),publicCard=publicIndex>=0?visibleCards[publicIndex]:null,from=new THREE.Vector3((i-pileCount/2)*.045,TABLE_Y+.24,.08-i*.018),mesh=cardMesh(publicCard,{back:!publicCard});
+          queueCardFlight(mesh,from,target.clone().add(new THREE.Vector3((i-(pileCount-1)/2)*.035,i*.002,-i*.012)),{
+            duration:470+Math.min(120,i*12),delay:120+i*42,lift:.55,
+            fromRot:(i-pileCount/2)*.02,toRot:0,bank:.10,roll:(i%2?-.08:.08),
+            fromScale:new THREE.Vector3(.82,.82,.82),toScale:new THREE.Vector3(.69,.69,.69)
+          });
+        }
+      }
+    }
 
     if(game==='president'&&(previous.centerIds||[]).length&&!(currentSnapshot.centerIds||[]).length){
       const cards=previous.centerCards||[];
@@ -1020,7 +1039,8 @@ export function createTable3DRenderer({onFatal}={}){
     }else if(game==='menteur'){
       const count=Math.min(7,Number(center.backCount)||0);
       for(let i=0;i<count;i++){const mesh=cardMesh(null,{back:true});placeCard(mesh,(i-count/2)*.045,.08-i*.018,TABLE_Y+.1+i*.025,(i-count/2)*.02,.82)}
-      (center.cards||[]).forEach((card,i)=>{const x=(i-(center.cards.length-1)/2)*.72,z=-.65,mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,x,z,TABLE_Y+.16+i*.01,(i-(center.cards.length-1)/2)*.04,.72);if(card?.id)centerVisuals.set(card.id,{mesh,card,position:new THREE.Vector3(x,TABLE_Y+.25,z)})});
+      const historicalReveal=s?.phase==='play'&&!center.claim&&Number(center.backCount||0)===0;
+      if(!historicalReveal)(center.cards||[]).forEach((card,i)=>{const x=(i-(center.cards.length-1)/2)*.72,z=-.65,mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,x,z,TABLE_Y+.16+i*.01,(i-(center.cards.length-1)/2)*.04,.72);if(card?.id)centerVisuals.set(card.id,{mesh,card,position:new THREE.Vector3(x,TABLE_Y+.25,z)})});
     }else if(game==='suites'){
       setCameraPose(0,8.9,7.2,0,.18,0);
       const suits=['S','H','D','C'];
