@@ -6,6 +6,7 @@ const RANK_NAME={1:'A',11:'V',12:'D',13:'R'};
 const CARD_W=1.22,CARD_H=1.78,CARD_D=.045;
 const TABLE_Y=.28;
 const LIVE_CARD_GAMES=new Set(['huit','president','menteur','suites','plis','encheres','quatrevingtdixneuf','cactus']);
+const TABLETOP_CARD_GAMES=new Set([...LIVE_CARD_GAMES,'pouilleux','vingtetun']);
 const visualHash=str=>{
   let h=2166136261;
   for(const ch of String(str)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}
@@ -203,7 +204,7 @@ export function createTable3DRenderer({onFatal}={}){
     const hand=host?.querySelector?.('[data-table-3d-arrange-hand]');if(hand)hand.hidden=!hasActiveLocalCardPoses();
   }
   function emitLocalTabletopCard(action,data={}){
-    if(!current?.online||current?.spectator||!LIVE_CARD_GAMES.has(current?.gameId))return false;
+    if(!current?.online||current?.spectator||!TABLETOP_CARD_GAMES.has(current?.gameId))return false;
     window.dispatchEvent(new CustomEvent('salon:local-tabletop-card',{detail:{action,gameId:current.gameId,...data}}));return true;
   }
   function arrangeActiveHand(){
@@ -215,9 +216,9 @@ export function createTable3DRenderer({onFatal}={}){
     updateLocalPoseResetButton();draw();return changed;
   }
   function resetActiveLocalPoses(){
-    if(!activePoseScope)return false;const prefix=activePoseScope+'|';let changed=false;
-    for(const key of [...localPoses.keys()])if(key.startsWith(prefix)){localPoses.delete(key);changed=true}
-    if(!changed)return false;
+    if(!activePoseScope)return false;const prefix=activePoseScope+'|',cardPrefix=activePoseScope+'|card|';let changed=false,hadCards=false;
+    for(const key of [...localPoses.keys()])if(key.startsWith(prefix)){if(key.startsWith(cardPrefix))hadCards=true;localPoses.delete(key);changed=true}
+    if(!changed)return false;if(hadCards)emitLocalTabletopCard('arrange');
     poseSeen=new Set();if(current){syncCurrent(current);pruneLocalPoses()}updateLocalPoseResetButton();draw();return true;
   }
   function pruneLocalPoses(){
@@ -390,7 +391,7 @@ export function createTable3DRenderer({onFatal}={}){
     return new THREE.Vector3(clampMotion(from.x+dx*distance+sideX*side,-5.0,5.0),TABLE_Y+.125,clampMotion(from.z+dz*distance+sideZ*side,-3.02,3.02));
   }
   function onRemoteTabletopCard(event){
-    const game=current?.gameId,d=event?.detail||{};if(!active||!LIVE_CARD_GAMES.has(game)||(d.gameId&&d.gameId!==game))return;
+    const game=current?.gameId,d=event?.detail||{};if(!active||!TABLETOP_CARD_GAMES.has(game)||(d.gameId&&d.gameId!==game))return;
     const actor=Number(d.actor);if(!Number.isInteger(actor)||actor===current?.privateIndex)return;
     if(d.action==='arrange'){clearRemoteLooseCards(actor);return}
     if(d.action!=='throw')return;const seat=currentCardOpponentSeat(actor);if(!seat)return;
