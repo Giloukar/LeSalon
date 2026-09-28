@@ -822,7 +822,7 @@ export function createTable3DRenderer({onFatal}={}){
       const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,ownVisuals=new Map();
       own.forEach((card,i)=>{
         const slot=handCardSlot(n,i),mesh=cardMesh(card,{back:!!card.hidden});
-        placeCard(mesh,slot.x,slot.z,TABLE_Y+.11+slot.yOffset,slot.fan,slot.scale);makeLooseManipulable(mesh,{kind:'loose-card'});
+        placeCard(mesh,slot.x,slot.z,TABLE_Y+.11+slot.yOffset,slot.fan,slot.scale);makeLooseManipulable(mesh,{kind:'loose-card',cardId:card.id,persistPose:true});
         if(card?.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
       });
       const maid=data.maid||{},count=Number(maid.targetCount)||0,visible=Math.min(24,count);
@@ -875,7 +875,7 @@ export function createTable3DRenderer({onFatal}={}){
       own.forEach((card,i)=>{
         const slot=handCardSlot(n,i),chosen=selected.has(card.id),isLegal=legal.has(card.id),mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:selectable.has(card.id),playable:selectable.has(card.id)});
         mesh.userData.kind='special-select';mesh.userData.cardId=card.id;mesh.userData.home={position:new THREE.Vector3(slot.x,TABLE_Y+.12+slot.yOffset+(chosen?.25:isLegal?.08:0),slot.z),rotation:new THREE.Euler(-Math.PI/2,0,slot.fan),scale:new THREE.Vector3(1,1,1).multiplyScalar(slot.scale*(chosen?1.07:isLegal?1.025:.98))};
-        mesh.position.copy(mesh.userData.home.position);mesh.rotation.copy(mesh.userData.home.rotation);mesh.scale.copy(mesh.userData.home.scale);makeLooseManipulable(mesh,{kind:'special-select',tapEnabled:selectable.has(card.id),cardId:card.id});objects.add(mesh);
+        mesh.position.copy(mesh.userData.home.position);mesh.rotation.copy(mesh.userData.home.rotation);mesh.scale.copy(mesh.userData.home.scale);makeLooseManipulable(mesh,{kind:'special-select',tapEnabled:selectable.has(card.id),cardId:card.id,persistPose:true});objects.add(mesh);
         ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
       });
 
@@ -959,7 +959,7 @@ export function createTable3DRenderer({onFatal}={}){
       const dn=own.length;
       own.forEach((card,i)=>{
         const slot=handCardSlot(dn,i),mesh=cardMesh(card,{back:!!card.hidden});
-        placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.fan,slot.scale*.92);makeLooseManipulable(mesh,{kind:'loose-card'});
+        placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.fan,slot.scale*.92);makeLooseManipulable(mesh,{kind:'loose-card',cardId:card.id,persistPose:true});
         if(card?.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
       });
 
@@ -1095,7 +1095,7 @@ export function createTable3DRenderer({onFatal}={}){
       const mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:canSelect,playable:canSelect});
       mesh.userData.kind='card-select';mesh.userData.cardId=card.id;mesh.userData.playable=canSelect;mesh.userData.legal=legal;
       mesh.position.set(slot.x,TABLE_Y+.12+slot.yOffset+(chosen?.26:legal?.09:0),slot.z);mesh.rotation.set(-Math.PI/2,0,slot.fan);mesh.scale.setScalar(slot.scale*(chosen?1.075:legal?1.025:.98));
-      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'card-select',tapEnabled:canSelect,cardId:card.id});objects.add(mesh);
+      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'card-select',tapEnabled:canSelect,cardId:card.id,persistPose:true});objects.add(mesh);
       if(card?.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
     });
     const opponents=s.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer),opponentVisuals=new Map();
@@ -1184,7 +1184,7 @@ export function createTable3DRenderer({onFatal}={}){
       const slot=handCardSlot(n,i),mesh=cardMesh(card,{id:card.id,interactiveCard:true,playable:playable.has(card.id)});
       const lift=playable.has(card.id)?.14:0,scale=slot.scale*(playable.has(card.id)?1.025:1);
       placeCard(mesh,slot.x,slot.z,TABLE_Y+.12+slot.yOffset+lift,slot.fan,scale);
-      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};mesh.userData.looseManip=true;
+      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'card',cardId:card.id,persistPose:true});
       ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale});
     });
 
@@ -1300,7 +1300,7 @@ export function createTable3DRenderer({onFatal}={}){
     hand.forEach((tile,i)=>{
       const slot=rummiRackSlot(hand.length,i),mesh=rummiTileMesh(tile,selected.has(tile.id),!!data.canMove);
       mesh.position.set(slot.x,TABLE_Y+.42+slot.yOffset,slot.z);mesh.rotation.x=-Math.PI/2;mesh.scale.setScalar(slot.scale);
-      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'rummi-tile',tapEnabled:!!data.canMove,tileId:tile.id});objects.add(mesh);
+      mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'rummi-tile',tapEnabled:!!data.canMove,tileId:tile.id,persistPose:true,poseFloorY:TABLE_Y+.37});objects.add(mesh);
       currentVisuals.set(tile.id,{mesh,tile,position:mesh.position.clone(),scale:mesh.scale.clone(),rotation:mesh.rotation.z,zone:'hand'});
     });
 
@@ -1369,7 +1369,7 @@ export function createTable3DRenderer({onFatal}={}){
         mesh.userData.index=index;mesh.userData.owner=i;mesh.userData.interactive=interactiveCard;
         placeCard(mesh,x,z,TABLE_Y+.11,(col-.5)*.035,mine?0.76:0.62);
         mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};
-        if(mine){makeLooseManipulable(mesh,{kind:mesh.userData.kind,tapEnabled:interactiveCard,index,owner:i});if(card.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z})}
+        if(mine){makeLooseManipulable(mesh,{kind:mesh.userData.kind,tapEnabled:interactiveCard,index,owner:i,cardId:card.id,persistPose:true});if(card.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z})}
         meshes.push(mesh);
       });
       playerVisuals.set(i,{...seat,meshes});
