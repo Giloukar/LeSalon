@@ -129,6 +129,25 @@ test('manifest model packs preload, transform and unload without touching gamepl
 
 test('replaceable 3D asset registry stays presentation-only and supports hot swaps',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','online');const before=await clean(t.page);const r=await t.page.evaluate(()=>{const calls=[],events=[],unsubscribe=SalonTable3DAssets.subscribe(kind=>events.push(kind));const dispose=SalonTable3DAssets.register('card',ctx=>{calls.push({kind:ctx.kind,flag:ctx.flag});return{factory:true}});const created=SalonTable3DAssets.create('card',{flag:7});const listed=SalonTable3DAssets.list();const hasBefore=SalonTable3DAssets.has('card');dispose();unsubscribe();return{created,listed,hasBefore,hasAfter:SalonTable3DAssets.has('card'),calls,events};});assert.equal(r.hasBefore,true);assert.equal(r.hasAfter,false);assert.equal(r.created.factory,true);assert.deepEqual(r.calls,[{kind:'card',flag:7}]);assert.deepEqual(r.events,['card','card']);assert.equal(r.listed.includes('card'),true);assert.deepEqual(await clean(t.page),before);const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');assert.match(source,/function externalAsset\(kind,context,userData=\{\}\)/);for(const kind of ['card','rummikub-tile','die','pawn','golf-ball','golf-obstacle','golf-portal','code-gem','balloon','metropole-house','metropole-owner-marker'])assert.match(source,new RegExp("externalAsset\\('"+kind+"'"));assert.match(source,/assetUnsubscribe\?\?=externalAssets\?\.subscribe/);assert.match(source,/assetUnsubscribe\?\.\(\);assetUnsubscribe=null/);assert.match(source,/intersectObjects\(interactive,true\)/);}finally{await browser.close();}});
 
+test('dense Rummikub layout packs by real group width and shares cells with drop targeting',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/function rummiDesiredGroupWidth\(group\)/);
+ assert.match(source,/function rummiPackRows\(active,width=9\.35,gap=\.18\)/);
+ assert.match(source,/packed=rummiPackRows\(active,width,gap\)/);
+ assert.match(source,/cells=new Array\(active\.length\)/);
+ assert.match(source,/cells\[order\]=\{x:cursor\+cellW\/2,z:baseZ\+rowIndex\*cellD,width:cellW,depth:cellD,row:rowIndex,col\}/);
+ assert.match(source,/function rummiLayoutCell\(layout,order\)/);
+ assert.match(source,/widthScale=\(cell\.width-\.16\)/);
+ assert.match(source,/depthScale=\(Math\.max\(\.42,cell\.depth-\.12\)\)\/\.9/);
+ assert.match(source,/cell=rummiLayoutCell\(layout,order\),cx=cell\.x,cz=cell\.z/);
+ assert.match(source,/dx<=cell\.width\*\.47&&dz<=Math\.min\(\.78,cell\.depth\*\.42\)/);
+ assert.match(source,/slot\.cellD\*\.34/);
+ assert.match(source,/slot\.cellW\*\.48/);
+ assert.doesNotMatch(source,/layout\.cols/);
+ assert.doesNotMatch(source,/layout\.cellW/);
+ assert.doesNotMatch(source,/rummiPackRows[^\n]*dispatch\(/);
+});
+
 test('Three.js hardening adapts mobile quality, motion and reusable geometry',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  const css=await readFile(path.join(root,'shared/table-3d.css'),'utf8');
@@ -293,7 +312,7 @@ test('Eight 3D staging keeps opponent motion presentation-only',async()=>{
 
 test('Rummikub dense 3D layout and shared card motion remain presentation-only',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
- assert.match(source,/maxLen>=10\?2/);
+ assert.match(source,/function rummiPackRows\(active,width=9\.35,gap=\.18\)/);
  assert.match(source,/total<=10\?1:total<=20\?2:3/);
  assert.match(source,/lastCardFamilySnapshots=new Map\(\)/);
  assert.match(source,/queueCardFlight\(/);

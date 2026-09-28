@@ -528,3 +528,12 @@ Le mode pile est volontairement distinct des actions de jeu : tant qu'il est act
 Seul l'objet réellement au sommet peut initier la prise de pile. L'ordre de dépôt existant est conservé pendant le déplacement et lors de l'enregistrement des nouvelles poses, afin que la carte supérieure ne devienne pas artificiellement la carte inférieure après un déplacement collectif.
 
 Un mouvement normal avant la fin de l'appui long annule le mode pile et conserve le comportement habituel de la carte seule. Un second doigt destiné à la rotation annule également l'attente d'appui long : les gestes tactiles restent donc non ambigus.
+
+
+## Rummikub — layout dense adaptatif
+
+La table commune Rummikub n'utilise plus une grille de colonnes uniformes. Chaque groupe reçoit maintenant une largeur dérivée de son nombre réel de tuiles, puis les groupes sont empaquetés dans des lignes successives tant que leur largeur cumulée reste compatible avec la table.
+
+Cette disposition permet notamment à une longue suite de partager une ligne avec un petit groupe lorsqu'il reste assez d'espace, et permet à quatre groupes courts de tenir sur une même ligne. Quand le nombre de lignes augmente, l'échelle des tuiles tient aussi compte de la profondeur disponible afin d'éviter les recouvrements verticaux.
+
+Les cellules calculées sont la source unique pour le rendu, les boutons d'ajout à un groupe et les zones de dépôt pendant un drag. Une tuile ne peut donc pas sembler appartenir à une zone visuelle différente de celle reconnue au relâchement. Cette adaptation reste entièrement dans la présentation 3D et ne modifie ni les groupes du moteur, ni leurs indices, ni la validation d'un coup.

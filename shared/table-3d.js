@@ -521,16 +521,39 @@ export function createTable3DRenderer({onFatal}={}){
       handIds:(data?.hand||[]).map(t=>t?.id).filter(Boolean),positions
     };
   }
+  function rummiDesiredGroupWidth(group){
+    const length=Math.max(1,Number(group?.length)||1),natural=.66;
+    return Math.min(9.35,Math.max(1.64,length*natural+.18));
+  }
+  function rummiPackRows(active,width=9.35,gap=.18){
+    const rows=[];let row={orders:[],desired:0};
+    (active||[]).forEach((entry,order)=>{
+      const desired=rummiDesiredGroupWidth(entry?.group),next=row.desired+(row.orders.length?gap:0)+desired;
+      if(row.orders.length&&next>width){rows.push(row);row={orders:[],desired:0}}
+      if(row.orders.length)row.desired+=gap;
+      row.orders.push(order);row.desired+=desired;
+    });
+    if(row.orders.length)rows.push(row);
+    return rows;
+  }
   function rummiBoardLayout(groups){
-    const active=(groups||[]).map((group,index)=>({group,index})).filter(x=>x.group?.length),count=Math.max(1,active.length),maxLen=Math.max(1,...active.map(x=>x.group.length));
-    let cols=count<=2?count:maxLen>=10?2:count>=7?3:Math.min(3,Math.ceil(Math.sqrt(count*1.25)));
-    cols=Math.max(1,cols);const rows=Math.max(1,Math.ceil(count/cols)),width=9.35,depth=3.55,cellW=width/cols,cellD=depth/rows;
-    return{active,cols,rows,cellW,cellD,baseZ:-2.05,width,depth};
+    const active=(groups||[]).map((group,index)=>({group,index})).filter(x=>x.group?.length),width=9.35,depth=3.55,gap=.18,packed=rummiPackRows(active,width,gap),rows=Math.max(1,packed.length),cellD=depth/rows,baseZ=-2.05,cells=new Array(active.length);
+    packed.forEach((row,rowIndex)=>{
+      const widths=row.orders.map(order=>rummiDesiredGroupWidth(active[order]?.group)),total=widths.reduce((sum,value)=>sum+value,0)+gap*Math.max(0,widths.length-1);
+      let cursor=-total/2;
+      row.orders.forEach((order,col)=>{
+        const cellW=widths[col];cells[order]={x:cursor+cellW/2,z:baseZ+rowIndex*cellD,width:cellW,depth:cellD,row:rowIndex,col};cursor+=cellW+gap;
+      });
+    });
+    return{active,rows,cellD,baseZ,width,depth,gap,cells};
+  }
+  function rummiLayoutCell(layout,order){
+    return layout?.cells?.[order]||{x:0,z:layout?.baseZ??-2.05,width:layout?.width??9.35,depth:layout?.cellD??3.55,row:0,col:0};
   }
   function rummiGroupSlot(layout,order,length,tileIndex){
-    const col=order%layout.cols,row=Math.floor(order/layout.cols),baseX=(col-(layout.cols-1)/2)*layout.cellW,baseZ=layout.baseZ+row*layout.cellD;
-    const natural=.66,scale=Math.max(.48,Math.min(.96,(layout.cellW-.28)/(Math.max(1,length)*natural))),spacing=natural*scale;
-    return{x:baseX+(tileIndex-(length-1)/2)*spacing,z:baseZ,scale,row,col};
+    const cell=rummiLayoutCell(layout,order),natural=.66,widthScale=(cell.width-.16)/(Math.max(1,length)*natural),depthScale=(Math.max(.42,cell.depth-.12))/.9;
+    const scale=Math.max(.38,Math.min(.96,widthScale,depthScale)),spacing=natural*scale;
+    return{x:cell.x+(tileIndex-(length-1)/2)*spacing,z:cell.z,scale,row:cell.row,col:cell.col,cellW:cell.width,cellD:cell.depth};
   }
   function rummiRackSlot(count,index){
     const total=Math.max(1,count),rows=total<=10?1:total<=20?2:3,perRow=Math.ceil(total/rows),row=Math.floor(index/perRow),start=row*perRow,rowCount=Math.min(perRow,total-start),local=index-start;
@@ -1326,7 +1349,7 @@ export function createTable3DRenderer({onFatal}={}){
       });
       if(data.canMove&&selected.size){
         const slot=rummiGroupSlot(layout,order,Math.max(1,group.length),Math.floor(Math.max(0,group.length-1)/2)),target=actionSprite('AJOUTER','rummi-dest',{dest:gi},'#dbea9e');
-        target.position.set(slot.x,TABLE_Y+.84,slot.z+Math.min(.58,layout.cellD*.34));target.scale.set(Math.min(1.45,layout.cellW*.48),.36,1);objects.add(target);
+        target.position.set(slot.x,TABLE_Y+.84,slot.z+Math.min(.58,slot.cellD*.34));target.scale.set(Math.min(1.45,slot.cellW*.48),.36,1);objects.add(target);
       }
     });
 
@@ -2092,16 +2115,15 @@ export function createTable3DRenderer({onFatal}={}){
     const groups=data.table||[],layout=rummiBoardLayout(groups);
     let best=null;
     for(let order=0;order<layout.active.length;order++){
-      const entry=layout.active[order],col=order%layout.cols,row=Math.floor(order/layout.cols),cx=(col-(layout.cols-1)/2)*layout.cellW,cz=layout.baseZ+row*layout.cellD;
-      const dx=Math.abs(position.x-cx),dz=Math.abs(position.z-cz);
-      if(dx<=layout.cellW*.47&&dz<=Math.min(.78,layout.cellD*.38)){
-        const score=dx/Math.max(.1,layout.cellW)+dz/Math.max(.1,layout.cellD);
+      const entry=layout.active[order],cell=rummiLayoutCell(layout,order),cx=cell.x,cz=cell.z,dx=Math.abs(position.x-cx),dz=Math.abs(position.z-cz);
+      if(dx<=cell.width*.47&&dz<=Math.min(.78,cell.depth*.42)){
+        const score=dx/Math.max(.1,cell.width)+dz/Math.max(.1,cell.depth);
         if(!best||score<best.score)best={dest:entry.index,x:cx,z:cz,score};
       }
     }
     if(best)return best;
     if(position.z>=1.72&&Math.abs(position.x)<=4.45)return{dest:'hand',x:Math.max(-3.4,Math.min(3.4,position.x)),z:2.18,score:0};
-    const tableMinZ=layout.baseZ-.72,tableMaxZ=layout.baseZ+(layout.rows-1)*layout.cellD+.72;
+    const edge=Math.min(.68,Math.max(.28,layout.cellD*.45)),tableMinZ=layout.baseZ-edge,tableMaxZ=layout.baseZ+(layout.rows-1)*layout.cellD+edge;
     if(position.z>=tableMinZ&&position.z<=tableMaxZ&&Math.abs(position.x)<=4.65)return{dest:'new',x:position.x,z:position.z,score:0};
     return null;
   }
