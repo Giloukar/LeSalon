@@ -501,6 +501,30 @@ test('persistent local poses stack cleanly and expose a local-only reset',async(
  assert.doesNotMatch(source,/localPoseDisplay[^\n]*onlineAct\(/);
 });
 
+test('free 3D camera orbit, zoom, pinch and reset stay presentation-only',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/cameraControl=\{yaw:0,pitch:0,zoom:1\}/);
+ assert.match(source,/function cameraViewChanged\(\)/);
+ assert.match(source,/function resetCameraView\(\)/);
+ assert.match(source,/data-table-3d-reset-camera hidden/);
+ assert.match(source,/Math\.atan2\(dx,dz\)\+cameraControl\.yaw/);
+ assert.match(source,/basePhi\+cameraControl\.pitch/);
+ assert.match(source,/cameraRadius=baseRadius\*clampMotion\(cameraControl\.zoom,\.62,1\.72\)/);
+ assert.match(source,/function zoomCamera\(delta\)/);
+ assert.match(source,/function beginCameraDrag\(e\)/);
+ assert.match(source,/function addCameraPointer\(e\)/);
+ assert.match(source,/function moveCameraDrag\(e\)/);
+ assert.match(source,/function cameraDragDistance\(points=cameraDrag\?\.points\)/);
+ assert.doesNotMatch(source,/cameraControl\.pinchZoom/);
+ assert.match(source,/cameraDrag\.pinchZoom\*\(cameraDrag\.pinchDistance\/distance\)/);
+ assert.match(source,/if\(cameraDrag&&e\.pointerType==='touch'\)\{if\(addCameraPointer\(e\)\)return\}/);
+ assert.match(source,/if\(!obj\)\{if\(e\.pointerType==='touch'\|\|e\.button===0\)beginCameraDrag\(e\);return\}/);
+ assert.match(source,/if\(releaseCameraPointer\(e\)\)return/);
+ assert.doesNotMatch(source,/zoomCamera[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/moveCameraDrag[^\n]*onlineAct\(/);
+ assert.doesNotMatch(source,/cameraControl[^\n]*publishOnline\(/);
+});
+
 test('manual local object rotation stays presentation-only on wheel and touch twist',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/canvas\.addEventListener\('wheel',onWheel,\{passive:false\}\)/);
