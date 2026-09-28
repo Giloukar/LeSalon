@@ -160,7 +160,7 @@ export function createTable3DRenderer({onFatal}={}){
   function freePoseForMesh(mesh,home=mesh?.userData?.home){
     if(!mesh||!home)return null;
     const y=Number(mesh.userData?.localPoseFloorY??TABLE_Y+.12),position=new THREE.Vector3(clampMotion(mesh.position.x,-5.05,5.05),y,clampMotion(mesh.position.z,-3.08,3.08));
-    return{position,rotation:new THREE.Euler(-Math.PI/2,0,mesh.rotation.z),scale:home.scale.clone()};
+    return{position,rotation:new THREE.Euler(faceRotationX(mesh.rotation.x),0,mesh.rotation.z),scale:home.scale.clone()};
   }
   function saveLocalPose(mesh,home=mesh?.userData?.home,{order=null}={}){
     const key=mesh?.userData?.localPoseKey;if(!key)return null;
@@ -237,6 +237,7 @@ export function createTable3DRenderer({onFatal}={}){
     canvas.addEventListener('pointercancel',onPointerCancel);
     canvas.addEventListener('lostpointercapture',onLostPointerCapture);
     canvas.addEventListener('wheel',onWheel,{passive:false});
+    canvas.addEventListener('keydown',onKeyDown);
     canvas.addEventListener('pointerleave',()=>setHover(null));
     canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();onFatal?.(new Error('Contexte WebGL perdu'));});
     window.addEventListener('blur',onWindowBlur);
@@ -648,7 +649,7 @@ export function createTable3DRenderer({onFatal}={}){
     const userData={kind:'rummi-tile',tileId:tile.id,interactive:interactiveTile},visual=Object.freeze({num:tile?.num,color:tile?.color,joker:!!tile?.joker});
     const external=externalAsset('rummikub-tile',{tile:visual,selected,hidden:false,canonicalSize:{width:.62,height:.9,depth:.085}},userData);
     if(external){if(interactiveTile)interactive.push(external);return external}
-    const mesh=new THREE.Mesh(rummiTileGeometry,rummiTileMaterial(tile,selected));mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData=userData;if(interactiveTile)interactive.push(mesh);return mesh;
+    const front=rummiTileMaterial(tile,selected),mats=[edgeMaterial,edgeMaterial,edgeMaterial,edgeMaterial,front,rummiBackMaterial],mesh=new THREE.Mesh(rummiTileGeometry,mats);mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData=userData;if(interactiveTile)interactive.push(mesh);return mesh;
   }
   function rummiHiddenTileMesh(){
     const external=externalAsset('rummikub-tile',{tile:null,selected:false,hidden:true,canonicalSize:{width:.62,height:.9,depth:.085}},{kind:'rummi-hidden',interactive:false});
@@ -717,7 +718,7 @@ export function createTable3DRenderer({onFatal}={}){
       const floorY=Number(a.mesh.userData?.localPoseFloorY??TABLE_Y+.12);
       const ageY=Math.max(0,now-a.start),settle=Math.min(1,ageY/230),settleEase=1-Math.pow(1-settle,3);
       a.mesh.position.y=THREE.MathUtils.lerp(a.startY??floorY,floorY,settleEase)+Math.sin(Math.min(1,ageY/300)*Math.PI)*Math.min(.28,.06+a.speed*.09);
-      a.mesh.rotation.x=-Math.PI/2+clampMotion(-a.velocity.z*.055,-.16,.16);
+      a.mesh.rotation.x=(a.faceX??-Math.PI/2)+clampMotion(-a.velocity.z*.055,-.16,.16);
       a.mesh.rotation.y=clampMotion(a.velocity.x*.045,-.14,.14);
       a.mesh.rotation.z+=a.spin*dt;
       const xLimit=5.05,zLimit=3.08;
@@ -727,7 +728,7 @@ export function createTable3DRenderer({onFatal}={}){
       else if(a.mesh.position.z<-zLimit){a.mesh.position.z=-zLimit;a.velocity.z=Math.abs(a.velocity.z)*.54;a.spin+=.010}
       const speed=a.velocity.length(),age=now-a.start;
       if((speed<.012&&age>260)||age>a.duration){
-        a.done=true;a.mesh.position.y=floorY;a.mesh.rotation.x=-Math.PI/2;a.mesh.rotation.y=0;a.mesh.scale.copy(a.home.scale);
+        a.done=true;a.mesh.position.y=floorY;a.mesh.rotation.x=a.faceX??-Math.PI/2;a.mesh.rotation.y=0;a.mesh.scale.copy(a.home.scale);
         if(a.mesh.userData?.persistLocalPose){
           const pose=saveLocalPose(a.mesh,a.home,{order:a.poseOrder});if(pose){a.mesh.position.copy(pose.position);a.mesh.rotation.copy(pose.rotation);a.mesh.scale.copy(pose.scale)}
         }else restoreManipulatedMesh(a.mesh,a.home,{velocityX:0,velocityY:0},{index:a.index||0});
@@ -1857,7 +1858,7 @@ export function createTable3DRenderer({onFatal}={}){
       velocity.x+=side;velocity.z-=side*.7;
       const poseOrder=d.stackMode?localPoses.get(item.mesh.userData?.localPoseKey)?.order:null;
       tossAnimations.push({
-        mesh:item.mesh,home:item.home,index:item.index,poseOrder,
+        mesh:item.mesh,home:item.home,index:item.index,poseOrder,faceX:faceRotationX(item.mesh.rotation.x),
         velocity,spin:spinBase+(item.index-(items.length-1)/2)*.012,
         speed:velocity.length(),start:now+item.index*10,lastAt:now+item.index*10,
         startY:item.mesh.position.y,duration:1050+Math.round(Math.min(1,speed/.5)*260)+item.index*25,done:false
@@ -1885,6 +1886,26 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function normalizeAngleDelta(delta){
     let d=Number(delta)||0;while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;return d;
+  }
+  function faceRotationX(value){return Number(value)>0?Math.PI/2:-Math.PI/2}
+  function flipLocalObject(mesh){
+    if(!mesh?.userData?.persistLocalPose)return false;
+    stopTossForMesh(mesh);
+    const key=mesh.userData.localPoseKey,order=key?localPoses.get(key)?.order:null,home=mesh.userData.home||meshTransform(mesh);
+    mesh.rotation.x=-faceRotationX(mesh.rotation.x);mesh.rotation.y=0;
+    const pose=saveLocalPose(mesh,home,{order});if(!pose)return false;
+    mesh.position.copy(pose.position);mesh.rotation.copy(pose.rotation);mesh.scale.copy(pose.scale);updateLocalPoseResetButton();draw();return true;
+  }
+  function flipDraggedObject(){
+    const d=drag;if(!d?.mesh?.userData?.persistLocalPose||d.stackMode)return false;
+    d.manualFace=-faceRotationX(Number.isFinite(d.manualFace)?d.manualFace:d.mesh.rotation.x);
+    d.mesh.rotation.x=d.manualFace;d.mesh.rotation.y=0;d.flipped=true;d.moved=true;draw();return true;
+  }
+  function onKeyDown(e){
+    if(!active||String(e.key||'').toLowerCase()!=='f')return;
+    const obj=drag?.mesh?.userData?.persistLocalPose?drag.mesh:hovered;
+    if(!obj?.userData?.persistLocalPose)return;
+    if(drag?.mesh===obj?flipDraggedObject():flipLocalObject(obj))e.preventDefault();
   }
   function rotateDraggedObject(delta){
     const d=drag;if(!d?.mesh||!Number.isFinite(delta)||Math.abs(delta)<.0001)return false;
@@ -1944,7 +1965,7 @@ export function createTable3DRenderer({onFatal}={}){
   function beginLooseCardDrag(obj,e,kind){
     const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()},gestureEnabled=!!(current?.canInteract&&LIVE_CARD_GAMES.has(current?.gameId)&&(['card-select','special-select'].includes(kind)||kind==='cactus-quick')),companions=groupedDragCompanions(obj,kind);
     stopTossForMesh(obj);companions.forEach(c=>stopTossForMesh(c.mesh));
-    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind,loose:true,mesh:obj,cardId:obj.userData.cardId,tileId:obj.userData.tileId,index:obj.userData.index,owner:obj.userData.owner,tapEnabled:!!obj.userData.tapEnabled,gestureEnabled,gestureStarted:false,gestureHome:home.position.clone(),companions,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),manualRotation:obj.rotation.z,rotated:false,twist:null,stackMode:false,stackTimer:0,moved:false,home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
+    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind,loose:true,mesh:obj,cardId:obj.userData.cardId,tileId:obj.userData.tileId,index:obj.userData.index,owner:obj.userData.owner,tapEnabled:!!obj.userData.tapEnabled,gestureEnabled,gestureStarted:false,gestureHome:home.position.clone(),companions,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),manualRotation:obj.rotation.z,manualFace:faceRotationX(obj.rotation.x),rotated:false,flipped:false,twist:null,stackMode:false,stackTimer:0,moved:false,home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
     armLocalStackDrag(drag,e);host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
   }
   function moveLooseCardDrag(e){
@@ -1958,12 +1979,12 @@ export function createTable3DRenderer({onFatal}={}){
       d.worldVelocity??=new THREE.Vector3();d.worldVelocity.lerp(rawWorld,.46);d.lastWorld?.set?.(p.x,1.05,p.z);
       d.mesh.position.set(p.x,1.05,p.z);
       const lean=clampMotion(d.velocityX*.010,-.08,.08);
-      d.mesh.rotation.set(-Math.PI/2,clampMotion(-d.velocityY*.012,-.20,.20),(Number.isFinite(d.manualRotation)?d.manualRotation:d.home.rotation.z)+lean);
+      d.mesh.rotation.set(Number.isFinite(d.manualFace)?d.manualFace:-Math.PI/2,clampMotion(-d.velocityY*.012,-.20,.20),(Number.isFinite(d.manualRotation)?d.manualRotation:d.home.rotation.z)+lean);
       d.mesh.scale.copy(d.home.scale).multiplyScalar(1.045);
       (d.companions||[]).forEach((c,i)=>{
         const side=(i%2?1:-1)*(.055+Math.floor(i/2)*.028),back=.055+(i+1)*.032,target=new THREE.Vector3(d.mesh.position.x+side,d.mesh.position.y+.018*(i+1),d.mesh.position.z+back);
         c.mesh.position.lerp(target,.42);
-        c.mesh.rotation.set(d.mesh.rotation.x,d.mesh.rotation.y,d.mesh.rotation.z+(i-(d.companions.length-1)/2)*.018);
+        c.mesh.rotation.set(faceRotationX(c.home.rotation.x),d.mesh.rotation.y,d.mesh.rotation.z+(i-(d.companions.length-1)/2)*.018);
         c.mesh.scale.copy(c.home.scale).multiplyScalar(1.025);
       });
     }
@@ -2022,10 +2043,11 @@ export function createTable3DRenderer({onFatal}={}){
   function rummiDropDestination(position){return rummiDropTarget(position)?.dest??null}
   function onPointerDown(e){
     if(!active)return;
+    try{canvas?.focus?.({preventScroll:true})}catch(_){canvas?.focus?.()}
     if(drag?.mesh&&e.pointerId!==drag.pointerId&&e.pointerType==='touch'){
       clearStackHold(drag);
       const angle=Math.atan2(e.clientY-drag.lastY,e.clientX-drag.lastX);
-      drag.twist={pointerId:e.pointerId,lastAngle:angle};capturePointer(e.pointerId);e.preventDefault();return;
+      drag.twist={pointerId:e.pointerId,lastAngle:angle,startedAt:performance.now(),turned:false};capturePointer(e.pointerId);e.preventDefault();return;
     }
     const obj=hit(e);setHover(obj);if(!obj)return;
     if(!current?.canInteract&&!obj.userData.looseManip)return;
@@ -2038,7 +2060,7 @@ export function createTable3DRenderer({onFatal}={}){
     }
     if(obj.userData.kind!=='card')return;
     const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()},canPlay=!!obj.userData.playable;
-    stopTossForMesh(obj);drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card',mesh:obj,cardId:obj.userData.cardId,canPlay,gestureStarted:false,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),manualRotation:obj.rotation.z,rotated:false,twist:null,stackMode:false,stackTimer:0,moved:false,overDrop:false,gestureHome:home.position.clone(),home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
+    stopTossForMesh(obj);drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card',mesh:obj,cardId:obj.userData.cardId,canPlay,gestureStarted:false,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),manualRotation:obj.rotation.z,manualFace:faceRotationX(obj.rotation.x),rotated:false,flipped:false,twist:null,stackMode:false,stackTimer:0,moved:false,overDrop:false,gestureHome:home.position.clone(),home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
     armLocalStackDrag(drag,e);if(canPlay&&!drag.stackMode){emitLocalCardGesture('start',0,0);drag.gestureStarted=true}host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
   }
   function onPointerMove(e){
@@ -2046,7 +2068,9 @@ export function createTable3DRenderer({onFatal}={}){
     if(!drag){setHover(hit(e));return}
     if(drag.twist?.pointerId===e.pointerId){
       const angle=Math.atan2(e.clientY-drag.lastY,e.clientX-drag.lastX),delta=normalizeAngleDelta(angle-drag.twist.lastAngle);
-      drag.twist.lastAngle=angle;rotateDraggedObject(delta);e.preventDefault();return;
+      drag.twist.lastAngle=angle;
+      if(Math.abs(delta)>.008){drag.twist.turned=true;rotateDraggedObject(delta)}
+      e.preventDefault();return;
     }
     if(e.pointerId!==drag.pointerId)return;
     if(drag.loose){moveLooseCardDrag(e);return}
@@ -2054,7 +2078,7 @@ export function createTable3DRenderer({onFatal}={}){
     const now=performance.now(),dt=Math.max(8,now-(drag.lastAt||now)),dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;if(!drag.moved&&Math.hypot(dx,dy)>6){drag.moved=true;clearStackHold(drag)}
     if(!drag.moved)return;
     drag.velocityX=(e.clientX-drag.lastX)/dt*16.67;drag.velocityY=(e.clientY-drag.lastY)/dt*16.67;drag.lastX=e.clientX;drag.lastY=e.clientY;drag.lastAt=now;
-    updatePointer(e);const p=new THREE.Vector3();if(raycaster.ray.intersectPlane(dragPlane,p)){const rawWorld=new THREE.Vector3(p.x-(drag.lastWorld?.x??drag.mesh.position.x),0,p.z-(drag.lastWorld?.z??drag.mesh.position.z)).multiplyScalar(16.67/dt);drag.worldVelocity??=new THREE.Vector3();drag.worldVelocity.lerp(rawWorld,.46);drag.lastWorld?.set?.(p.x,1.02,p.z);drag.mesh.position.set(p.x,1.02,p.z);const lean=clampMotion(drag.velocityX*.009,-.07,.07);drag.mesh.rotation.set(-Math.PI/2,clampMotion(-drag.velocityY*.010,-.16,.16),(Number.isFinite(drag.manualRotation)?drag.manualRotation:drag.home.rotation.z)+lean);(drag.companions||[]).forEach((c,i)=>{const side=(i%2?1:-1)*(.055+Math.floor(i/2)*.028),back=.055+(i+1)*.032,target=new THREE.Vector3(drag.mesh.position.x+side,drag.mesh.position.y+.018*(i+1),drag.mesh.position.z+back);c.mesh.position.lerp(target,.42);c.mesh.rotation.set(drag.mesh.rotation.x,drag.mesh.rotation.y,drag.mesh.rotation.z+(i-(drag.companions.length-1)/2)*.018);c.mesh.scale.copy(c.home.scale).multiplyScalar(1.025);});}
+    updatePointer(e);const p=new THREE.Vector3();if(raycaster.ray.intersectPlane(dragPlane,p)){const rawWorld=new THREE.Vector3(p.x-(drag.lastWorld?.x??drag.mesh.position.x),0,p.z-(drag.lastWorld?.z??drag.mesh.position.z)).multiplyScalar(16.67/dt);drag.worldVelocity??=new THREE.Vector3();drag.worldVelocity.lerp(rawWorld,.46);drag.lastWorld?.set?.(p.x,1.02,p.z);drag.mesh.position.set(p.x,1.02,p.z);const lean=clampMotion(drag.velocityX*.009,-.07,.07);drag.mesh.rotation.set(Number.isFinite(drag.manualFace)?drag.manualFace:-Math.PI/2,clampMotion(-drag.velocityY*.010,-.16,.16),(Number.isFinite(drag.manualRotation)?drag.manualRotation:drag.home.rotation.z)+lean);(drag.companions||[]).forEach((c,i)=>{const side=(i%2?1:-1)*(.055+Math.floor(i/2)*.028),back=.055+(i+1)*.032,target=new THREE.Vector3(drag.mesh.position.x+side,drag.mesh.position.y+.018*(i+1),drag.mesh.position.z+back);c.mesh.position.lerp(target,.42);c.mesh.rotation.set(faceRotationX(c.home.rotation.x),drag.mesh.rotation.y,drag.mesh.rotation.z+(i-(drag.companions.length-1)/2)*.018);c.mesh.scale.copy(c.home.scale).multiplyScalar(1.025);});}
     const near=drag.canPlay&&Math.hypot(drag.mesh.position.x-1.25,drag.mesh.position.z-.05)<cardDropRadius(drag);drag.overDrop=near;dropMarker.material.opacity=near ? .82 : .2;
     if(drag.canPlay&&!drag.stackMode){const gesture=eightGestureCoordinates(drag.mesh,drag.gestureHome);emitLocalCardGesture('move',gesture.progress,gesture.lateral)}draw();e.preventDefault();
   }
@@ -2063,7 +2087,7 @@ export function createTable3DRenderer({onFatal}={}){
     const d=drag;clearStackHold(d);drag=null;host?.classList.remove('is-dragging','is-stack-dragging');dropMarker.material.opacity=.2;
     if(d.loose&&d.kind!=='card')dropMarker.visible=false;
     if(cancelled){if(d.kind==='card'&&d.canPlay||d.loose&&d.gestureStarted)emitLocalCardGesture('cancel',0,0);if(d.loose)returnManipulatedCard(d,{snap:document.hidden});else{syncCurrent(current);draw()}return}
-    const tap=!d.stackMode&&!d.rotated&&Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
+    const tap=!d.stackMode&&!d.rotated&&!d.flipped&&Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
     if(d.loose&&!tap){
       if(d.stackMode){
         if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);
@@ -2179,7 +2203,8 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function releaseTwistPointer(e){
     if(!drag?.twist||drag.twist.pointerId!==e.pointerId)return false;
-    drag.twist=null;return true;
+    const twist=drag.twist,quickTap=!twist.turned&&performance.now()-Number(twist.startedAt||0)<=260;
+    drag.twist=null;if(quickTap)flipDraggedObject();return true;
   }
   function onPointerUp(e){if(releaseTwistPointer(e))return;finishDrag(e,false)}
   function onPointerCancel(e){if(releaseTwistPointer(e))return;cancelActiveDrag(e.pointerId)}
@@ -2197,7 +2222,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function destroy(){
     deactivate();clearObjects();
-    canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);canvas?.removeEventListener('lostpointercapture',onLostPointerCapture);canvas?.removeEventListener('wheel',onWheel);window.removeEventListener('blur',onWindowBlur);window.removeEventListener('salon:remote-card-gesture',onRemoteCardGesture);document.removeEventListener('visibilitychange',onVisibilityChange);assetUnsubscribe?.();assetUnsubscribe=null;
+    canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);canvas?.removeEventListener('lostpointercapture',onLostPointerCapture);canvas?.removeEventListener('wheel',onWheel);canvas?.removeEventListener('keydown',onKeyDown);window.removeEventListener('blur',onWindowBlur);window.removeEventListener('salon:remote-card-gesture',onRemoteCardGesture);document.removeEventListener('visibilitychange',onVisibilityChange);assetUnsubscribe?.();assetUnsubscribe=null;
     cardGeometry.dispose();tileGeometry.dispose();pawnGeometry.dispose();dieGeometry.dispose();rummiTileGeometry.dispose();grainGeometry.dispose();heldPadGeometry.dispose();codeGemGeometry.dispose();intrusDotGeometry.dispose();balloonGeometry.dispose();golfBallGeometry.dispose();cityTileGeometry.dispose();cityHouseGeometry.dispose();cityPegGeometry.dispose();edgeMaterial.dispose();backMaterial.dispose();for(const m of frontMaterials.values())m.dispose();for(const m of tileMaterials.values())m.dispose();for(const m of rummiTileMaterials.values())m.dispose();for(const m of pawnMaterials.values())m.dispose();for(const m of dieFaceMaterials.values())m.dispose();for(const m of cellLabelMaterials.values())m.dispose();for(const m of boxTileMaterials.values())m.dispose();neutralDieMaterial.dispose();rummiBackMaterial.dispose();for(const t of disposableTextures)t.dispose();for(const t of cellLabelTextures)t.dispose();
     tableMesh?.geometry?.dispose();tableMesh?.material?.dispose();dropMarker?.geometry?.dispose();dropMarker?.material?.dispose();renderer?.dispose();
     localPoses.clear();poseSeen.clear();activePoseScope='';localPoseOrder=0;
