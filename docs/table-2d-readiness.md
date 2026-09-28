@@ -517,3 +517,14 @@ Sur écran tactile, un second doigt pendant le drag active une rotation à deux 
 Une rotation volontaire annule le comportement de simple « tap » : tourner une carte ne déclenche donc pas accidentellement une sélection ou un coup. Au relâchement, l'angle choisi est stocké avec la pose locale ; la légère inclinaison visuelle liée à la vitesse du drag n'est pas conservée comme orientation permanente.
 
 Cette rotation n'est jamais une action de jeu. Aucun angle n'est envoyé au réseau, aucune révision n'est créée et les dépôts autoritatifs conservent leur priorité. Le bouton **↺ Ranger mes objets** réinitialise aussi ces orientations avec les autres poses locales.
+
+
+## Prise et déplacement d'une pile locale
+
+Les empilements de poses locales peuvent désormais être saisis comme un paquet physique. Sur ordinateur, maintenir **Shift** au début du drag d'une carte ou tuile située au sommet d'une pile prend tous les objets locaux empilés sous elle. Sur tactile, un appui long d'environ 340 ms avant le déplacement active le même mode.
+
+Le mode pile est volontairement distinct des actions de jeu : tant qu'il est actif, aucune zone de défausse, combinaison Rummikub, jet Cactus, collecte de pli ou autre dépôt autoritatif n'est exécuté. Le paquet ne sert qu'à réorganiser localement la table. Il peut être posé doucement ou lancé avec la même inertie que les objets individuels.
+
+Seul l'objet réellement au sommet peut initier la prise de pile. L'ordre de dépôt existant est conservé pendant le déplacement et lors de l'enregistrement des nouvelles poses, afin que la carte supérieure ne devienne pas artificiellement la carte inférieure après un déplacement collectif.
+
+Un mouvement normal avant la fin de l'appui long annule le mode pile et conserve le comportement habituel de la carte seule. Un second doigt destiné à la rotation annule également l'attente d'appui long : les gestes tactiles restent donc non ambigus.

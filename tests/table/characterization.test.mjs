@@ -471,7 +471,7 @@ test('persistent local poses stack cleanly and expose a local-only reset',async(
  assert.match(source,/function localPoseDisplay\(key,pose\)/);
  assert.match(source,/Math\.abs\(other\.position\.x-pose\.position\.x\)<\.58/);
  assert.match(source,/Math\.abs\(other\.position\.z-pose\.position\.z\)<\.78/);
- assert.match(source,/pose\.order=\+\+localPoseOrder/);
+ assert.match(source,/pose\.order=Number\.isFinite\(order\)\?order:\+\+localPoseOrder/);
  assert.match(source,/data-table-3d-reset-poses hidden/);
  assert.match(source,/function resetActiveLocalPoses\(\)/);
  assert.match(source,/syncCurrent\(current\);pruneLocalPoses\(\)/);
@@ -491,12 +491,37 @@ test('manual local object rotation stays presentation-only on wheel and touch tw
  assert.match(source,/drag\.twist=\{pointerId:e\.pointerId,lastAngle:angle\}/);
  assert.match(source,/drag\.twist\?\.pointerId===e\.pointerId/);
  assert.match(source,/rotateDraggedObject\(delta\)/);
- assert.match(source,/const tap=!d\.rotated&&/);
+ assert.match(source,/const tap=!d\.stackMode&&!d\.rotated&&/);
  assert.match(source,/saveLocalPose\(obj,home\)/);
  assert.match(source,/canvas\?\.removeEventListener\('wheel',onWheel\)/);
  assert.doesNotMatch(source,/rotateDraggedObject[^\n]*dispatch\(/);
  assert.doesNotMatch(source,/onWheel[^\n]*onlineAct\(/);
  assert.doesNotMatch(source,/drag\.twist[^\n]*publishOnline\(/);
+});
+
+test('local pose stacks can be moved as local-only packets without becoming game actions',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/function localStackCompanions\(mesh\)/);
+ assert.match(source,/const maxOrder=Math\.max/);
+ assert.match(source,/function enableLocalStackDrag\(d\)/);
+ assert.match(source,/function armLocalStackDrag\(d,e\)/);
+ assert.match(source,/e\?\.shiftKey/);
+ assert.match(source,/e\?\.pointerType==='touch'/);
+ assert.match(source,/setTimeout\(\(\)=>\{if\(drag===d&&!d\.moved&&!d\.twist\)enableLocalStackDrag\(d\)\},340\)/);
+ assert.match(source,/if\(d\.stackMode\)\{/);
+ assert.match(source,/poseOrder=d\.stackMode\?localPoses\.get/);
+ assert.match(source,/saveLocalPose\(a\.mesh,a\.home,\{order:a\.poseOrder\}\)/);
+ assert.match(source,/const tap=!d\.stackMode&&!d\.rotated/);
+ assert.doesNotMatch(source,/enableLocalStackDrag[^\n]*onlineAct\(/);
+ assert.doesNotMatch(source,/stackMode[^\n]*dispatch\(/);
+});
+
+test('local whole-stack movement preserves existing pose order',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/function saveLocalPose\(mesh,home=mesh\?\.userData\?\.home,\{order=null\}=\{\}\)/);
+ assert.match(source,/pose\.order=Number\.isFinite\(order\)\?order:\+\+localPoseOrder/);
+ assert.match(source,/localPoseOrder=Math\.max\(localPoseOrder,order\)/);
+ assert.match(source,/sort\(\(a,b\)=>\(Number\(a\.pose\.order\)\|\|0\)-\(Number\(b\.pose\.order\)\|\|0\)\)/);
 });
 
 test('free 3D tabletop manipulation stays presentation-only until an explicit valid action',async()=>{
