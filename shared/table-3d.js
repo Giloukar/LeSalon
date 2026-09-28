@@ -83,7 +83,7 @@ export function createTable3DRenderer({onFatal}={}){
   let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='';
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
-  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
+  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,pendingMaidPickOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
 
   function applyCameraFit(){
     if(!camera||!cameraPose)return;
@@ -446,6 +446,24 @@ export function createTable3DRenderer({onFatal}={}){
       viewer,turn:Number(s?.turn??0),deckCount:Math.max(0,Number(ninety?.deckCount)||0),
       lastId:ninety?.last?.id||null,last:visualCardSnapshot(ninety?.last),
       ownIds:(own||[]).map(c=>c?.id).filter(Boolean),handCounts:players.map(p=>p?.hand?.length||0)
+    };
+  }
+  function maidSnapshot(payload,maid,own){
+    const s=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0;
+    return{
+      key:[s?.startedAt||'',viewer,(s?.players||[]).map(p=>p?.name||'').join('|')].join('~'),
+      viewer,turn:Number(s?.turn??0),target:Number(maid?.target??-1),targetCount:Number(maid?.targetCount||0),
+      discardCount:Array.isArray(s?.discard)?s.discard.length:0,
+      ownIds:(own||[]).map(c=>c?.id).filter(Boolean)
+    };
+  }
+  function blackjackSnapshot(payload,bj){
+    const s=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0;
+    return{
+      key:[s?.startedAt||'',viewer,Number(s?.round||0)].join('~'),
+      viewer,phase:String(bj?.phase||s?.phase||''),turn:Number(s?.turn??0),deckCount:Math.max(0,Number(bj?.deckCount)||0),
+      hand:(bj?.hand||[]).map(visualCardSnapshot).filter(Boolean),
+      dealer:(bj?.dealer||[]).map(visualCardSnapshot).filter(Boolean)
     };
   }
   function queueCardFlight(mesh,from,to,{duration=620,delay=0,lift=.8,onDone=null,fromRot=0,toRot=0,bank=.10,roll=.08,fromScale=null,toScale=null}={}){
