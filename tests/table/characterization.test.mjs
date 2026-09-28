@@ -537,6 +537,23 @@ test('persistent local poses stack cleanly and expose a local-only reset',async(
  assert.doesNotMatch(source,/localPoseDisplay[^\n]*onlineAct\(/);
 });
 
+test('free thrown cards are shared anonymously and can be arranged back into hand',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ const html=await readFile(path.join(root,'jeux.html'),'utf8');
+ assert.match(source,/const TABLETOP_CARD_GAMES=new Set/);
+ assert.match(source,/data-table-3d-arrange-hand hidden/);
+ assert.match(source,/function arrangeActiveHand\(\)/);
+ assert.match(source,/emitLocalTabletopCard\('throw'/);
+ assert.match(source,/cardMesh\(null,\{back:true\}\)/);
+ assert.match(source,/window\.addEventListener\('salon:remote-tabletop-card',onRemoteTabletopCard\)/);
+ assert.match(source,/socialCards=new THREE\.Group\(\)/);
+ assert.match(html,/type:'card-tabletop'/);
+ assert.match(html,/\['throw','arrange'\]\.includes/);
+ assert.doesNotMatch(html,/card-tabletop[^\n]*(cardId|rank|suit)/);
+});
+
+test('tabletop throw packets expose motion but never card identity',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','online');const r=await t.page.evaluate(()=>{net.gameId='huit';const packet={type:'card-tabletop',matchId:net.matchId,revision:net.revision,gameId:'huit',action:'throw',token:7,lateral:.4,forward:.65,rotation:.2,speed:.7,cardId:'secret',rank:8,suit:'H'};const clean=tabletopCardClean(packet,0);const arrange=tabletopCardClean({...packet,action:'arrange'},0);return{clean,arrange};});assert.equal(r.clean.action,'throw');assert.equal(r.clean.token,7);assert.equal(Object.hasOwn(r.clean,'cardId'),false);assert.equal(Object.hasOwn(r.clean,'rank'),false);assert.equal(Object.hasOwn(r.clean,'suit'),false);assert.deepEqual(Object.keys(r.arrange).sort(),['action','actor','gameId','matchId','revision','type'].sort());}finally{await browser.close();}});
+
 test('free 3D camera orbit, zoom, pinch and reset stay presentation-only',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/cameraControl=\{yaw:0,pitch:0,zoom:1\}/);
