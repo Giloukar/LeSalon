@@ -3659,7 +3659,7 @@ if(window.SalonTableView){
  window.addEventListener('salon:table-3d-window',e=>{void table3dApplyWindowMode(e.detail?.mode)});
  document.addEventListener('click',async e=>{
   const b=e.target.closest?.('[data-table-3d-window]');if(!b)return;
-  e.preventDefault();await table3dApplyWindowMode(b.dataset.table3dWindow);
+  e.preventDefault();await table3dApplyWindowMode(b.getAttribute('data-table-3d-window'));
  },true);
  document.addEventListener('click',async e=>{
   const b=e.target.closest?.('[data-table-view-mode]');if(!b)return;
