@@ -835,10 +835,64 @@ export function createTable3DRenderer({onFatal}={}){
     }
 
     if(game==='vingtetun'){
-      const bj=data.blackjack||{},dealer=bj.dealer||[],own=bj.hand||[];
-      dealer.forEach((card,i)=>{const mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,(i-(dealer.length-1)/2)*.82,-.9,TABLE_Y+.13+i*.012,(i-(dealer.length-1)/2)*.04,.78)});
+      const bj=data.blackjack||{},dealer=bj.dealer||[],own=bj.hand||[],shoePos=new THREE.Vector3(-3.75,TABLE_Y+.24,-.55),ownVisuals=new Map(),dealerVisuals=[];
+      const deckCount=Math.max(0,Number(bj.deckCount)||0),shoeVisible=Math.min(5,Math.max(1,deckCount));
+      for(let i=0;i<shoeVisible;i++){
+        const mesh=cardMesh(null,{back:true});placeCard(mesh,shoePos.x+i*.018,shoePos.z-i*.018,TABLE_Y+.07+i*.025,-.045+i*.012,.70);
+      }
+      const shoeLabel=makeLabel('SABOT · '+deckCount,'#d8ded9');shoeLabel.position.set(shoePos.x,1.0,shoePos.z-.72);shoeLabel.scale.set(2.0,.44,1);objects.add(shoeLabel);
+
+      dealer.forEach((card,i)=>{
+        const x=(i-(dealer.length-1)/2)*.82,z=-.9,mesh=cardMesh(card,{back:!!card.hidden});
+        placeCard(mesh,x,z,TABLE_Y+.13+i*.012,(i-(dealer.length-1)/2)*.04,.78);
+        dealerVisuals.push({mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
+      });
       const dn=own.length;
-      own.forEach((card,i)=>{const slot=handCardSlot(dn,i),mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.fan,slot.scale*.92);makeLooseManipulable(mesh,{kind:'loose-card'})});
+      own.forEach((card,i)=>{
+        const slot=handCardSlot(dn,i),mesh=cardMesh(card,{back:!!card.hidden});
+        placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.fan,slot.scale*.92);makeLooseManipulable(mesh,{kind:'loose-card'});
+        if(card?.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
+      });
+
+      const snapshot=blackjackSnapshot(payload,bj),previous=lastBlackjackSnapshot;
+      if(previous&&previous.key===snapshot.key&&motionAllowed()){
+        const previousOwn=previous.hand||[],previousDealer=previous.dealer||[],newOwn=snapshot.hand.filter(c=>!previousOwn.some(p=>p.id===c.id));
+        own.forEach((card,i)=>{
+          const visual=ownVisuals.get(card?.id);if(!visual)return;
+          const prevIndex=previousOwn.findIndex(p=>p.id===card.id);
+          if(prevIndex>=0&&previousOwn.length!==own.length){
+            const before=handCardSlot(previousOwn.length,prevIndex),from=new THREE.Vector3(before.x,TABLE_Y+.25+before.yOffset,before.z);
+            if(from.distanceTo(visual.position)>.08){
+              visual.mesh.visible=false;
+              queueCardFlight(cardMesh(card,{back:!!card.hidden}),from,visual.position,{duration:330,delay:25*i,lift:.18,fromRot:before.fan,toRot:visual.rotation,bank:.04,roll:(i%2?-.04:.04),fromScale:new THREE.Vector3(before.scale*.92,before.scale*.92,before.scale*.92),toScale:visual.scale,onDone:()=>{visual.mesh.visible=true}});
+            }
+          }
+        });
+        newOwn.forEach((card,q)=>{
+          const visual=ownVisuals.get(card.id);if(!visual)return;visual.mesh.visible=false;
+          queueCardFlight(cardMesh(card,{back:!!card.hidden}),shoePos,visual.position,{duration:520+q*35,delay:q*145,lift:.72,fromRot:-.04,toRot:visual.rotation,bank:.14,roll:(q%2?-.10:.10),fromScale:new THREE.Vector3(.70,.70,.70),toScale:visual.scale,onDone:()=>{visual.mesh.visible=true}});
+        });
+
+        dealer.forEach((card,i)=>{
+          const visual=dealerVisuals[i],prev=previousDealer[i],isNew=i>=previousDealer.length;
+          if(!visual)return;
+          if(isNew){
+            visual.mesh.visible=false;
+            queueCardFlight(cardMesh(card?.hidden?null:card,{back:!!card?.hidden}),shoePos,visual.position,{duration:520+i*35,delay:70+i*145,lift:.76,fromRot:-.04,toRot:visual.rotation,bank:.14,roll:(i%2?-.11:.11),fromScale:new THREE.Vector3(.70,.70,.70),toScale:visual.scale,onDone:()=>{visual.mesh.visible=true}});
+          }else if(prev?.hidden&&!card?.hidden){
+            visual.mesh.visible=false;
+            queueCardFlight(cardMesh(null,{back:true}),visual.position,visual.position,{duration:500,delay:40,lift:.24,fromRot:visual.rotation,toRot:visual.rotation,bank:.04,roll:Math.PI,fromScale:visual.scale,toScale:visual.scale,onDone:()=>{visual.mesh.visible=true}});
+          }else if(previousDealer.length!==dealer.length){
+            const prevX=(i-(previousDealer.length-1)/2)*.82,from=new THREE.Vector3(prevX,TABLE_Y+.24+i*.012,-.9);
+            if(from.distanceTo(visual.position)>.08){
+              visual.mesh.visible=false;
+              queueCardFlight(cardMesh(card?.hidden?null:card,{back:!!card?.hidden}),from,visual.position,{duration:320,delay:30*i,lift:.16,fromRot:(i-(previousDealer.length-1)/2)*.04,toRot:visual.rotation,bank:.035,roll:(i%2?-.035:.035),fromScale:visual.scale,toScale:visual.scale,onDone:()=>{visual.mesh.visible=true}});
+            }
+          }
+        });
+      }
+      lastBlackjackSnapshot=snapshot;
+
       const dealerLabel=makeLabel('BANQUE · '+(dealer.length?(bj.dealerRevealed?bj.dealerValue:bj.dealerValue+' + ?'):'—'),'#e6d7b4');dealerLabel.position.set(0,1.02,-2.1);dealerLabel.scale.set(3,.62,1);objects.add(dealerLabel);
       if(bj.phase==='bet'){
         const bet=makeLabel('FAITES VOS JEUX','#dbea9e');bet.position.set(0,1.05,-.05);bet.scale.set(3.6,.8,1);objects.add(bet);
@@ -850,7 +904,7 @@ export function createTable3DRenderer({onFatal}={}){
       }
       if(title)title.textContent='VUE 3D · VINGT-ET-UN';
       if(status)status.textContent=bj.phase==='bet'?(bj.chips||0)+' jetons disponibles':own.length?(bj.playerValue||0)+' points · mise '+(bj.bet||0):'La banque distribue';
-      if(help)help.textContent=bj.phase==='bet'?'Choisissez votre mise dans le panneau dessous':bj.phase==='play'?'Tirer, rester ou doubler avec les commandes dessous':'Les cartes de la banque restent masquées jusqu’à la révélation';
+      if(help)help.textContent=bj.phase==='bet'?'Choisissez votre mise · les cartes seront distribuées depuis le sabot':bj.phase==='play'?'Tirer, rester ou doubler · chaque nouvelle carte vient physiquement du sabot':'La banque tire depuis le sabot · sa carte cachée reste masquée jusqu’à la révélation';
       return;
     }
 
