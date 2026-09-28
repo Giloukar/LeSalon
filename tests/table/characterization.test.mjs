@@ -465,6 +465,21 @@ test('authoritative drop handling precedes local free placement fallback',async(
  assert.match(source,/current\?\.interactions\?\.rummi\?\.\('drop'/);
 });
 
+test('persistent local poses stack cleanly and expose a local-only reset',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/localPoseOrder=0/);
+ assert.match(source,/function localPoseDisplay\(key,pose\)/);
+ assert.match(source,/Math\.abs\(other\.position\.x-pose\.position\.x\)<\.58/);
+ assert.match(source,/Math\.abs\(other\.position\.z-pose\.position\.z\)<\.78/);
+ assert.match(source,/pose\.order=\+\+localPoseOrder/);
+ assert.match(source,/data-table-3d-reset-poses hidden/);
+ assert.match(source,/function resetActiveLocalPoses\(\)/);
+ assert.match(source,/syncCurrent\(current\);pruneLocalPoses\(\)/);
+ assert.match(source,/updateLocalPoseResetButton\(\);draw\(\)/);
+ assert.doesNotMatch(source,/resetActiveLocalPoses[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/localPoseDisplay[^\n]*onlineAct\(/);
+});
+
 test('free 3D tabletop manipulation stays presentation-only until an explicit valid action',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/manipAnimations=\[\]/);
