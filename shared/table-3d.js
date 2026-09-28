@@ -835,8 +835,8 @@ export function createTable3DRenderer({onFatal}={}){
 
   function syncYam(payload){
     clearObjects();dropMarker.visible=false;
-    const s=payload.state,dice=payload.viewData?.yamDice||s?.dice||[1,1,1,1,1],held=payload.viewData?.yamHeld||s?.held||[],rolls=Number(payload.viewData?.yamRolls??s?.rolls??0);
-    setCameraPose(0,6.75,8.6,0,.25,.15);
+    const s=payload.state,dice=payload.viewData?.yamDice||s?.dice||[1,1,1,1,1],held=payload.viewData?.yamHeld||s?.held||[],rolls=Number(payload.viewData?.yamRolls??s?.rolls??0),categories=payload.viewData?.yamCategories||[],playerScore=Number(payload.viewData?.yamPlayerScore)||0;
+    setCameraPose(0,7.15,8.9,0,.18,-.25);
     const key='yam|'+(s?.turn??0)+'|'+rolls+'|'+dice.join('-'),animate=rolls>0&&key!==lastDiceKey;if(animate)lastDiceKey=key;
     dice.forEach((value,i)=>{
       const die=rolls?dieMesh(value):blankDieMesh(),x=(i-2)*1.35,z=held[i]?.42:0;
@@ -851,10 +851,17 @@ export function createTable3DRenderer({onFatal}={}){
     if(payload.canInteract&&rolls<3&&held.filter(Boolean).length<5){
       const roll=actionSprite(rolls?'RELANCER':'LANCER','yam-roll');roll.position.set(0,1.05,2.25);objects.add(roll);
     }
+    categories.forEach((category,i)=>{
+      const row=Math.floor(i/3),col=i%3,x=(col-1)*2.55,z=-1.18-row*.72,value=category.filled?category.score:category.preview,label=(category.filled?'✓ ':'')+String(category.name||category.id||'').toUpperCase()+' · '+(value??'—');
+      let control;
+      if(payload.canInteract&&rolls>0&&!category.filled)control=actionSprite(label,'yam-score',{category:category.id},Number(category.preview)>0?'#dbea9e':'#d8ded9');
+      else{control=makeLabel(label,category.filled?'#9da8a0':'#d8ded9');control.userData={...control.userData,kind:'yam-score-label'}}
+      control.position.set(x,1.02,z);control.scale.set(2.18,.46,1);objects.add(control);
+    });
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     if(title)title.textContent='VUE 3D · YAM';
-    if(status)status.textContent=rolls?'Lancer '+rolls+' / 3 · '+held.filter(Boolean).length+' dé'+(held.filter(Boolean).length>1?'s':'')+' conservé'+(held.filter(Boolean).length>1?'s':''):'Cinq dés prêts';
-    if(help)help.textContent=rolls&&rolls<3?'Touchez un dé pour le conserver · catégories et score restent synchronisés dessous':rolls>=3?'Trois lancers joués · choisissez une catégorie dessous':'Lancez les cinq dés';
+    if(status)status.textContent=(rolls?'Lancer '+rolls+' / 3 · '+held.filter(Boolean).length+' dé'+(held.filter(Boolean).length>1?'s':'')+' conservé'+(held.filter(Boolean).length>1?'s':''):'Cinq dés prêts')+' · '+playerScore+' pts';
+    if(help)help.textContent=!rolls?'Lancez les cinq dés':rolls<3?'Touchez un dé pour le conserver, relancez ou inscrivez directement une catégorie':'Trois lancers joués · choisissez une catégorie directement sur la table';
     if(diceAnimations.length)startMotion();
   }
 
@@ -2143,9 +2150,9 @@ export function createTable3DRenderer({onFatal}={}){
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'deck',startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
     if(obj.userData.looseManip&&obj.userData.kind!=='card'){beginLooseCardDrag(obj,e,obj.userData.kind);return}
     if(['maid-pick','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','cactus-action','ninety-action','blackjack-action','card-action','rummi-tile','rummi-dest','rummi-action'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,command:obj.userData.command,amount:obj.userData.amount,ace:obj.userData.ace,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
-    if(['goose-roll','goose-choice','yam-roll','yam-hold','box-roll','box-toggle','box-close','city-roll','city-action','city-property','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue','intrus-spot','intrus-continue','code-cycle','code-submit','code-continue','golf-adjust','golf-shoot','golf-continue'].includes(obj.userData.kind)){
+    if(['goose-roll','goose-choice','yam-roll','yam-hold','yam-score','box-roll','box-toggle','box-close','city-roll','city-action','city-property','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue','intrus-spot','intrus-continue','code-cycle','code-submit','code-continue','golf-adjust','golf-shoot','golf-continue'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
-      drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,control:obj.userData.control,command:obj.userData.command,delta:obj.userData.delta,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return;
+      drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,control:obj.userData.control,command:obj.userData.command,category:obj.userData.category,delta:obj.userData.delta,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return;
     }
     if(obj.userData.kind!=='card')return;
     const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()},canPlay=!!obj.userData.playable;
@@ -2270,6 +2277,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='city-action'){if(tap)current?.interactions?.city?.(d.command,d.index);return}
     if(d.kind==='city-property'){if(tap){cityFocusIndex=d.index;syncMetropole(current);draw()}return}
     if(d.kind==='yam-roll'||d.kind==='yam-hold'){if(tap)current?.interactions?.yam?.(d.kind==='yam-hold'?'hold':'roll',d.index);return}
+    if(d.kind==='yam-score'){if(tap)current?.interactions?.yam?.('score',d.category);return}
     if(d.kind==='box-roll'||d.kind==='box-toggle'||d.kind==='box-close'){
       if(tap)current?.interactions?.box?.(d.kind==='box-roll'?'roll':d.kind==='box-toggle'?'toggle':'close',d.kind==='box-roll'?d.count:d.number);return;
     }
