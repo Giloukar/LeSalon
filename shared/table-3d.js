@@ -182,6 +182,17 @@ export function createTable3DRenderer({onFatal}={}){
     if(!changed)return false;
     poseSeen=new Set();if(current){syncCurrent(current);pruneLocalPoses()}updateLocalPoseResetButton();draw();return true;
   }
+  function wrapLocalRotation(value){
+    const tau=Math.PI*2,angle=Number(value)||0;return ((angle+Math.PI)%tau+tau)%tau-Math.PI;
+  }
+  function rotatePersistentPose(mesh,delta){
+    if(!mesh?.userData?.persistLocalPose||!Number.isFinite(delta)||!delta)return false;
+    stopTossForMesh(mesh);
+    const home=mesh.userData.home||meshTransform(mesh),floorY=Number(mesh.userData.localPoseFloorY??TABLE_Y+.12);
+    mesh.position.y=floorY;mesh.rotation.set(-Math.PI/2,0,wrapLocalRotation((Number(mesh.rotation.z)||0)+delta));mesh.scale.copy(home.scale);
+    const pose=saveLocalPose(mesh,home);if(!pose)return false;
+    mesh.position.copy(pose.position);mesh.rotation.copy(pose.rotation);mesh.scale.copy(pose.scale);updateLocalPoseResetButton();draw();return true;
+  }
   function pruneLocalPoses(){
     if(!activePoseScope)return;
     const prefix=activePoseScope+'|';
@@ -235,6 +246,7 @@ export function createTable3DRenderer({onFatal}={}){
     canvas.addEventListener('pointerup',onPointerUp);
     canvas.addEventListener('pointercancel',onPointerCancel);
     canvas.addEventListener('lostpointercapture',onLostPointerCapture);
+    canvas.addEventListener('wheel',onWheel,{passive:false});
     canvas.addEventListener('pointerleave',()=>setHover(null));
     canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();onFatal?.(new Error('Contexte WebGL perdu'));});
     window.addEventListener('blur',onWindowBlur);
@@ -246,7 +258,7 @@ export function createTable3DRenderer({onFatal}={}){
     const column=document.querySelector('.table-column');if(!column)return null;
     if(!host?.isConnected){
       host=document.createElement('section');host.className='table-3d-host';host.setAttribute('aria-label','Vue 3D de la table');
-      host.innerHTML='<div class="table-3d-window-controls" aria-label="Affichage 3D"><button type="button" class="table-3d-window-button table-3d-reset" data-table-3d-reset-poses hidden aria-label="Ranger mes objets selon la disposition du jeu" title="Ranger mes objets · local uniquement">↺</button><button type="button" class="table-3d-window-button table-3d-minimize" data-table-3d-window="embedded" aria-label="Réduire la vue 3D dans la page" title="Réduire la vue 3D">↙</button><button type="button" class="table-3d-window-button table-3d-expand" data-table-3d-window="full" aria-label="Agrandir la vue 3D" title="Plein écran">⛶</button><button type="button" class="table-3d-window-button table-3d-close" data-table-view-mode="2d" aria-label="Revenir à la vue 2D" title="Revenir à la vue 2D">×</button></div><div class="table-3d-hud"><span class="table-3d-accent" data-table-3d-title>VUE 3D</span><span data-table-3d-status>Table synchronisée</span></div><div class="table-3d-help" data-table-3d-help>Vue immersive synchronisée avec la partie</div>';
+      host.innerHTML='<div class="table-3d-window-controls" aria-label="Affichage 3D"><button type="button" class="table-3d-window-button table-3d-reset" data-table-3d-reset-poses hidden aria-label="Ranger mes objets selon la disposition du jeu" title="Ranger mes objets · local uniquement">↺</button><button type="button" class="table-3d-window-button table-3d-minimize" data-table-3d-window="embedded" aria-label="Réduire la vue 3D dans la page" title="Réduire la vue 3D">↙</button><button type="button" class="table-3d-window-button table-3d-expand" data-table-3d-window="full" aria-label="Agrandir la vue 3D" title="Plein écran">⛶</button><button type="button" class="table-3d-window-button table-3d-close" data-table-view-mode="2d" aria-label="Revenir à la vue 2D" title="Revenir à la vue 2D">×</button></div><div class="table-3d-hud"><span class="table-3d-accent" data-table-3d-title>VUE 3D</span><span data-table-3d-status>Table synchronisée</span></div><div class="table-3d-help" data-table-3d-help>Glisser · molette : tourner vos cartes/tuiles · geste rapide : lancer</div>';
       host.querySelectorAll('[data-table-3d-window]').forEach(button=>button.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.dispatchEvent(new CustomEvent('salon:table-3d-window',{detail:{mode:button.dataset.table3dWindow}}))}));
       host.querySelector('[data-table-3d-reset-poses]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();resetActiveLocalPoses()});
       const banner=column.querySelector('.turn-banner');banner?.after(host);if(!banner)column.prepend(host);
@@ -1925,6 +1937,13 @@ export function createTable3DRenderer({onFatal}={}){
     return null;
   }
   function rummiDropDestination(position){return rummiDropTarget(position)?.dest??null}
+  function onWheel(e){
+    if(!active||drag)return;
+    const obj=hit(e),dy=Number(e.deltaY)||0,dx=Number(e.deltaX)||0,delta=Math.abs(dy)>=Math.abs(dx)?dy:dx;
+    if(!obj?.userData?.persistLocalPose||!delta)return;
+    const step=(e.shiftKey?Math.PI/6:Math.PI/18)*(delta>0?-1:1);
+    if(rotatePersistentPose(obj,step)){e.preventDefault();e.stopPropagation()}
+  }
   function onPointerDown(e){
     if(!active)return;
     const obj=hit(e);setHover(obj);if(!obj)return;
@@ -2075,7 +2094,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function destroy(){
     deactivate();clearObjects();
-    canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);canvas?.removeEventListener('lostpointercapture',onLostPointerCapture);window.removeEventListener('blur',onWindowBlur);window.removeEventListener('salon:remote-card-gesture',onRemoteCardGesture);document.removeEventListener('visibilitychange',onVisibilityChange);assetUnsubscribe?.();assetUnsubscribe=null;
+    canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);canvas?.removeEventListener('lostpointercapture',onLostPointerCapture);canvas?.removeEventListener('wheel',onWheel);window.removeEventListener('blur',onWindowBlur);window.removeEventListener('salon:remote-card-gesture',onRemoteCardGesture);document.removeEventListener('visibilitychange',onVisibilityChange);assetUnsubscribe?.();assetUnsubscribe=null;
     cardGeometry.dispose();tileGeometry.dispose();pawnGeometry.dispose();dieGeometry.dispose();rummiTileGeometry.dispose();grainGeometry.dispose();heldPadGeometry.dispose();codeGemGeometry.dispose();intrusDotGeometry.dispose();balloonGeometry.dispose();golfBallGeometry.dispose();cityTileGeometry.dispose();cityHouseGeometry.dispose();cityPegGeometry.dispose();edgeMaterial.dispose();backMaterial.dispose();for(const m of frontMaterials.values())m.dispose();for(const m of tileMaterials.values())m.dispose();for(const m of rummiTileMaterials.values())m.dispose();for(const m of pawnMaterials.values())m.dispose();for(const m of dieFaceMaterials.values())m.dispose();for(const m of cellLabelMaterials.values())m.dispose();for(const m of boxTileMaterials.values())m.dispose();neutralDieMaterial.dispose();rummiBackMaterial.dispose();for(const t of disposableTextures)t.dispose();for(const t of cellLabelTextures)t.dispose();
     tableMesh?.geometry?.dispose();tableMesh?.material?.dispose();dropMarker?.geometry?.dispose();dropMarker?.material?.dispose();renderer?.dispose();
     localPoses.clear();poseSeen.clear();activePoseScope='';localPoseOrder=0;
