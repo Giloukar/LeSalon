@@ -517,3 +517,12 @@ Sur écran tactile, un second doigt pendant le drag active une rotation à deux 
 Une rotation volontaire annule le comportement de simple « tap » : tourner une carte ne déclenche donc pas accidentellement une sélection ou un coup. Au relâchement, l'angle choisi est stocké avec la pose locale ; la légère inclinaison visuelle liée à la vitesse du drag n'est pas conservée comme orientation permanente.
 
 Cette rotation n'est jamais une action de jeu. Aucun angle n'est envoyé au réseau, aucune révision n'est créée et les dépôts autoritatifs conservent leur priorité. Le bouton **↺ Ranger mes objets** réinitialise aussi ces orientations avec les autres poses locales.
+
+
+## Retournement local recto / verso
+
+Les cartes et tuiles que le joueur peut déjà manipuler librement peuvent maintenant être retournées sans créer d'action de jeu. Sur ordinateur, après avoir focalisé la table 3D, la touche `F` retourne l'objet tenu ou l'objet local survolé. Sur écran tactile, un bref tap du second doigt pendant qu'un objet est tenu le retourne ; si ce second doigt se déplace, le geste reste une rotation à deux doigts.
+
+L'orientation recto/verso est stockée dans la même pose locale que la position et la rotation horizontale. Elle survit donc aux rerenders, aux déplacements et aux lancers libres. Un retournement volontaire annule aussi le comportement de simple tap afin qu'une carte ne soit pas jouée ou sélectionnée accidentellement au relâchement.
+
+Ce retournement reste strictement visuel et local. Il n'envoie aucune action moteur, aucune révision réseau et ne permet jamais de révéler une carte adverse : seuls les objets déjà autorisés à conserver une pose locale sont concernés. Le bouton **↺ Ranger mes objets** supprime également cette orientation locale en restaurant la disposition logique du jeu.
