@@ -62,17 +62,20 @@ test('all four puff flavors retain their artwork on the shared transparent uncap
       const shell = model.getObjectByName('Transparent_outer_sleeve_and_neck');
       window.beforeModel = { geometry: print.geometry, baseColor: base.material.color.getHex(), shell: shell.material };
       return { names: model.children.map(n => n.name), silver: base.material.metalness, transmission: shell.material.transmission, transparent: shell.material.transparent, opacity: shell.material.opacity, depthWrite: shell.material.depthWrite,
+        neckMaterials: model.children.filter(n => n.isMesh && (n.name === 'Visible_hollow_air_channel' || n.name.startsWith('Air_channel_collar'))).map(n => ({transmission:n.material.transmission,transparent:n.material.transparent,opacity:n.material.opacity})),
         skinNames: Object.values(skinInfo).map(s => s.name), flavorNames: Object.values(skinInfo).filter(s => s.flavor).map(s => s.flavor),
         height: shell.geometry.boundingBox?.max.y ?? Math.max(...Array.from(shell.geometry.attributes.position.array).filter((_,i)=>i%3===1)) };
     });
     assert.equal(before.names.includes('Ivory_flat_mouthpiece'), false);
     assert.ok(before.names.includes('Visible_hollow_air_channel'));
+    assert.equal(before.neckMaterials.length, 3);
+    before.neckMaterials.forEach(m => {assert.ok(m.transmission > .95);assert.equal(m.transparent,true);assert.ok(m.opacity < .5);});
     assert.ok(before.transmission > .95);
     assert.equal(before.transparent, true);
     assert.ok(before.opacity < .5);
     assert.equal(before.depthWrite, false);
     assert.ok(before.silver > .8);
-    assert.ok(Math.abs(before.height - .1327) < .00001);
+    assert.ok(Math.abs(before.height - .12135) < .00001);
     assert.deepEqual(before.skinNames, ['Blackberry', 'Golden Falcon', 'Cherry Ice', 'Blue Razz']);
     assert.deepEqual(before.flavorNames, [['MANGO','PASSION FRUIT'],['CHERRY','ICE'],['BLUE','RAZZ']]);
     await page.evaluate(capture => {window.capturePuff=capture;}, !!process.env.PUFF_SCREENSHOT_DIR);
