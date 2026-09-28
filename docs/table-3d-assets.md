@@ -114,3 +114,12 @@ Métropole n'a plus besoin du panneau 2D pour terminer un tour. Le payload 3D ex
 Les rues du joueur courant deviennent sélectionnables sur le plateau pendant son tour. Une rue sélectionnée affiche seulement les opérations actuellement légales — hypothéquer, lever l'hypothèque, construire ou vendre une maison — avec les montants issus des règles existantes. Les boutons 3D appellent exclusivement interactions.city(...), qui redirige vers le même dispatch autoritatif que l'interface 2D.
 
 La sélection visuelle d'une rue (cityFocusIndex) est locale au renderer et n'est jamais envoyée au réseau. Les règles de propriété, d'équilibrage des maisons, de dette, de faillite et de coût restent dans le moteur Métropole.
+
+
+## Retournement local recto / verso
+
+Les cartes et tuiles possédant une pose locale peuvent être retournées sans aucune action de jeu. Sur ordinateur, placez le pointeur sur l'objet puis appuyez sur F ; le même raccourci fonctionne pendant un drag. Sur tactile, maintenez l'objet avec un doigt puis faites un tap bref avec un second doigt. Si le second doigt se déplace, le geste reste une rotation à deux doigts et aucun retournement n'est déclenché.
+
+Le côté visible est conservé dans la pose locale, y compris après un lancer inertiel. Les tuiles Rummikub procédurales disposent maintenant d'un vrai matériau de dos afin que le retournement soit visuellement lisible avant même l'arrivée des modèles GLB définitifs.
+
+Le retournement est désactivé pendant le déplacement volontaire d'une pile complète afin de ne pas introduire une inversion implicite de l'ordre du paquet. Il ne déclenche ni dispatch, ni action en ligne, ni publication de présence.
