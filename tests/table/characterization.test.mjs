@@ -480,6 +480,20 @@ test('persistent local poses stack cleanly and expose a local-only reset',async(
  assert.doesNotMatch(source,/localPoseDisplay[^\n]*onlineAct\(/);
 });
 
+test('persistent local poses can be rotated locally without touching game or network state',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/function wrapLocalRotation\(value\)/);
+ assert.match(source,/function rotatePersistentPose\(mesh,delta\)/);
+ assert.match(source,/canvas\.addEventListener\('wheel',onWheel,\{passive:false\}\)/);
+ assert.match(source,/const step=\(e\.shiftKey\?Math\.PI\/6:Math\.PI\/18\)/);
+ assert.match(source,/mesh\.rotation\.set\(-Math\.PI\/2,0,wrapLocalRotation/);
+ assert.match(source,/saveLocalPose\(mesh,home\)/);
+ assert.match(source,/canvas\?\.removeEventListener\('wheel',onWheel\)/);
+ assert.doesNotMatch(source,/rotatePersistentPose[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/rotatePersistentPose[^\n]*onlineAct\(/);
+ assert.doesNotMatch(source,/rotatePersistentPose[^\n]*publishOnline\(/);
+});
+
 test('free 3D tabletop manipulation stays presentation-only until an explicit valid action',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/manipAnimations=\[\]/);
