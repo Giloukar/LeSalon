@@ -2201,12 +2201,12 @@ export function createTable3DRenderer({onFatal}={}){
     const d=drag,wasCard=d.kind==='card',wasLoose=!!d.loose;clearStackHold(d);if(wasCard&&d.gestureStarted||wasLoose&&d.gestureStarted)emitLocalCardGesture('cancel',0,0);drag=null;host?.classList.remove('is-dragging','is-stack-dragging');if(dropMarker)dropMarker.material.opacity=.2;
     if(wasLoose||wasCard){returnManipulatedCard(d,{snap:document.hidden});return}
   }
-  function releaseTwistPointer(e){
+  function releaseTwistPointer(e,{allowFlip=false}={}){
     if(!drag?.twist||drag.twist.pointerId!==e.pointerId)return false;
-    const twist=drag.twist,quickTap=!twist.turned&&performance.now()-Number(twist.startedAt||0)<=260;
+    const twist=drag.twist,quickTap=allowFlip&&!twist.turned&&performance.now()-Number(twist.startedAt||0)<=260;
     drag.twist=null;if(quickTap)flipDraggedObject();return true;
   }
-  function onPointerUp(e){if(releaseTwistPointer(e))return;finishDrag(e,false)}
+  function onPointerUp(e){if(releaseTwistPointer(e,{allowFlip:true}))return;finishDrag(e,false)}
   function onPointerCancel(e){if(releaseTwistPointer(e))return;cancelActiveDrag(e.pointerId)}
   function onLostPointerCapture(e){if(releaseTwistPointer(e))return;cancelActiveDrag(e.pointerId)}
   function onWindowBlur(){cancelActiveDrag()}
