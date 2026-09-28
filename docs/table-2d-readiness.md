@@ -486,3 +486,14 @@ Cette physique est volontairement non autoritative. Elle ne change ni la positio
 Après immobilisation, l'objet revient doucement à sa position logique courante. Les sélections groupées peuvent être lancées comme un petit paquet avec de légers écarts entre les éléments. Un objet en mouvement peut être repris immédiatement : son animation physique locale est alors interrompue au point exact où il se trouve.
 
 La vitesse de lancer est réduite lorsque l'utilisateur marque une pause avant de relâcher, afin qu'un simple placement précis ne soit pas interprété comme un jet. Le canal multijoueur de présence reste inchangé : aucun vecteur de vitesse, angle, rebond ou position libre n'est transmis aux autres clients.
+
+
+## Poses locales persistantes
+
+Les cartes de la main du joueur et les tuiles de son chevalet peuvent maintenant conserver une position libre locale. Un déplacement lent hors d'une zone d'action ne provoque plus nécessairement un retour au rangement automatique : l'objet se pose sur le tapis à l'endroit choisi. Un lancer rapide utilise la physique d'inertie, puis sa position d'arrêt devient également sa pose locale.
+
+La pose est indexée par partie, joueur et identifiant d'objet. Elle survit donc aux simples rerenders de sélection, de HUD ou de layout, sans devenir une donnée de jeu. Si la carte ou la tuile quitte réellement la main à la suite d'une action autoritative, sa pose locale est automatiquement supprimée. Si elle revient plus tard dans la partie, elle repart du layout logique normal et non d'une ancienne position obsolète.
+
+Les actions confirmées tiennent compte de cette position purement visuelle : une carte laissée sur le bord de la table puis jouée part visuellement de cet endroit vers la pile de jeu. Le 8 américain, le 99, Cactus et les jeux de cartes partagés utilisent cette origine lorsqu'elle existe. Les cartes du Vingt-et-un volontairement posées ailleurs ne sont pas recentrées de force lorsqu'une nouvelle carte est tirée.
+
+Les poses ne sont jamais envoyées aux autres joueurs, ne changent aucun état sauvegardé et ne remplacent pas les règles. Une zone de dépôt légale garde toujours la priorité sur le placement libre. Le changement de partie ou de joueur utilise un espace de poses distinct, ce qui empêche toute fuite visuelle entre mains privées.
