@@ -3193,7 +3193,7 @@ receiveSocial=function(data,actor,connection){
 
 /* Présence libre des cartes en 3D : géométrie anonyme uniquement.
    Aucune identité de carte, valeur ou couleur ne quitte la vue privée du joueur. */
-const CARD_TABLETOP_GAMES=new Set(['huit','president','menteur','suites','plis','encheres','quatrevingtdixneuf','pouilleux','vingtetun']);
+const CARD_TABLETOP_GAMES=new Set(['huit','president','menteur','suites','plis','encheres','quatrevingtdixneuf','vingtetun']);
 function cardTabletopGameId(){return String((net.role==='host'?net.state?.id:S?.id)||net.gameId||'')}
 function cardTabletopClean(data,actor){
  const gameId=cardTabletopGameId();
@@ -3228,7 +3228,7 @@ function cardTabletopSend(detail){
  const gameId=S?.id;
  if(!isOnline()||!CARD_TABLETOP_GAMES.has(gameId)||!net.active||!net.connected||net.spectator||netPaused())return;
  const phase=['pose','remove','reset'].includes(detail?.phase)?detail.phase:null;if(!phase)return;
- const now=performance.now();if(phase==='pose'&&now-cardTabletopLastAt<45)return;cardTabletopLastAt=now;
+ const now=performance.now();if(phase==='pose'&&cardTabletopLastAt&&now-cardTabletopLastAt<45)return;cardTabletopLastAt=now;
  const packet={type:'card-tabletop',matchId:net.matchId,gameId,phase};
  if(phase!=='reset')packet.token=Number(detail.token);
  if(phase==='pose'){packet.x=Number(detail.x);packet.z=Number(detail.z);packet.lift=Number(detail.lift);packet.rotation=Number(detail.rotation)}
