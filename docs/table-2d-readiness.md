@@ -448,3 +448,12 @@ Le Pouilleux accepte désormais une pioche réellement gestuelle : la carte cach
 Le Vingt-et-un dispose maintenant d'un sabot 3D représentant le nombre de cartes restantes. La distribution initiale, les tirages du joueur et les tirages de la banque partent physiquement de ce sabot. Les cartes déjà présentes se recentrent par animation au lieu de sauter lorsque la main s'agrandit. La carte cachée de la banque reste un dos de carte dans la projection ; lors de sa révélation, le dos effectue un mouvement de retournement avant de laisser apparaître la face projetée.
 
 Aucune carte privée supplémentaire n'est exposée : le seul nouveau champ de projection du Vingt-et-un est `deckCount`, qui ne contient qu'un nombre. Toutes les actions restent celles du moteur existant.
+
+
+## Bataille — carte supérieure et pli physique
+
+La Bataille n'est plus limitée au bouton « Retourner le pli ». La carte supérieure du paquet du joueur actif est maintenant manipulable dans la scène 3D : un toucher conserve l'action rapide historique, tandis qu'un glissement vers le centre exprime la même intention via l'adaptateur autoritatif `specialCard('battle')`.
+
+Après confirmation du moteur, chaque carte du pli part du paquet de son propriétaire vers sa position centrale. Les cartes explicitement projetées comme cachées pendant une bataille restent des dos de carte : la couche Three.js ne reçoit ni ne reconstruit leur valeur. La carte réellement déplacée par le joueur peut reprendre son animation depuis la position exacte où elle a été relâchée.
+
+Lorsque le moteur désigne un gagnant, une seconde phase d'animation rassemble ensuite les cartes visibles du pli vers son paquet. Les vols de ramassage démarrent seulement après la fin de la séquence de révélation grâce aux départs différés de la couche d'animation. L'état affiché reste néanmoins l'état confirmé : le mouvement est une reconstruction visuelle postérieure au coup, pas une simulation parallèle des règles de bataille.
