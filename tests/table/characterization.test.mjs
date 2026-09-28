@@ -532,7 +532,8 @@ test('local face flipping persists locally and coexists with rotation, tosses an
  assert.match(source,/faceX:faceRotationX\(item\.mesh\.rotation\.x\)/);
  assert.match(source,/a\.mesh\.rotation\.x=\(a\.faceX\?\?-Math\.PI\/2\)/);
  assert.match(source,/const tap=!d\.stackMode&&!d\.rotated&&!d\.flipped/);
- assert.match(source,/twist=drag\.twist,quickTap=!twist\.turned/);
+ assert.match(source,/twist=drag\.twist,quickTap=allowFlip&&!twist\.turned/);
+ assert.match(source,/function onPointerUp\(e\)\{if\(releaseTwistPointer\(e,\{allowFlip:true\}\)\)return/);
  assert.match(source,/performance\.now\(\)-Number\(twist\.startedAt\|\|0\)<=260/);
  assert.match(source,/if\(quickTap\)flipDraggedObject\(\)/);
  assert.match(source,/mats=\[edgeMaterial,edgeMaterial,edgeMaterial,edgeMaterial,front,rummiBackMaterial\]/);
