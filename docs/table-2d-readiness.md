@@ -466,3 +466,12 @@ Lorsqu'un joueur conteste une annonce, le tas ne disparaît plus instantanément
 Le ramassage part de la pile centrale et rejoint le siège du perdant. Les cartes du dernier mensonge que le moteur a explicitement placées dans `revealed` peuvent être montrées face visible ; toutes les autres cartes du tas restent des dos pour les autres joueurs. Si le spectateur courant est lui-même le perdant, ses nouvelles cartes privées peuvent devenir visibles pendant leur trajet vers leurs positions finales, puisqu'elles appartiennent déjà à sa main projetée.
 
 Les cartes révélées conservées par la vue 2D comme historique du défi ne sont plus recréées physiquement au centre de la table 3D une fois le tas ramassé. L'action de défi elle-même continue de passer exclusivement par `cardAction('challenge')`.
+
+
+## Chasse aux plis — ramassage gestuel du pli
+
+Le gagnant d'un pli peut désormais saisir directement l'une des cartes du pli terminé. Les autres cartes deviennent des compagnons visuels du drag et suivent le mouvement comme un petit paquet physique. Un toucher garde l'action rapide historique ; un glissement du groupe vers la zone du joueur exprime l'intention de ramasser.
+
+Le relâchement valide appelle uniquement `cardAction('collect')`. Avant cet appel, la couche de présentation mémorise les positions, rotations et échelles exactes des cartes déplacées. Quand l'état confirmé suivant montre que le pli a quitté la table, l'animation de ramassage repart de ces positions réelles au lieu de faire revenir brièvement les cartes au centre.
+
+Un relâchement hors de la zone valide n'envoie aucune action et toutes les cartes du groupe reviennent avec l'inertie locale existante. La logique de gagnant, de score, de manche et de distribution suivante reste entièrement dans le moteur Chasse aux plis.

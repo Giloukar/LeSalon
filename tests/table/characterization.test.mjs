@@ -403,6 +403,20 @@ test('Menteur challenge pile collection is reconstructed from confirmed projecte
 
 test('Menteur 3D challenge still uses the authoritative challenge action',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'menteur','online');const r=await t.page.evaluate(async()=>{net.gameId='menteur';const revealed={id:'liar-test-truth',rank:5,suit:'S'};net.state.phase='challenge';net.state.turn=0;net.state.required=5;net.state.discard=[clone(revealed)];net.state.revealed=[];net.state.claim={owner:1,rank:5,cards:[clone(revealed)]};S=projectGame(net.state,0);let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const before={hand:net.state.players[0].hand.length,discard:net.state.discard.length,revision:net.revision};const challenged=seen.interactions.cardAction('challenge');return{challenged,before,after:{hand:net.state.players[0].hand.length,discard:net.state.discard.length,phase:net.state.phase,claim:net.state.claim,revision:net.revision,revealed:net.state.revealed.map(c=>c.id)}};});assert.equal(r.challenged,true);assert.equal(r.after.hand,r.before.hand+1);assert.equal(r.after.discard,0);assert.equal(r.after.phase,'play');assert.equal(r.after.claim,null);assert.equal(r.after.revision,r.before.revision+1);assert.deepEqual(r.after.revealed,['liar-test-truth']);}finally{await browser.close();}});
 
+test('completed trick cards drag as one physical group and collect through the existing action',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/makeLooseManipulable\(mesh,\{kind:'trick-collect',tapEnabled:true,cardId:entry\.card\.id\}\)/);
+ assert.match(source,/if\(kind==='trick-collect'\)return objects\.children\.filter/);
+ assert.match(source,/function rememberTrickCollectOrigins\(d\)/);
+ assert.match(source,/d\.kind==='trick-collect'&&current\?\.gameId==='plis'/);
+ assert.match(source,/d\.trickToHand=d\.mesh\.position\.z>=1\.42/);
+ assert.match(source,/current\?\.interactions\?\.cardAction\?\.\('collect'\)/);
+ assert.match(source,/previous\.trickOrigins\?\.get\?\.\(entry\.card\.id\)/);
+ assert.doesNotMatch(source,/trickToHand[^\n]*dispatch\(/);
+});
+
+test('physical trick collection still uses the authoritative collect action',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'plis','online');const r=await t.page.evaluate(async()=>{net.gameId='plis';net.state.phase='trickResult';net.state.turn=0;net.state.completedTricks=1;net.state.trickCards=[{owner:0,card:{id:'trick-a',rank:10,suit:'S'}},{owner:1,card:{id:'trick-b',rank:9,suit:'S'}}];net.state.lastTrick=[];net.state.discard=[];S=projectGame(net.state,0);let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const before={moves:net.state.moves,discard:net.state.discard.length,revision:net.revision};const collected=seen.interactions.cardAction('collect');return{collected,before,after:{moves:net.state.moves,discard:net.state.discard.map(c=>c.id),phase:net.state.phase,trick:net.state.trickCards.length,revision:net.revision}};});assert.equal(r.collected,true);assert.equal(r.after.moves,r.before.moves+1);assert.deepEqual(r.after.discard,['trick-a','trick-b']);assert.equal(r.after.phase,'play');assert.equal(r.after.trick,0);assert.equal(r.after.revision,r.before.revision+1);}finally{await browser.close();}});
+
 test('free 3D tabletop manipulation stays presentation-only until an explicit valid action',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/manipAnimations=\[\]/);
