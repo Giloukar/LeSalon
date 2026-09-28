@@ -480,6 +480,25 @@ test('persistent local poses stack cleanly and expose a local-only reset',async(
  assert.doesNotMatch(source,/localPoseDisplay[^\n]*onlineAct\(/);
 });
 
+test('manual local object rotation stays presentation-only on wheel and touch twist',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/canvas\.addEventListener\('wheel',onWheel,\{passive:false\}\)/);
+ assert.match(source,/function normalizeAngleDelta\(delta\)/);
+ assert.match(source,/function rotateDraggedObject\(delta\)/);
+ assert.match(source,/function onWheel\(e\)/);
+ assert.match(source,/direction\*-Math\.PI\/18/);
+ assert.match(source,/e\.pointerType==='touch'/);
+ assert.match(source,/drag\.twist=\{pointerId:e\.pointerId,lastAngle:angle\}/);
+ assert.match(source,/drag\.twist\?\.pointerId===e\.pointerId/);
+ assert.match(source,/rotateDraggedObject\(delta\)/);
+ assert.match(source,/const tap=!d\.rotated&&/);
+ assert.match(source,/saveLocalPose\(obj,home\)/);
+ assert.match(source,/canvas\?\.removeEventListener\('wheel',onWheel\)/);
+ assert.doesNotMatch(source,/rotateDraggedObject[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/onWheel[^\n]*onlineAct\(/);
+ assert.doesNotMatch(source,/drag\.twist[^\n]*publishOnline\(/);
+});
+
 test('free 3D tabletop manipulation stays presentation-only until an explicit valid action',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/manipAnimations=\[\]/);
