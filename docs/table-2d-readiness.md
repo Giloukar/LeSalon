@@ -457,3 +457,12 @@ La Bataille n'est plus limitée au bouton « Retourner le pli ». La carte supé
 Après confirmation du moteur, chaque carte du pli part du paquet de son propriétaire vers sa position centrale. Les cartes explicitement projetées comme cachées pendant une bataille restent des dos de carte : la couche Three.js ne reçoit ni ne reconstruit leur valeur. La carte réellement déplacée par le joueur peut reprendre son animation depuis la position exacte où elle a été relâchée.
 
 Lorsque le moteur désigne un gagnant, une seconde phase d'animation rassemble ensuite les cartes visibles du pli vers son paquet. Les vols de ramassage démarrent seulement après la fin de la séquence de révélation grâce aux départs différés de la couche d'animation. L'état affiché reste néanmoins l'état confirmé : le mouvement est une reconstruction visuelle postérieure au coup, pas une simulation parallèle des règles de bataille.
+
+
+## Menteur — résolution physique d'un défi
+
+Lorsqu'un joueur conteste une annonce, le tas ne disparaît plus instantanément de la table 3D. La scène compare le snapshot de la phase `challenge` avec l'état `play` confirmé suivant : si la défausse est passée à zéro et qu'une main a grossi, cette main est identifiée comme destinataire du tas.
+
+Le ramassage part de la pile centrale et rejoint le siège du perdant. Les cartes du dernier mensonge que le moteur a explicitement placées dans `revealed` peuvent être montrées face visible ; toutes les autres cartes du tas restent des dos pour les autres joueurs. Si le spectateur courant est lui-même le perdant, ses nouvelles cartes privées peuvent devenir visibles pendant leur trajet vers leurs positions finales, puisqu'elles appartiennent déjà à sa main projetée.
+
+Les cartes révélées conservées par la vue 2D comme historique du défi ne sont plus recréées physiquement au centre de la table 3D une fois le tas ramassé. L'action de défi elle-même continue de passer exclusivement par `cardAction('challenge')`.

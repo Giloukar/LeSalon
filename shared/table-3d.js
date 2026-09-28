@@ -297,6 +297,9 @@ export function createTable3DRenderer({onFatal}={}){
       base.centerIds=(center.cards||[]).map(c=>c?.id).filter(Boolean);base.centerCards=(center.cards||[]).map(visualCardSnapshot).filter(Boolean);
     }else if(game==='menteur'){
       base.backCount=Number(center.backCount)||0;base.centerIds=(center.cards||[]).map(c=>c?.id).filter(Boolean);
+      base.centerCards=(center.cards||[]).map(visualCardSnapshot).filter(Boolean);
+      base.claimOwner=Number.isInteger(center.claim?.owner)?center.claim.owner:null;
+      base.claimCount=Number(center.claim?.count)||0;
     }else if(game==='suites')base.centerIds=Object.values(center.lanes||{}).flat().map(c=>c?.id).filter(Boolean);
     else if(game==='plis'){
       const physicalEntries=Array.isArray(state?.trickCards)&&state.trickCards.length?(center.entries||[]):(['trickResult','over'].includes(String(state?.phase||''))?(center.entries||[]):[]);
@@ -338,9 +341,27 @@ export function createTable3DRenderer({onFatal}={}){
     rememberRummiDropOrigin(d.tileId,d.mesh);
     (d.companions||[]).forEach(c=>rememberRummiDropOrigin(c.id,c.mesh));
   }
-  function animateCardFamilyConfirmed(game,payload,center,previous,currentSnapshot,opponentVisuals,centerVisuals){
+  function animateCardFamilyConfirmed(game,payload,center,previous,currentSnapshot,opponentVisuals,centerVisuals,ownVisuals){
     if(!previous||previous.key!==currentSnapshot.key||!motionAllowed())return;
     const viewer=currentSnapshot.viewer,discardCorner=new THREE.Vector3(4.35,TABLE_Y+.24,-1.85);
+
+    if(game==='menteur'&&previous.phase==='challenge'&&currentSnapshot.phase==='play'&&previous.backCount>0&&currentSnapshot.backCount===0){
+      const receivers=currentSnapshot.handCounts.map((count,i)=>({i,delta:count-(previous.handCounts?.[i]??count)})).filter(x=>x.delta>0).sort((a,b)=>b.delta-a.delta);
+      const receiver=receivers[0]?.i;
+      if(Number.isInteger(receiver)){
+        const target=cardFamilyOrigin(receiver,viewer,opponentVisuals),visibleCards=currentSnapshot.centerCards||[],addedIds=receiver===viewer?(currentSnapshot.ownIds||[]).filter(id=>!(previous.ownIds||[]).includes(id)):[],pileCount=Math.min(12,Math.max(previous.backCount,visibleCards.length));
+        for(let i=0;i<pileCount;i++){
+          const publicIndex=i-(pileCount-visibleCards.length),publicCard=publicIndex>=0?visibleCards[publicIndex]:null,localVisual=receiver===viewer?ownVisuals?.get?.(addedIds[i]):null,flightCard=localVisual?.card||publicCard,from=new THREE.Vector3((i-pileCount/2)*.045,TABLE_Y+.24,.08-i*.018),mesh=cardMesh(flightCard,{back:!flightCard}),to=localVisual?.position?.clone?.()||target.clone().add(new THREE.Vector3((i-(pileCount-1)/2)*.035,i*.002,-i*.012));
+          if(localVisual?.mesh)localVisual.mesh.visible=false;
+          queueCardFlight(mesh,from,to,{
+            duration:470+Math.min(120,i*12),delay:120+i*42,lift:.55,
+            fromRot:(i-pileCount/2)*.02,toRot:localVisual?.rotation||0,bank:.10,roll:(i%2?-.08:.08),
+            fromScale:new THREE.Vector3(.82,.82,.82),toScale:localVisual?.scale||new THREE.Vector3(.69,.69,.69),
+            onDone:()=>{if(localVisual?.mesh)localVisual.mesh.visible=true}
+          });
+        }
+      }
+    }
 
     if(game==='president'&&(previous.centerIds||[]).length&&!(currentSnapshot.centerIds||[]).length){
       const cards=previous.centerCards||[];
@@ -999,13 +1020,14 @@ export function createTable3DRenderer({onFatal}={}){
     setCameraPose(0,7.4,9.1,0,.22,.15);
     const selected=new Set(data.selectedIds||[]),selectable=new Set(data.selectableIds||[]),playable=new Set(data.cardPlayableIds||[]);
     const dropTarget=cardGestureTarget(game,TABLE_Y+.025);dropMarker.visible=!!(payload.canInteract&&selectable.size);dropMarker.position.set(dropTarget.x,TABLE_Y+.025,dropTarget.z);dropMarker.material.opacity=.2;
-    const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length;
+    const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,ownVisuals=new Map();
     own.forEach((card,i)=>{
       const slot=handCardSlot(n,i),chosen=selected.has(card.id),canSelect=selectable.has(card.id),legal=playable.has(card.id);
       const mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:canSelect,playable:canSelect});
       mesh.userData.kind='card-select';mesh.userData.cardId=card.id;mesh.userData.playable=canSelect;mesh.userData.legal=legal;
       mesh.position.set(slot.x,TABLE_Y+.12+slot.yOffset+(chosen?.26:legal?.09:0),slot.z);mesh.rotation.set(-Math.PI/2,0,slot.fan);mesh.scale.setScalar(slot.scale*(chosen?1.075:legal?1.025:.98));
       mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'card-select',tapEnabled:canSelect,cardId:card.id});objects.add(mesh);
+      if(card?.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
     });
     const opponents=s.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer),opponentVisuals=new Map();
     opponents.forEach(({p,i},k)=>{
@@ -1020,7 +1042,8 @@ export function createTable3DRenderer({onFatal}={}){
     }else if(game==='menteur'){
       const count=Math.min(7,Number(center.backCount)||0);
       for(let i=0;i<count;i++){const mesh=cardMesh(null,{back:true});placeCard(mesh,(i-count/2)*.045,.08-i*.018,TABLE_Y+.1+i*.025,(i-count/2)*.02,.82)}
-      (center.cards||[]).forEach((card,i)=>{const x=(i-(center.cards.length-1)/2)*.72,z=-.65,mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,x,z,TABLE_Y+.16+i*.01,(i-(center.cards.length-1)/2)*.04,.72);if(card?.id)centerVisuals.set(card.id,{mesh,card,position:new THREE.Vector3(x,TABLE_Y+.25,z)})});
+      const historicalReveal=s?.phase==='play'&&!center.claim&&Number(center.backCount||0)===0;
+      if(!historicalReveal)(center.cards||[]).forEach((card,i)=>{const x=(i-(center.cards.length-1)/2)*.72,z=-.65,mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,x,z,TABLE_Y+.16+i*.01,(i-(center.cards.length-1)/2)*.04,.72);if(card?.id)centerVisuals.set(card.id,{mesh,card,position:new THREE.Vector3(x,TABLE_Y+.25,z)})});
     }else if(game==='suites'){
       setCameraPose(0,8.9,7.2,0,.18,0);
       const suits=['S','H','D','C'];
@@ -1044,7 +1067,7 @@ export function createTable3DRenderer({onFatal}={}){
       });
     }
     const currentSnapshot=cardFamilySnapshot(payload,center),previousSnapshot=lastCardFamilySnapshots.get(game);
-    animateCardFamilyConfirmed(game,payload,center,previousSnapshot,currentSnapshot,opponentVisuals,centerVisuals);lastCardFamilySnapshots.set(game,currentSnapshot);
+    animateCardFamilyConfirmed(game,payload,center,previousSnapshot,currentSnapshot,opponentVisuals,centerVisuals,ownVisuals);lastCardFamilySnapshots.set(game,currentSnapshot);
     const action=data.cardAction||{};
     if(payload.canInteract){
       if(game==='president'){

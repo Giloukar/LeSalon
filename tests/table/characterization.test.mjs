@@ -389,6 +389,20 @@ test('Battle top-card drag and staged reveal remain adapters over projected stat
 
 test('Battle 3D action still goes through the authoritative battle engine',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'bataille','online');const r=await t.page.evaluate(async()=>{net.gameId='bataille';S=projectGame(net.state,0);let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const before={number:net.state.battleNumber,moves:net.state.moves,revision:net.revision,counts:net.state.players.map(p=>p.hand.length)};const played=seen.interactions.specialCard('battle');const projected=S.battleReveal||[];return{played,before,after:{number:net.state.battleNumber,moves:net.state.moves,revision:net.revision,counts:net.state.players.map(p=>p.hand.length),reveal:net.state.battleReveal.length},projectedHidden:projected.filter(r=>r.hidden).map(r=>({hasCard:Object.hasOwn(r,'card'),keys:Object.keys(r)}))};});assert.equal(r.played,true);assert.equal(r.after.number,r.before.number+1);assert.equal(r.after.moves,r.before.moves+1);assert.equal(r.after.revision,r.before.revision+1);assert.equal(r.after.reveal>0,true);for(const hidden of r.projectedHidden)assert.equal(hidden.hasCard,false);}finally{await browser.close();}});
 
+test('Menteur challenge pile collection is reconstructed from confirmed projected state',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/base\.centerCards=\(center\.cards\|\|\[\]\)\.map\(visualCardSnapshot\)/);
+ assert.match(source,/game==='menteur'&&previous\.phase==='challenge'&&currentSnapshot\.phase==='play'/);
+ assert.match(source,/receivers=currentSnapshot\.handCounts\.map/);
+ assert.match(source,/addedIds=receiver===viewer/);
+ assert.match(source,/historicalReveal=s\?\.phase==='play'&&!center\.claim&&Number\(center\.backCount\|\|0\)===0/);
+ assert.match(source,/if\(localVisual\?\.mesh\)localVisual\.mesh\.visible=false/);
+ assert.doesNotMatch(source,/historicalReveal[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/receivers[^\n]*onlineAct\(/);
+});
+
+test('Menteur 3D challenge still uses the authoritative challenge action',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'menteur','online');const r=await t.page.evaluate(async()=>{net.gameId='menteur';const revealed={id:'liar-test-truth',rank:5,suit:'S'};net.state.phase='challenge';net.state.turn=0;net.state.required=5;net.state.discard=[clone(revealed)];net.state.revealed=[];net.state.claim={owner:1,rank:5,cards:[clone(revealed)]};S=projectGame(net.state,0);let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const before={hand:net.state.players[0].hand.length,discard:net.state.discard.length,revision:net.revision};const challenged=seen.interactions.cardAction('challenge');return{challenged,before,after:{hand:net.state.players[0].hand.length,discard:net.state.discard.length,phase:net.state.phase,claim:net.state.claim,revision:net.revision,revealed:net.state.revealed.map(c=>c.id)}};});assert.equal(r.challenged,true);assert.equal(r.after.hand,r.before.hand+1);assert.equal(r.after.discard,0);assert.equal(r.after.phase,'play');assert.equal(r.after.claim,null);assert.equal(r.after.revision,r.before.revision+1);assert.deepEqual(r.after.revealed,['liar-test-truth']);}finally{await browser.close();}});
+
 test('free 3D tabletop manipulation stays presentation-only until an explicit valid action',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/manipAnimations=\[\]/);
