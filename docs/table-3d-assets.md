@@ -105,3 +105,12 @@ Les transformations ne sont appliquées que lorsqu'elles sont déclarées : les 
 Le chargement est tolérant aux erreurs par asset. Un fichier qui échoue apparaît dans `result.failed` et conserve son placeholder procédural, pendant que les autres modèles du pack sont activés. `result.unload()` ou `SalonTable3DModelPack.unload(id)` retire les factories du pack et revient immédiatement aux placeholders.
 
 L'événement `salon:table-3d-model-pack` publie les phases `loading`, `progress`, `ready` et `unloaded`, ce qui permettra d'ajouter plus tard une interface de progression sans coupler cette interface au renderer.
+
+
+## Métropole entièrement pilotable en 3D
+
+Métropole n'a plus besoin du panneau 2D pour terminer un tour. Le payload 3D expose uniquement les permissions déjà calculées à partir du moteur courant : lancer, caution, achat ou refus, règlement d'une dette, faillite, fin de tour et reprise après détention.
+
+Les rues du joueur courant deviennent sélectionnables sur le plateau pendant son tour. Une rue sélectionnée affiche seulement les opérations actuellement légales — hypothéquer, lever l'hypothèque, construire ou vendre une maison — avec les montants issus des règles existantes. Les boutons 3D appellent exclusivement interactions.city(...), qui redirige vers le même dispatch autoritatif que l'interface 2D.
+
+La sélection visuelle d'une rue (cityFocusIndex) est locale au renderer et n'est jamais envoyée au réseau. Les règles de propriété, d'équilibrage des maisons, de dette, de faillite et de coût restent dans le moteur Métropole.
