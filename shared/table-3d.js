@@ -83,7 +83,7 @@ export function createTable3DRenderer({onFatal}={}){
   let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='';
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
-  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,lastBattleSnapshot=null,pendingMaidPickOrigin=null,pendingBattleOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
+  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,lastBattleSnapshot=null,pendingMaidPickOrigin=null,pendingBattleOrigin=null,pendingCactusSwap=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
 
   function applyCameraFit(){
     if(!camera||!cameraPose)return;
@@ -257,6 +257,20 @@ export function createTable3DRenderer({onFatal}={}){
   function cactusSeat(viewer,count,index){
     const mine=index===viewer,angle=mine?Math.PI/2:(index/(count-1||1))*Math.PI-Math.PI/2;
     return{mine,x:mine?0:Math.sin(angle)*4.2,z:mine?2.45:-2.15+Math.cos(angle)*.72};
+  }
+  function cactusCardSlot(viewer,count,owner,index,y=TABLE_Y+.25){
+    const seat=cactusSeat(viewer,count,owner),col=index%2,row=Math.floor(index/2);
+    return{index,x:seat.x+(col-.5)*1.02,z:seat.z+(row-.5)*.78,y,scale:seat.mine?.76:.62,rotation:(col-.5)*.035};
+  }
+  function cactusSwapDropTarget(position){
+    const data=current?.viewData?.cactus;if(!data||!position)return null;
+    const viewer=Number(data.viewer),players=data.players||[],count=Math.max(1,players.length),hand=players[viewer]?.hand||[];
+    let best=null;
+    hand.forEach((card,index)=>{
+      if(!card)return;const slot=cactusCardSlot(viewer,count,viewer,index,TABLE_Y+.25),distance=Math.hypot(position.x-slot.x,position.z-slot.z);
+      if(distance<.92&&(!best||distance<best.distance))best={...slot,distance};
+    });
+    return best;
   }
   function currentCardOpponentSeat(actor){
     const state=current?.state,viewer=Number.isInteger(current?.privateIndex)?current.privateIndex:0,game=current?.gameId;
@@ -461,7 +475,8 @@ export function createTable3DRenderer({onFatal}={}){
       viewer,turn:Number(data?.turn??s?.turn??0),phase:String(data?.phase||s?.phase||''),source:data?.source||null,
       deckCount:Math.max(0,Number(data?.deckCount)||0),
       discardId:discard?.id||null,discard:discard?{id:discard.id,suit:discard.suit,rank:discard.rank,joker:!!discard.joker}:null,
-      drawnId:data?.drawn?.id||null,
+      drawnId:data?.drawn?.id||null,drawn:visualCardSnapshot(data?.drawn),
+      lastSwap:data?.lastSwap?{owner:Number(data.lastSwap.owner),index:Number(data.lastSwap.index),source:String(data.lastSwap.source||''),serial:Number(data.lastSwap.serial)||0}:null,
       ownIds:own.map(c=>c?.id).filter(Boolean),
       handCounts:players.map(p=>(p?.hand||[]).filter(Boolean).length)
     };
