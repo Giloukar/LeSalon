@@ -508,7 +508,12 @@ test('local face flipping is persistent and never becomes a game or network acti
  assert.match(source,/String\(e\.key\|\|''\)\.toLowerCase\(\)!=='f'/);
  assert.match(source,/mesh\.rotation\.x=-faceRotationX\(mesh\.rotation\.x\)/);
  assert.match(source,/manualFace:faceRotationX\(obj\.rotation\.x\)/);
+ assert.match(source,/kind:'card'.*manualFace:faceRotationX\(obj\.rotation\.x\)/s);
  assert.match(source,/Number\.isFinite\(d\.manualFace\)\?d\.manualFace:-Math\.PI\/2/);
+ assert.match(source,/Number\.isFinite\(drag\.manualFace\)\?drag\.manualFace:-Math\.PI\/2/);
+ assert.match(source,/faceX:faceRotationX\(item\.mesh\.rotation\.x\)/);
+ assert.match(source,/a\.mesh\.rotation\.x=\(a\.faceX\?\?-Math\.PI\/2\)/);
+ assert.match(source,/const tap=!d\.rotated&&!d\.flipped&&/);
  assert.match(source,/const faceX=mesh\.rotation\.x>0\?Math\.PI\/2:-Math\.PI\/2/);
  assert.match(source,/canvas\.addEventListener\('keydown',onKeyDown\)/);
  assert.match(source,/canvas\?\.removeEventListener\('keydown',onKeyDown\)/);
