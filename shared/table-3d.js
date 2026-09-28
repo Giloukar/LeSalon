@@ -1106,7 +1106,7 @@ export function createTable3DRenderer({onFatal}={}){
       else if(game==='plis')status.textContent='Atout '+(SUIT_SYMBOL[center.trump]||center.trump)+' · pli '+Math.min(6,(center.completedTricks||0)+1)+'/6';
       else if(game==='encheres')status.textContent='Tour '+(center.bidRound||1)+' · '+(center.pot||0)+' points à remporter';
     }
-    if(help)help.textContent=payload.canInteract?'Touchez pour sélectionner · glissez librement une carte · validez directement sur la table':'La table 3D suit la partie et les mouvements confirmés';
+    if(help)help.textContent=game==='plis'&&action.canCollect?'Saisissez une carte du pli : tout le paquet suit · ramenez-le vers vous pour le collecter':payload.canInteract?'Touchez pour sélectionner · glissez librement une carte · validez directement sur la table':'La table 3D suit la partie et les mouvements confirmés';
   }
 
   function syncEight(payload){
