@@ -522,6 +522,19 @@ test('local face flipping is persistent and never becomes a game or network acti
  assert.doesNotMatch(source,/onKeyDown[^\n]*publishOnline\(/);
 });
 
+test('second-finger tap flips while two-finger movement still rotates',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/startedAt:performance\.now\(\),moved:false/);
+ assert.match(source,/const distance=Math\.hypot\(e\.clientX-twist\.startX,e\.clientY-twist\.startY\)/);
+ assert.match(source,/if\(!twist\.moved&&distance>9\)twist\.moved=true/);
+ assert.match(source,/if\(twist\.moved\)rotateDraggedObject\(delta\)/);
+ assert.match(source,/quickTap=allowFlip&&!twist\.moved&&performance\.now\(\)-twist\.startedAt<280/);
+ assert.match(source,/if\(quickTap\)flipDraggedObject\(\)/);
+ assert.match(source,/releaseTwistPointer\(e,\{allowFlip:true\}\)/);
+ assert.doesNotMatch(source,/quickTap[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/quickTap[^\n]*onlineAct\(/);
+});
+
 test('free 3D tabletop manipulation stays presentation-only until an explicit valid action',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/manipAnimations=\[\]/);
