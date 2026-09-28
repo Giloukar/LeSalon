@@ -264,7 +264,7 @@ class Smoke {
 }
 
 /* ---------- Coque Falcon-X issue des photos, sans capuchon ---------- */
-const GLB_URL = new URL("../assets/puff/jnr-falcon-uncapped.glb?v=1", import.meta.url).href;
+const GLB_URL = new URL("../assets/puff/jnr-falcon-uncapped.glb?v=2", import.meta.url).href;
 async function loadPuff() {
   const gltf = await new GLTFLoader().loadAsync(GLB_URL);
   const root = gltf.scene, group = new THREE.Group();
@@ -278,11 +278,12 @@ async function loadPuff() {
     const m = o.material;
     if (m.name === "Printed_wrap_original_Blackberry") decorMats.add(m);
     if (m.name === "Flavor_colored_upper_housing") flavorMats.add(m);
-    m.envMapIntensity = m.transmission ? .35 : .55;
+    const innerGlass = m.name === "Clear_internal_airway";
+    m.envMapIntensity = m.transmission ? (innerGlass ? .65 : .35) : .55;
     if (m.transmission) {
       // Le widget est un canvas alpha, sans fond opaque : une coque transmissive
       // opaque blanchirait le DOM derrière le col et masquerait l’afficheur.
-      m.transparent = true; m.opacity = .22; m.depthWrite = false;
+      m.transparent = true; m.opacity = innerGlass ? .16 : .09; m.depthWrite = false;
     }
   });
   if (!decorMats.size) throw new Error("Puff: matériau d’habillage absent du modèle");

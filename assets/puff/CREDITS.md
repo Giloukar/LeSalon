@@ -20,7 +20,7 @@ Les autres sons (tirage, expiration, jingles) sont synthétisés en WebAudio dan
 - `jnr-falcon-uncapped.glb` — nouvelle géométrie reconstruite à partir des quatre
   photographies fournies par Mathis le 28 septembre 2026 : corps ovale aplati,
   socle argenté, coque et embout transparents, conduit creux, sans capuchon gris.
-  Dimensions estimées : 64 × 132,7 × 32 mm, axe Y vertical, face avant vers +Z.
+  Dimensions estimées : 64 × 121,35 × 32 mm, axe Y vertical, face avant vers +Z.
   Le dessous et les parties internes non photographiées sont approximatifs.
 - Les quatre habillages du site restent Blackberry / Red Raspberry,
   Golden Falcon / Mango Passion Fruit, Cherry Ice et Blue Razz. L’impression
@@ -32,3 +32,5 @@ Les autres sons (tirage, expiration, jingles) sont synthétisés en WebAudio dan
 - glTF 2.0 avec textures embarquées, unités en mètres, extensions de matériaux
   transmission / volume / IOR / clearcoat. Le widget utilise GLTFLoader 0.169.0.
   Le GLB source reste éditable avec des pièces nommées distinctes.
+
+Révision de l’embout : longueur au-dessus de l’épaule ramenée de 22,7 à 11,35 mm ; conduit et bagues internes en polycarbonate transparent, avec parois creuses et réfraction (aucune pièce blanche dans l’embout).
