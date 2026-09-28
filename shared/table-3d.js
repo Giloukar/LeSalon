@@ -162,10 +162,11 @@ export function createTable3DRenderer({onFatal}={}){
     const y=Number(mesh.userData?.localPoseFloorY??TABLE_Y+.12),position=new THREE.Vector3(clampMotion(mesh.position.x,-5.05,5.05),y,clampMotion(mesh.position.z,-3.08,3.08));
     return{position,rotation:new THREE.Euler(-Math.PI/2,0,mesh.rotation.z),scale:home.scale.clone()};
   }
-  function saveLocalPose(mesh,home=mesh?.userData?.home){
+  function saveLocalPose(mesh,home=mesh?.userData?.home,{order=null}={}){
     const key=mesh?.userData?.localPoseKey;if(!key)return null;
     const pose=freePoseForMesh(mesh,home);if(!pose)return null;
-    pose.order=++localPoseOrder;localPoses.set(key,cloneTransform(pose));poseSeen.add(key);
+    pose.order=Number.isFinite(order)?order:++localPoseOrder;if(Number.isFinite(order))localPoseOrder=Math.max(localPoseOrder,order);
+    localPoses.set(key,cloneTransform(pose));poseSeen.add(key);
     const display=localPoseDisplay(key,pose);mesh.userData.home=cloneTransform(display);return display;
   }
   function hasActiveLocalPoses(){
@@ -728,7 +729,7 @@ export function createTable3DRenderer({onFatal}={}){
       if((speed<.012&&age>260)||age>a.duration){
         a.done=true;a.mesh.position.y=floorY;a.mesh.rotation.x=-Math.PI/2;a.mesh.rotation.y=0;a.mesh.scale.copy(a.home.scale);
         if(a.mesh.userData?.persistLocalPose){
-          const pose=saveLocalPose(a.mesh,a.home);if(pose){a.mesh.position.copy(pose.position);a.mesh.rotation.copy(pose.rotation);a.mesh.scale.copy(pose.scale)}
+          const pose=saveLocalPose(a.mesh,a.home,{order:a.poseOrder});if(pose){a.mesh.position.copy(pose.position);a.mesh.rotation.copy(pose.rotation);a.mesh.scale.copy(pose.scale)}
         }else restoreManipulatedMesh(a.mesh,a.home,{velocityX:0,velocityY:0},{index:a.index||0});
         running=true;
       }else running=true;
@@ -1821,8 +1822,9 @@ export function createTable3DRenderer({onFatal}={}){
       stopTossForMesh(item.mesh);
       const side=(item.index%2?1:-1)*Math.floor((item.index+1)/2)*.012,velocity=base.clone();
       velocity.x+=side;velocity.z-=side*.7;
+      const poseOrder=d.stackMode?localPoses.get(item.mesh.userData?.localPoseKey)?.order:null;
       tossAnimations.push({
-        mesh:item.mesh,home:item.home,index:item.index,
+        mesh:item.mesh,home:item.home,index:item.index,poseOrder,
         velocity,spin:spinBase+(item.index-(items.length-1)/2)*.012,
         speed:velocity.length(),start:now+item.index*10,lastAt:now+item.index*10,
         startY:item.mesh.position.y,duration:1050+Math.round(Math.min(1,speed/.5)*260)+item.index*25,done:false
@@ -1837,7 +1839,7 @@ export function createTable3DRenderer({onFatal}={}){
     items.forEach(item=>{
       if(!item.mesh||!item.home)return;
       if(!item.mesh.userData?.persistLocalPose){restoreManipulatedMesh(item.mesh,item.home,d,{index:item.index});return}
-      const from=meshTransform(item.mesh),pose=saveLocalPose(item.mesh,item.home);if(!pose)return;
+      const from=meshTransform(item.mesh),poseOrder=d.stackMode?localPoses.get(item.mesh.userData?.localPoseKey)?.order:null,pose=saveLocalPose(item.mesh,item.home,{order:poseOrder});if(!pose)return;
       manipAnimations.push({
         mesh:item.mesh,from:from.position,
         control:from.position.clone().lerp(pose.position,.5).add(new THREE.Vector3(0,.10+item.index*.012,0)),
