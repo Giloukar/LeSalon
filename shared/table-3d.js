@@ -1741,6 +1741,9 @@ export function createTable3DRenderer({onFatal}={}){
       const radius=d.pointerType==='touch'||matchMedia('(pointer: coarse)').matches?2.15:1.8;
       d.battleToCenter=Math.hypot(d.mesh.position.x,d.mesh.position.z)<=radius;
       showDropMarkerAt(0,0,d.battleToCenter);
+    }else if(d.kind==='trick-collect'&&current?.gameId==='plis'){
+      d.trickToHand=d.mesh.position.z>=1.42&&Math.abs(d.mesh.position.x)<=4.45;
+      showDropMarkerAt(Math.max(-2.8,Math.min(2.8,d.mesh.position.x)),2.20,d.trickToHand);
     }
     draw();e.preventDefault();return true;
   }
@@ -1837,11 +1840,16 @@ export function createTable3DRenderer({onFatal}={}){
         if(current?.interactions?.specialCard?.('battle'))return;
         pendingBattleOrigin=null;
       }
+      if(d.kind==='trick-collect'&&d.trickToHand){
+        rememberTrickCollectOrigins(d);
+        if(current?.interactions?.cardAction?.('collect'))return;
+      }
       if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d);return
     }
     if(d.loose&&(!d.tapEnabled||!current?.canInteract)){returnManipulatedCard(d,{snap:true});return}
     if(d.kind==='loose-card'){returnManipulatedCard(d,{snap:true});return}
     if(d.kind==='card-select'){current?.interactions?.cardSelect?.(d.cardId);return}
+    if(d.kind==='trick-collect'){if(tap)current?.interactions?.cardAction?.('collect');return}
     if(d.kind==='special-select'){current?.interactions?.specialCard?.('select',d.cardId);return}
     if(d.kind==='maid-pick'){if(tap){pendingMaidPickOrigin={position:d.mesh.position.clone(),rotation:d.mesh.rotation.z,scale:d.mesh.scale.clone(),index:d.index};if(!current?.interactions?.specialCard?.('pick',d.index))pendingMaidPickOrigin=null}return}
     if(d.kind==='special-select'){if(tap)current?.interactions?.specialCard?.('select',d.cardId);return}
