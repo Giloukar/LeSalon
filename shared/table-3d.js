@@ -682,7 +682,7 @@ export function createTable3DRenderer({onFatal}={}){
       const drag=Math.pow(.925,dt),spinDrag=Math.pow(.91,dt);
       a.velocity.multiplyScalar(drag);a.spin*=spinDrag;
       a.mesh.position.x+=a.velocity.x*dt;a.mesh.position.z+=a.velocity.z*dt;
-      const floorY=TABLE_Y+.12;
+      const floorY=Number(a.mesh.userData?.localPoseFloorY??TABLE_Y+.12);
       const ageY=Math.max(0,now-a.start),settle=Math.min(1,ageY/230),settleEase=1-Math.pow(1-settle,3);
       a.mesh.position.y=THREE.MathUtils.lerp(a.startY??floorY,floorY,settleEase)+Math.sin(Math.min(1,ageY/300)*Math.PI)*Math.min(.28,.06+a.speed*.09);
       a.mesh.rotation.x=-Math.PI/2+clampMotion(-a.velocity.z*.055,-.16,.16);
@@ -695,8 +695,11 @@ export function createTable3DRenderer({onFatal}={}){
       else if(a.mesh.position.z<-zLimit){a.mesh.position.z=-zLimit;a.velocity.z=Math.abs(a.velocity.z)*.54;a.spin+=.010}
       const speed=a.velocity.length(),age=now-a.start;
       if((speed<.012&&age>260)||age>a.duration){
-        a.done=true;a.mesh.position.y=floorY;a.mesh.rotation.x=-Math.PI/2;a.mesh.rotation.y=0;
-        restoreManipulatedMesh(a.mesh,a.home,{velocityX:0,velocityY:0},{index:a.index||0});running=true;
+        a.done=true;a.mesh.position.y=floorY;a.mesh.rotation.x=-Math.PI/2;a.mesh.rotation.y=0;a.mesh.scale.copy(a.home.scale);
+        if(a.mesh.userData?.persistLocalPose){
+          const pose=saveLocalPose(a.mesh,a.home);if(pose){a.mesh.position.copy(pose.position);a.mesh.rotation.copy(pose.rotation);a.mesh.scale.copy(pose.scale)}
+        }else restoreManipulatedMesh(a.mesh,a.home,{velocityX:0,velocityY:0},{index:a.index||0});
+        running=true;
       }else running=true;
     }
     if(tossAnimations.some(a=>a.done))tossAnimations=tossAnimations.filter(a=>!a.done);
@@ -1795,6 +1798,24 @@ export function createTable3DRenderer({onFatal}={}){
     }
     startMotion();return true;
   }
+  function settlePersistentPlacement(d){
+    const items=[{mesh:d?.mesh,home:d?.home,index:0},...(d?.companions||[]).map((c,i)=>({mesh:c.mesh,home:c.home,index:i+1}))];
+    if(!items.some(item=>item.mesh?.userData?.persistLocalPose))return false;
+    const now=performance.now();
+    items.forEach(item=>{
+      if(!item.mesh||!item.home)return;
+      if(!item.mesh.userData?.persistLocalPose){restoreManipulatedMesh(item.mesh,item.home,d,{index:item.index});return}
+      const from=meshTransform(item.mesh),pose=saveLocalPose(item.mesh,item.home);if(!pose)return;
+      manipAnimations.push({
+        mesh:item.mesh,from:from.position,
+        control:from.position.clone().lerp(pose.position,.5).add(new THREE.Vector3(0,.10+item.index*.012,0)),
+        to:pose.position.clone(),fromRot:from.rotation,toRot:pose.rotation.clone(),
+        fromScale:from.scale,toScale:pose.scale.clone(),
+        start:now+item.index*12,duration:185+item.index*10,done:false
+      });
+    });
+    startMotion();return true;
+  }
   function beginLooseCardDrag(obj,e,kind){
     const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()},gestureEnabled=!!(current?.canInteract&&LIVE_CARD_GAMES.has(current?.gameId)&&(['card-select','special-select'].includes(kind)||kind==='cactus-quick')),companions=groupedDragCompanions(obj,kind);
     stopTossForMesh(obj);companions.forEach(c=>stopTossForMesh(c.mesh));
@@ -1943,6 +1964,7 @@ export function createTable3DRenderer({onFatal}={}){
       }
       if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);
       if(startFreeToss(d))return;
+      if(settlePersistentPlacement(d))return;
       returnManipulatedCard(d);return
     }
     if(d.loose&&(!d.tapEnabled||!current?.canInteract)){returnManipulatedCard(d,{snap:true});return}
@@ -1998,6 +2020,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.canPlay&&(!d.moved||near)){emitLocalCardGesture('commit',1,0);current?.interactions?.playCard?.(d.cardId);return}
     if(d.canPlay)emitLocalCardGesture('cancel',0,0);
     if(startFreeToss(d))return;
+    if(settlePersistentPlacement(d))return;
     returnManipulatedCard(d);
   }
   function cancelActiveDrag(pointerId=null){
