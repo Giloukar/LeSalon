@@ -312,7 +312,7 @@ test('Eight 3D staging keeps opponent motion presentation-only',async()=>{
 
 test('Rummikub dense 3D layout and shared card motion remain presentation-only',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
- assert.match(source,/maxLen>=10\?2/);
+ assert.match(source,/function rummiPackRows\(active,width=9\.35,gap=\.18\)/);
  assert.match(source,/total<=10\?1:total<=20\?2:3/);
  assert.match(source,/lastCardFamilySnapshots=new Map\(\)/);
  assert.match(source,/queueCardFlight\(/);
