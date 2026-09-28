@@ -170,7 +170,7 @@ test('Three.js hardening adapts mobile quality, motion and reusable geometry',as
  assert.match(source,/ninety-action/);
  assert.match(source,/blackjack-action/);
  assert.match(source,/card-action/);
- assert.match(source,/salon:table-3d-window/);
+ assert.match(html,/salon:table-3d-window/);
  assert.match(source,/function applyCameraFit\(\)/);
  assert.match(source,/portraitBoost=aspect<\.82\?Math\.min\(1\.95,\.82\/aspect\):1/);
  assert.match(source,/camera\.fov=aspect<\.62\?42:aspect<\.82\?40:aspect<\.95\?39:aspect>1\.8\?37:39/);
