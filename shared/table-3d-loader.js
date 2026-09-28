@@ -16,10 +16,13 @@ view.register('3d',{
   available(){return webglAvailable()&&supportedHere()},
   async prepare(){
     if(!webglAvailable())throw new Error('WebGL indisponible');
-    modulePromise??=import(new URL('./table-3d.js?v=46',SRC).href);
+    modulePromise??=import(new URL('./table-3d.js?v=50',SRC).href);
     const mod=await modulePromise;
     renderer??=mod.createTable3DRenderer({
-      onFatal(error){view.fallback('webgl-failed',error)}
+      onFatal(error){
+        const failed=renderer;view.fallback('webgl-failed',error);
+        queueMicrotask(()=>{if(renderer===failed){try{failed?.destroy?.()}catch(_){}renderer=null}});
+      }
     });
     return renderer;
   },

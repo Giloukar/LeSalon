@@ -12,15 +12,19 @@ const visualHash=str=>{
   return (h>>>0)/4294967295;
 };
 const motionAllowed=()=>document.documentElement.dataset.motion!=='off'&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
-const targetPixelRatio=()=>{
-  const dpr=Math.max(1,Number(globalThis.devicePixelRatio)||1),coarse=matchMedia('(pointer: coarse)').matches,memory=Number(globalThis.navigator?.deviceMemory||8);
-  return Math.min(dpr,(coarse||memory<=4)?1.5:2);
-};
+function device3DProfile(){
+  const dpr=Math.max(1,Number(globalThis.devicePixelRatio)||1),coarse=matchMedia('(pointer: coarse)').matches,memory=Number(globalThis.navigator?.deviceMemory||8),constrained=coarse||memory<=4;
+  const pixelCap=constrained?1.25:memory<=6?1.5:2,textureScale=constrained?.62:memory<=6?.8:1;
+  return{coarse,memory,constrained,pixelRatio:Math.min(dpr,pixelCap),textureScale,shadowSize:constrained?512:1024};
+}
+const targetPixelRatio=()=>device3DProfile().pixelRatio;
 
 function canvasTexture(draw,w=512,h=720){
-  const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
-  const ctx=canvas.getContext('2d');draw(ctx,w,h);
-  const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=4;
+  const profile=device3DProfile(),scale=profile.textureScale,canvas=document.createElement('canvas');
+  canvas.width=Math.max(64,Math.round(w*scale));canvas.height=Math.max(64,Math.round(h*scale));
+  const ctx=canvas.getContext('2d');if(scale!==1)ctx.scale(scale,scale);draw(ctx,w,h);
+  const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=profile.constrained?2:4;
+  if(profile.constrained){tex.generateMipmaps=false;tex.minFilter=THREE.LinearFilter;tex.magFilter=THREE.LinearFilter}
   return tex;
 }
 function roundRect(ctx,x,y,w,h,r){
@@ -220,6 +224,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function init(){
     if(renderer)return;
+    const profile=device3DProfile();
     renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
     renderer.setPixelRatio(targetPixelRatio());
     renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -231,7 +236,7 @@ export function createTable3DRenderer({onFatal}={}){
     camera=new THREE.PerspectiveCamera(39,1,.1,60);setCameraPose(0,7.25,9.25,0,.25,.2);
 
     const hemi=new THREE.HemisphereLight(0xe9f3e7,0x162019,1.42);scene.add(hemi);
-    const key=new THREE.DirectionalLight(0xfff5df,2.05);key.position.set(-3,8,5);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-8;key.shadow.camera.right=8;key.shadow.camera.top=7;key.shadow.camera.bottom=-7;scene.add(key);
+    const key=new THREE.DirectionalLight(0xfff5df,2.05);key.position.set(-3,8,5);key.castShadow=true;key.shadow.mapSize.set(profile.shadowSize,profile.shadowSize);key.shadow.camera.left=-8;key.shadow.camera.right=8;key.shadow.camera.top=7;key.shadow.camera.bottom=-7;scene.add(key);
     const rim=new THREE.DirectionalLight(0xb8d8c5,1.0);rim.position.set(6,3,-5);scene.add(rim);
     const farFill=new THREE.DirectionalLight(0xe3f0df,1.25);farFill.position.set(0,6,-7);scene.add(farFill);
     const farGlow=new THREE.PointLight(0xbfd9c8,.62,18);farGlow.position.set(0,4,-4.2);scene.add(farGlow);
@@ -265,7 +270,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(!host?.isConnected){
       host=document.createElement('section');host.className='table-3d-host';host.setAttribute('aria-label','Vue 3D de la table');
       host.innerHTML='<div class="table-3d-window-controls" aria-label="Affichage 3D"><button type="button" class="table-3d-window-button table-3d-reset" data-table-3d-reset-poses hidden aria-label="Ranger mes objets selon la disposition du jeu" title="Ranger mes objets · local uniquement">↺</button><button type="button" class="table-3d-window-button table-3d-camera-reset" data-table-3d-reset-camera hidden aria-label="Recentrer la caméra 3D" title="Recentrer la caméra">◎</button><button type="button" class="table-3d-window-button table-3d-minimize" data-table-3d-window="embedded" aria-label="Réduire la vue 3D dans la page" title="Réduire la vue 3D">↙</button><button type="button" class="table-3d-window-button table-3d-expand" data-table-3d-window="full" aria-label="Agrandir la vue 3D" title="Plein écran">⛶</button><button type="button" class="table-3d-window-button table-3d-close" data-table-view-mode="2d" aria-label="Revenir à la vue 2D" title="Revenir à la vue 2D">×</button></div><div class="table-3d-hud"><span class="table-3d-accent" data-table-3d-title>VUE 3D</span><span data-table-3d-status>Table synchronisée</span></div><div class="table-3d-help" data-table-3d-help>Glissez le tapis pour tourner la vue · molette sur le tapis pour zoomer</div>';
-      host.querySelectorAll('[data-table-3d-window]').forEach(button=>button.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.dispatchEvent(new CustomEvent('salon:table-3d-window',{detail:{mode:button.dataset.table3dWindow}}))}));
+      host.querySelectorAll('[data-table-3d-window]').forEach(button=>button.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.dispatchEvent(new CustomEvent('salon:table-3d-window',{detail:{mode:button.getAttribute('data-table-3d-window')}}))}));
       host.querySelector('[data-table-3d-reset-poses]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();resetActiveLocalPoses()});
       host.querySelector('[data-table-3d-reset-camera]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();resetCameraView()});
       const banner=column.querySelector('.turn-banner');banner?.after(host);if(!banner)column.prepend(host);
@@ -280,14 +285,14 @@ export function createTable3DRenderer({onFatal}={}){
     renderer.setPixelRatio(targetPixelRatio());
     renderer.setSize(w,h,false);camera.aspect=aspect;applyCameraFit();draw();
   }
+  function disposeTemporaryTree(child){
+    child?.traverse?.(o=>{o.userData?.temporaryGeometry?.dispose?.();o.userData?.temporaryMaterial?.dispose?.();o.userData?.temporaryTexture?.dispose?.()});
+  }
   function clearObjects(){
     interactive.length=0;diceAnimations.length=0;pawnAnimations.length=0;cardAnimations.length=0;manipAnimations.length=0;tossAnimations.length=0;
     if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
-    for(const child of [...objects.children]){
-      objects.remove(child);
-      child.traverse?.(o=>{o.userData?.temporaryGeometry?.dispose?.();o.userData?.temporaryMaterial?.dispose?.();o.userData?.temporaryTexture?.dispose?.()});
-    }
-    for(const child of [...cardFx.children])cardFx.remove(child);
+    for(const child of [...objects.children]){objects.remove(child);disposeTemporaryTree(child)}
+    for(const child of [...cardFx.children]){cardFx.remove(child);disposeTemporaryTree(child)}
     remoteCardGestures.clear();
   }
   function placeCard(mesh,x,z,y=TABLE_Y+.07,rot=0,scale=1){

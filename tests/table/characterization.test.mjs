@@ -31,6 +31,8 @@ test('returning to 2D cancels a late asynchronous 3D activation',async()=>{const
 
 test('mobile-style pointers avoid native fullscreen and keep CSS fullscreen available',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','solo');const r=await t.page.evaluate(()=>{const original=window.matchMedia;window.matchMedia=query=>query==='(pointer: fine)'?{matches:false,addEventListener(){},removeEventListener(){}}:original(query);const safe=table3dNativeFullscreenSafe();table3dSetPresentation('full');const presentation=document.documentElement.dataset.table3dPresentation;window.matchMedia=original;table3dSetPresentation(null);return{safe,presentation};});assert.equal(r.safe,false);assert.equal(r.presentation,'full');}finally{await browser.close();}});
 
+test('embedded 3D window mode leaves CSS fullscreen immediately',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','solo');const r=await t.page.evaluate(async()=>{SalonTableView.register('3d',{available:()=>true,activate(){},deactivate(){},render(){}});await SalonTableView.setMode('3d',{persistPreference:false});table3dSetPresentation('full');await table3dApplyWindowMode('embedded');return{mode:SalonTableView.getMode(),presentation:document.documentElement.dataset.table3dPresentation};});assert.equal(r.mode,'3d');assert.equal(r.presentation,'embedded');}finally{await browser.close();}});
+
 test('game over leaves fullscreen 3D before opening the finale',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','solo');const r=await t.page.evaluate(async()=>{SalonTableView.register('3d',{available:()=>true,activate(){},deactivate(){document.documentElement.dataset.test3dDeactivated='yes'},render(){}});await SalonTableView.setMode('3d',{persistPreference:false});table3dSetPresentation('full');S.phase='over';S.winners=[0];S.finishedAt=123456;renderGame(false);celebrate();const dialog=document.querySelector('#finale-dialog');const out={mode:SalonTableView.getMode(),dataset:document.documentElement.dataset.tableView,presentation:document.documentElement.hasAttribute('data-table3d-presentation'),deactivated:document.documentElement.dataset.test3dDeactivated,dialogOpen:!!dialog?.open,hasWin:!!document.querySelector('.win-box')};if(dialog?.open)dialog.close();dialog?.remove();return out;});assert.equal(r.mode,'2d');assert.equal(r.dataset,'2d');assert.equal(r.presentation,false);assert.equal(r.deactivated,'yes');assert.equal(r.dialogOpen,true);assert.equal(r.hasWin,true);}finally{await browser.close();}});
 
 
@@ -151,6 +153,8 @@ test('dense Rummikub layout packs by real group width and shares cells with drop
 test('Three.js hardening adapts mobile quality, motion and reusable geometry',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  const css=await readFile(path.join(root,'shared/table-3d.css'),'utf8');
+ const html=await readFile(path.join(root,'jeux.html'),'utf8');
+ const loader=await readFile(path.join(root,'shared/table-3d-loader.js'),'utf8');
  assert.match(source,/dataset\.motion!=='off'/);
  assert.doesNotMatch(source,/const motionAllowed=.*&&motionAllowed\(\)/);
  assert.match(source,/prefers-reduced-motion: reduce/);
@@ -167,12 +171,16 @@ test('Three.js hardening adapts mobile quality, motion and reusable geometry',as
  assert.match(source,/ninety-action/);
  assert.match(source,/blackjack-action/);
  assert.match(source,/card-action/);
- assert.match(source,/salon:table-3d-window/);
+ assert.match(html,/salon:table-3d-window/);
  assert.match(source,/function applyCameraFit\(\)/);
  assert.match(source,/portraitBoost=aspect<\.82\?Math\.min\(1\.95,\.82\/aspect\):1/);
  assert.match(source,/camera\.fov=aspect<\.62\?42:aspect<\.82\?40:aspect<\.95\?39:aspect>1\.8\?37:39/);
  assert.equal((source.match(/setCameraPose\(/g)||[]).length>=18,true);
- assert.match(source,/memory<=4\)\?1\.5:2/);
+ assert.match(source,/function device3DProfile\(\)/);
+ assert.match(source,/pixelCap=constrained\?1\.25:memory<=6\?1\.5:2/);
+ assert.match(source,/textureScale=constrained\?\.62:memory<=6\?\.8:1/);
+ assert.match(source,/generateMipmaps=false/);
+ assert.match(source,/profile\.shadowSize/);
  assert.equal((source.match(/new THREE\.BoxGeometry\(\.62,\.9,\.085\)/g)||[]).length,1);
  assert.equal((source.match(/new THREE\.BoxGeometry\(1\.28,\.16,\.88\)/g)||[]).length,1);
  assert.match(source,/lostpointercapture/);
@@ -200,6 +208,14 @@ test('Three.js hardening adapts mobile quality, motion and reusable geometry',as
  assert.match(css,/height:100dvh/);
  assert.match(css,/\.table-3d-window-controls/);
  assert.match(css,/#game-actions\{position:fixed/);
+ assert.match(html,/\.game-layout \.hand\{--cardw:clamp\(52px,9dvh,78px\)/);
+ assert.match(html,/\.game-layout \.playing-card \.corner\{font-size:clamp\(16px,calc\(var\(--cardw\)\*\.27\),21px\)/);
+ assert.match(html,/async function table3dApplyWindowMode\(target\)/);
+ assert.match(html,/table3dRefreshLayout/);
+ assert.match(loader,/const failed=renderer;view\.fallback\('webgl-failed',error\)/);
+ assert.match(loader,/renderer=null/);
+ assert.match(source,/button\.getAttribute\('data-table-3d-window'\)/);
+ assert.match(source,/salon:table-3d-window/);
 });
 
 
