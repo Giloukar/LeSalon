@@ -83,7 +83,7 @@ export function createTable3DRenderer({onFatal}={}){
   let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='';
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
-  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
+  let objects=new THREE.Group(),cardFx=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,pendingMaidPickOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map();
 
   function applyCameraFit(){
     if(!camera||!cameraPose)return;
@@ -299,8 +299,9 @@ export function createTable3DRenderer({onFatal}={}){
       base.backCount=Number(center.backCount)||0;base.centerIds=(center.cards||[]).map(c=>c?.id).filter(Boolean);
     }else if(game==='suites')base.centerIds=Object.values(center.lanes||{}).flat().map(c=>c?.id).filter(Boolean);
     else if(game==='plis'){
-      base.centerIds=(center.entries||[]).map(e=>e?.card?.id).filter(Boolean);
-      base.entries=(center.entries||[]).map(e=>({owner:e.owner,card:visualCardSnapshot(e.card)})).filter(e=>e.card);
+      const physicalEntries=Array.isArray(state?.trickCards)&&state.trickCards.length?(center.entries||[]):(['trickResult','over'].includes(String(state?.phase||''))?(center.entries||[]):[]);
+      base.centerIds=physicalEntries.map(e=>e?.card?.id).filter(Boolean);
+      base.entries=physicalEntries.map(e=>({owner:e.owner,card:visualCardSnapshot(e.card)})).filter(e=>e.card);
       base.dealNumber=Number(center.dealNumber)||0;base.completedTricks=Number(center.completedTricks)||0;
     }else if(game==='encheres'){
       base.bidIds=(center.bids||[]).map(c=>c?.id||null);base.bidCards=(center.bids||[]).map(visualCardSnapshot);
@@ -352,9 +353,8 @@ export function createTable3DRenderer({onFatal}={}){
     if(game==='plis'&&previous.phase==='trickResult'&&currentSnapshot.phase==='play'&&previous.entries?.length){
       const target=cardFamilyOrigin(previous.turn,viewer,opponentVisuals);
       previous.entries.forEach((entry,i)=>{
-        const visual=centerVisuals.get(entry.card.id),count=previous.entries.length,a=(Math.PI*2*i/Math.max(1,count))-Math.PI/2;
-        const from=visual?.position?.clone?.()||new THREE.Vector3(Math.cos(a)*1.45,TABLE_Y+.26,Math.sin(a)*1.1);
-        if(visual?.mesh)visual.mesh.visible=false;
+        const count=previous.entries.length,a=(Math.PI*2*i/Math.max(1,count))-Math.PI/2;
+        const from=new THREE.Vector3(Math.cos(a)*1.45,TABLE_Y+.26,Math.sin(a)*1.1);
         const mesh=cardMesh(entry.card,{back:!!entry.card.hidden});
         queueCardFlight(mesh,from,target.clone().add(new THREE.Vector3((i-(count-1)/2)*.08,0,0)),{duration:500+i*35,delay:i*45,lift:.66,fromRot:i*.06,toRot:0,bank:.13,roll:(i%2?-.10:.10)});
       });
@@ -446,6 +446,24 @@ export function createTable3DRenderer({onFatal}={}){
       viewer,turn:Number(s?.turn??0),deckCount:Math.max(0,Number(ninety?.deckCount)||0),
       lastId:ninety?.last?.id||null,last:visualCardSnapshot(ninety?.last),
       ownIds:(own||[]).map(c=>c?.id).filter(Boolean),handCounts:players.map(p=>p?.hand?.length||0)
+    };
+  }
+  function maidSnapshot(payload,maid,own){
+    const s=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0;
+    return{
+      key:[s?.startedAt||'',viewer,(s?.players||[]).map(p=>p?.name||'').join('|')].join('~'),
+      viewer,turn:Number(s?.turn??0),target:Number(maid?.target??-1),targetCount:Number(maid?.targetCount||0),
+      discardCount:Array.isArray(s?.discard)?s.discard.length:0,
+      ownIds:(own||[]).map(c=>c?.id).filter(Boolean)
+    };
+  }
+  function blackjackSnapshot(payload,bj){
+    const s=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0;
+    return{
+      key:[s?.startedAt||'',viewer,Number(s?.round||0)].join('~'),
+      viewer,phase:String(bj?.phase||s?.phase||''),turn:Number(s?.turn??0),deckCount:Math.max(0,Number(bj?.deckCount)||0),
+      hand:(bj?.hand||[]).map(visualCardSnapshot).filter(Boolean),
+      dealer:(bj?.dealer||[]).map(visualCardSnapshot).filter(Boolean)
     };
   }
   function queueCardFlight(mesh,from,to,{duration=620,delay=0,lift=.8,onDone=null,fromRot=0,toRot=0,bank=.10,roll=.08,fromScale=null,toScale=null}={}){
@@ -692,16 +710,53 @@ export function createTable3DRenderer({onFatal}={}){
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
 
     if(game==='pouilleux'){
-      const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length;
-      own.forEach((card,i)=>{const slot=handCardSlot(n,i),mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,slot.x,slot.z,TABLE_Y+.11+slot.yOffset,slot.fan,slot.scale);makeLooseManipulable(mesh,{kind:'loose-card'})});
+      const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,ownVisuals=new Map();
+      own.forEach((card,i)=>{
+        const slot=handCardSlot(n,i),mesh=cardMesh(card,{back:!!card.hidden});
+        placeCard(mesh,slot.x,slot.z,TABLE_Y+.11+slot.yOffset,slot.fan,slot.scale);makeLooseManipulable(mesh,{kind:'loose-card'});
+        if(card?.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
+      });
       const maid=data.maid||{},count=Number(maid.targetCount)||0,visible=Math.min(24,count);
       for(let i=0;i<visible;i++){
         const slot=pickCardSlot(visible,i),mesh=cardMesh(null,{back:true});placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.rot,slot.scale);
         if(payload.canInteract){mesh.userData.home={position:mesh.position.clone(),rotation:mesh.rotation.clone(),scale:mesh.scale.clone()};makeLooseManipulable(mesh,{kind:'maid-pick',tapEnabled:true,index:i})}
       }
+
+      const discard=(s.discard||[]),discardVisuals=[],discardPos=new THREE.Vector3(3.55,TABLE_Y+.23,.25);
+      discard.slice(-4).forEach((card,i,arr)=>{
+        const mesh=cardMesh(card,{back:!!card?.hidden});placeCard(mesh,discardPos.x+i*.035,discardPos.z-i*.025,TABLE_Y+.10+i*.022,.06*(i-(arr.length-1)/2),.66);
+        discardVisuals.push({mesh,card,position:mesh.position.clone()});
+      });
+      if(discard.length){
+        const pileLabel=makeLabel('PAIRES · '+Math.floor(discard.length/2),'#e6d7b4');pileLabel.position.set(discardPos.x,1.0,discardPos.z-.72);pileLabel.scale.set(2.0,.44,1);objects.add(pileLabel);
+      }
+
+      const snapshot=maidSnapshot(payload,maid,own),previous=lastMaidSnapshot;
+      if(previous&&previous.key===snapshot.key&&motionAllowed()&&pendingMaidPickOrigin){
+        const added=(snapshot.ownIds||[]).find(id=>!(previous.ownIds||[]).includes(id)),pairMade=snapshot.discardCount>=previous.discardCount+2;
+        const from=pendingMaidPickOrigin.position?.clone?.()||new THREE.Vector3(0,TABLE_Y+.28,-.2);
+        if(added){
+          const visual=ownVisuals.get(added);
+          if(visual){
+            visual.mesh.visible=false;
+            queueCardFlight(cardMesh(null,{back:true}),from,visual.position,{duration:480,lift:.66,fromRot:pendingMaidPickOrigin.rotation||0,toRot:visual.rotation,bank:.13,roll:.10,fromScale:pendingMaidPickOrigin.scale||null,toScale:visual.scale,onDone:()=>{visual.mesh.visible=true}});
+          }
+        }else if(pairMade){
+          const handTarget=new THREE.Vector3(0,TABLE_Y+.28,2.18);
+          queueCardFlight(cardMesh(null,{back:true}),from,handTarget,{duration:390,lift:.56,fromRot:pendingMaidPickOrigin.rotation||0,toRot:0,bank:.12,roll:-.10,fromScale:pendingMaidPickOrigin.scale||null,toScale:new THREE.Vector3(.72,.72,.72)});
+          const pair=discard.slice(-2),finals=discardVisuals.slice(-2);
+          pair.forEach((card,i)=>{
+            if(finals[i]?.mesh)finals[i].mesh.visible=false;
+            queueCardFlight(cardMesh(card,{back:!!card?.hidden}),handTarget,finals[i]?.position||discardPos.clone().add(new THREE.Vector3(i*.05,0,-i*.03)),{duration:450+i*35,delay:390+i*70,lift:.52,fromRot:(i-.5)*.04,toRot:.04*(i-.5),bank:.10,roll:(i?-.08:.08),fromScale:new THREE.Vector3(.72,.72,.72),toScale:new THREE.Vector3(.66,.66,.66),onDone:()=>{if(finals[i]?.mesh)finals[i].mesh.visible=true}});
+          });
+        }
+        pendingMaidPickOrigin=null;
+      }
+      lastMaidSnapshot=snapshot;
+
       if(title)title.textContent='VUE 3D · POUILLEUX';
       if(status)status.textContent='Piochez chez '+(maid.targetName||'le joueur suivant')+' · '+count+' carte'+(count>1?'s':'');
-      if(help)help.textContent=payload.canInteract?'Touchez un dos de carte au centre · la paire éventuelle sera retirée par le moteur':(maid.pairs||0)+' paire'+((maid.pairs||0)>1?'s':'')+' déjà formée'+((maid.pairs||0)>1?'s':'');
+      if(help)help.textContent=payload.canInteract?'Touchez une carte ou glissez-la jusqu’à votre main · une paire part ensuite physiquement à la défausse':(maid.pairs||0)+' paire'+((maid.pairs||0)>1?'s':'')+' déjà formée'+((maid.pairs||0)>1?'s':'');
       return;
     }
 
@@ -780,10 +835,64 @@ export function createTable3DRenderer({onFatal}={}){
     }
 
     if(game==='vingtetun'){
-      const bj=data.blackjack||{},dealer=bj.dealer||[],own=bj.hand||[];
-      dealer.forEach((card,i)=>{const mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,(i-(dealer.length-1)/2)*.82,-.9,TABLE_Y+.13+i*.012,(i-(dealer.length-1)/2)*.04,.78)});
+      const bj=data.blackjack||{},dealer=bj.dealer||[],own=bj.hand||[],shoePos=new THREE.Vector3(-3.75,TABLE_Y+.24,-.55),ownVisuals=new Map(),dealerVisuals=[];
+      const deckCount=Math.max(0,Number(bj.deckCount)||0),shoeVisible=Math.min(5,Math.max(1,deckCount));
+      for(let i=0;i<shoeVisible;i++){
+        const mesh=cardMesh(null,{back:true});placeCard(mesh,shoePos.x+i*.018,shoePos.z-i*.018,TABLE_Y+.07+i*.025,-.045+i*.012,.70);
+      }
+      const shoeLabel=makeLabel('SABOT · '+deckCount,'#d8ded9');shoeLabel.position.set(shoePos.x,1.0,shoePos.z-.72);shoeLabel.scale.set(2.0,.44,1);objects.add(shoeLabel);
+
+      dealer.forEach((card,i)=>{
+        const x=(i-(dealer.length-1)/2)*.82,z=-.9,mesh=cardMesh(card,{back:!!card.hidden});
+        placeCard(mesh,x,z,TABLE_Y+.13+i*.012,(i-(dealer.length-1)/2)*.04,.78);
+        dealerVisuals.push({mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
+      });
       const dn=own.length;
-      own.forEach((card,i)=>{const slot=handCardSlot(dn,i),mesh=cardMesh(card,{back:!!card.hidden});placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.fan,slot.scale*.92);makeLooseManipulable(mesh,{kind:'loose-card'})});
+      own.forEach((card,i)=>{
+        const slot=handCardSlot(dn,i),mesh=cardMesh(card,{back:!!card.hidden});
+        placeCard(mesh,slot.x,slot.z,TABLE_Y+.13+slot.yOffset,slot.fan,slot.scale*.92);makeLooseManipulable(mesh,{kind:'loose-card'});
+        if(card?.id)ownVisuals.set(card.id,{mesh,card,position:mesh.position.clone(),rotation:mesh.rotation.z,scale:mesh.scale.clone()});
+      });
+
+      const snapshot=blackjackSnapshot(payload,bj),previous=lastBlackjackSnapshot;
+      if(previous&&previous.key===snapshot.key&&motionAllowed()){
+        const previousOwn=previous.hand||[],previousDealer=previous.dealer||[],newOwn=snapshot.hand.filter(c=>!previousOwn.some(p=>p.id===c.id));
+        own.forEach((card,i)=>{
+          const visual=ownVisuals.get(card?.id);if(!visual)return;
+          const prevIndex=previousOwn.findIndex(p=>p.id===card.id);
+          if(prevIndex>=0&&previousOwn.length!==own.length){
+            const before=handCardSlot(previousOwn.length,prevIndex),from=new THREE.Vector3(before.x,TABLE_Y+.25+before.yOffset,before.z);
+            if(from.distanceTo(visual.position)>.08){
+              visual.mesh.visible=false;
+              queueCardFlight(cardMesh(card,{back:!!card.hidden}),from,visual.position,{duration:330,delay:25*i,lift:.18,fromRot:before.fan,toRot:visual.rotation,bank:.04,roll:(i%2?-.04:.04),fromScale:new THREE.Vector3(before.scale*.92,before.scale*.92,before.scale*.92),toScale:visual.scale,onDone:()=>{visual.mesh.visible=true}});
+            }
+          }
+        });
+        newOwn.forEach((card,q)=>{
+          const visual=ownVisuals.get(card.id);if(!visual)return;visual.mesh.visible=false;
+          queueCardFlight(cardMesh(card,{back:!!card.hidden}),shoePos,visual.position,{duration:520+q*35,delay:q*145,lift:.72,fromRot:-.04,toRot:visual.rotation,bank:.14,roll:(q%2?-.10:.10),fromScale:new THREE.Vector3(.70,.70,.70),toScale:visual.scale,onDone:()=>{visual.mesh.visible=true}});
+        });
+
+        dealer.forEach((card,i)=>{
+          const visual=dealerVisuals[i],prev=previousDealer[i],isNew=i>=previousDealer.length;
+          if(!visual)return;
+          if(isNew){
+            visual.mesh.visible=false;
+            queueCardFlight(cardMesh(card?.hidden?null:card,{back:!!card?.hidden}),shoePos,visual.position,{duration:520+i*35,delay:70+i*145,lift:.76,fromRot:-.04,toRot:visual.rotation,bank:.14,roll:(i%2?-.11:.11),fromScale:new THREE.Vector3(.70,.70,.70),toScale:visual.scale,onDone:()=>{visual.mesh.visible=true}});
+          }else if(prev?.hidden&&!card?.hidden){
+            visual.mesh.visible=false;
+            queueCardFlight(cardMesh(null,{back:true}),visual.position,visual.position,{duration:500,delay:40,lift:.24,fromRot:visual.rotation,toRot:visual.rotation,bank:.04,roll:Math.PI,fromScale:visual.scale,toScale:visual.scale,onDone:()=>{visual.mesh.visible=true}});
+          }else if(previousDealer.length!==dealer.length){
+            const prevX=(i-(previousDealer.length-1)/2)*.82,from=new THREE.Vector3(prevX,TABLE_Y+.24+i*.012,-.9);
+            if(from.distanceTo(visual.position)>.08){
+              visual.mesh.visible=false;
+              queueCardFlight(cardMesh(card?.hidden?null:card,{back:!!card?.hidden}),from,visual.position,{duration:320,delay:30*i,lift:.16,fromRot:(i-(previousDealer.length-1)/2)*.04,toRot:visual.rotation,bank:.035,roll:(i%2?-.035:.035),fromScale:visual.scale,toScale:visual.scale,onDone:()=>{visual.mesh.visible=true}});
+            }
+          }
+        });
+      }
+      lastBlackjackSnapshot=snapshot;
+
       const dealerLabel=makeLabel('BANQUE · '+(dealer.length?(bj.dealerRevealed?bj.dealerValue:bj.dealerValue+' + ?'):'—'),'#e6d7b4');dealerLabel.position.set(0,1.02,-2.1);dealerLabel.scale.set(3,.62,1);objects.add(dealerLabel);
       if(bj.phase==='bet'){
         const bet=makeLabel('FAITES VOS JEUX','#dbea9e');bet.position.set(0,1.05,-.05);bet.scale.set(3.6,.8,1);objects.add(bet);
@@ -795,7 +904,7 @@ export function createTable3DRenderer({onFatal}={}){
       }
       if(title)title.textContent='VUE 3D · VINGT-ET-UN';
       if(status)status.textContent=bj.phase==='bet'?(bj.chips||0)+' jetons disponibles':own.length?(bj.playerValue||0)+' points · mise '+(bj.bet||0):'La banque distribue';
-      if(help)help.textContent=bj.phase==='bet'?'Choisissez votre mise dans le panneau dessous':bj.phase==='play'?'Tirer, rester ou doubler avec les commandes dessous':'Les cartes de la banque restent masquées jusqu’à la révélation';
+      if(help)help.textContent=bj.phase==='bet'?'Choisissez votre mise · les cartes seront distribuées depuis le sabot':bj.phase==='play'?'Tirer, rester ou doubler · chaque nouvelle carte vient physiquement du sabot':'La banque tire depuis le sabot · sa carte cachée reste masquée jusqu’à la révélation';
       return;
     }
 
@@ -856,8 +965,9 @@ export function createTable3DRenderer({onFatal}={}){
         const label=makeLabel((SUIT_NAME[suit]||suit).toUpperCase(),['H','D'].includes(suit)?'#eab3ad':'#dbea9e');label.scale.set(1.6,.42,1);label.position.set(-4.65,.92,(row-1.5)*1.25);objects.add(label);
       });
     }else if(game==='plis'){
-      (center.entries||[]).forEach((entry,i)=>{
-        const a=(Math.PI*2*i/Math.max(1,center.entries.length))-Math.PI/2,x=Math.cos(a)*1.45,z=Math.sin(a)*1.1,mesh=cardMesh(entry.card,{back:!!entry.card?.hidden});
+      const physicalEntries=Array.isArray(s?.trickCards)&&s.trickCards.length?(center.entries||[]):(['trickResult','over'].includes(String(s?.phase||''))?(center.entries||[]):[]);
+      physicalEntries.forEach((entry,i)=>{
+        const a=(Math.PI*2*i/Math.max(1,physicalEntries.length))-Math.PI/2,x=Math.cos(a)*1.45,z=Math.sin(a)*1.1,mesh=cardMesh(entry.card,{back:!!entry.card?.hidden});
         placeCard(mesh,x,z,TABLE_Y+.16,i*.06,.78);if(entry.card?.id)centerVisuals.set(entry.card.id,{mesh,card:entry.card,position:new THREE.Vector3(x,TABLE_Y+.26,z)});
       });
     }else if(game==='encheres'){
@@ -1524,6 +1634,9 @@ export function createTable3DRenderer({onFatal}={}){
     }else if(d.kind==='rummi-draw'&&current?.gameId==='rummikub'){
       d.drawToRack=d.mesh.position.z>=1.65&&Math.abs(d.mesh.position.x)<=4.55;
       showDropMarkerAt(Math.max(-3.4,Math.min(3.4,d.mesh.position.x)),2.18,d.drawToRack);
+    }else if(d.kind==='maid-pick'&&current?.gameId==='pouilleux'){
+      d.maidToHand=d.mesh.position.z>=1.55&&Math.abs(d.mesh.position.x)<=4.55;
+      showDropMarkerAt(Math.max(-3.35,Math.min(3.35,d.mesh.position.x)),2.18,d.maidToHand);
     }
     draw();e.preventDefault();return true;
   }
@@ -1610,13 +1723,18 @@ export function createTable3DRenderer({onFatal}={}){
       if(d.kind==='rummi-draw'&&d.drawToRack){
         if(current?.interactions?.rummi?.('draw'))return;
       }
+      if(d.kind==='maid-pick'&&d.maidToHand){
+        pendingMaidPickOrigin={position:d.mesh.position.clone(),rotation:d.mesh.rotation.z,scale:d.mesh.scale.clone(),index:d.index};
+        if(current?.interactions?.specialCard?.('pick',d.index))return;
+        pendingMaidPickOrigin=null;
+      }
       if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d);return
     }
     if(d.loose&&(!d.tapEnabled||!current?.canInteract)){returnManipulatedCard(d,{snap:true});return}
     if(d.kind==='loose-card'){returnManipulatedCard(d,{snap:true});return}
     if(d.kind==='card-select'){current?.interactions?.cardSelect?.(d.cardId);return}
     if(d.kind==='special-select'){current?.interactions?.specialCard?.('select',d.cardId);return}
-    if(d.kind==='maid-pick'){if(tap)current?.interactions?.specialCard?.('pick',d.index);return}
+    if(d.kind==='maid-pick'){if(tap){pendingMaidPickOrigin={position:d.mesh.position.clone(),rotation:d.mesh.rotation.z,scale:d.mesh.scale.clone(),index:d.index};if(!current?.interactions?.specialCard?.('pick',d.index))pendingMaidPickOrigin=null}return}
     if(d.kind==='special-select'){if(tap)current?.interactions?.specialCard?.('select',d.cardId);return}
     if(d.kind==='battle-action'){if(tap)current?.interactions?.specialCard?.('battle');return}
     if(d.kind==='cactus-quick'){if(tap)current?.interactions?.cactus?.('quick',d.index);return}

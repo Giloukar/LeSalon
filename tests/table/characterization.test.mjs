@@ -341,6 +341,39 @@ test('grouped 3D drag keeps selected companions presentation-only',async()=>{
  assert.doesNotMatch(source,/restoreManipulatedMesh[^\n]*onlineAct\(/);
 });
 
+test('collected tricks stay in 2D history without reappearing on the physical 3D table',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/const physicalEntries=Array\.isArray\(state\?\.trickCards\)&&state\.trickCards\.length/);
+ assert.match(source,/const physicalEntries=Array\.isArray\(s\?\.trickCards\)&&s\.trickCards\.length/);
+ assert.match(source,/game==='plis'&&previous\.phase==='trickResult'&&currentSnapshot\.phase==='play'/);
+ assert.doesNotMatch(source,/physicalEntries[^\n]*dispatch\(/);
+});
+
+test('Pouilleux 3D draw gesture reuses the authoritative pick interaction',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/function maidSnapshot\(payload,maid,own\)/);
+ assert.match(source,/d\.kind==='maid-pick'&&current\?\.gameId==='pouilleux'/);
+ assert.match(source,/d\.maidToHand=d\.mesh\.position\.z>=1\.55/);
+ assert.match(source,/pendingMaidPickOrigin=\{position:d\.mesh\.position\.clone\(\)/);
+ assert.match(source,/current\?\.interactions\?\.specialCard\?\.\('pick',d\.index\)/);
+ assert.match(source,/pairMade=snapshot\.discardCount>=previous\.discardCount\+2/);
+ assert.doesNotMatch(source,/maidToHand[^\n]*dispatch\(/);
+});
+
+test('blackjack 3D shoe animates only projected cards after authoritative state changes',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ const html=await readFile(path.join(root,'jeux.html'),'utf8');
+ assert.match(source,/function blackjackSnapshot\(payload,bj\)/);
+ assert.match(source,/shoePos=new THREE\.Vector3\(-3\.75,TABLE_Y\+\.24,-\.55\)/);
+ assert.match(source,/newOwn=snapshot\.hand\.filter/);
+ assert.match(source,/prev\?\.hidden&&!card\?\.hidden/);
+ assert.match(source,/queueCardFlight\(cardMesh\(card/);
+ assert.match(html,/deckCount:S\.deck\.length/);
+ assert.doesNotMatch(source,/blackjackSnapshot[^\n]*dispatch\(/);
+});
+
+test('blackjack 3D hit control still goes through the existing engine action',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'vingtetun','online');const r=await t.page.evaluate(async()=>{net.gameId='vingtetun';net.state.phase='play';net.state.turn=0;net.state.players.forEach((p,i)=>{p.status=i===0?'playing':'stand';p.bet=i===0?10:0;p.hand=i===0?[{id:'bj-test-2',rank:2,suit:'S'},{id:'bj-test-3',rank:3,suit:'H'}]:[]});net.state.dealer=[{id:'bj-dealer-10',rank:10,suit:'C'},{id:'bj-dealer-7',rank:7,suit:'D'}];net.state.dealerRevealed=false;net.state.deck=[{id:'bj-test-hit',rank:4,suit:'C'}];S=projectGame(net.state,0);let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const before={hand:net.state.players[0].hand.length,deck:net.state.deck.length,revision:net.revision};const projected={deckCount:seen.viewData.blackjack.deckCount,hidden:seen.viewData.blackjack.dealer[1]?.hidden,hasRank:Object.hasOwn(seen.viewData.blackjack.dealer[1]||{},'rank')};const hit=seen.interactions.specialCard('hit');return{hit,before,projected,after:{hand:net.state.players[0].hand.length,deck:net.state.deck.length,revision:net.revision,last:net.state.players[0].hand.at(-1)?.id}};});assert.equal(r.projected.deckCount,1);assert.equal(r.projected.hidden,true);assert.equal(r.projected.hasRank,false);assert.equal(r.hit,true);assert.equal(r.after.hand,r.before.hand+1);assert.equal(r.after.deck,r.before.deck-1);assert.equal(r.after.revision,r.before.revision+1);assert.equal(r.after.last,'bj-test-hit');}finally{await browser.close();}});
+
 test('free 3D tabletop manipulation stays presentation-only until an explicit valid action',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/manipAnimations=\[\]/);

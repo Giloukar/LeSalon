@@ -3416,7 +3416,7 @@ if(window.SalonTableView){
    data.specialCardGame=S.id;
    if(S.id==='pouilleux'){
     const target=next(S,S.turn,k=>pHand(S,k)>0);
-    data.maid={target,targetName:S.players[target]?.name||'',targetCount:S.players[target]?.hand?.length||0,pairs:Math.floor(S.discard.length/2)};
+    data.maid={target,targetName:S.players[target]?.name||'',targetCount:S.players[target]?.hand?.length||0,pairs:Math.floor(S.discard.length/2),discardCount:S.discard.length};
    }
    if(S.id==='quatrevingtdixneuf'){
     const hand=!gate&&!net.spectator?player(S).hand:[];
@@ -3424,7 +3424,7 @@ if(window.SalonTableView){
    }
    if(S.id==='vingtetun'){
     const dealer=S.dealer.map((c,i)=>i===0||S.dealerRevealed||S.phase==='over'?c:{hidden:true,id:'dealer-hidden-'+i});
-    data.blackjack={phase:S.phase,dealer,dealerRevealed:!!S.dealerRevealed,hand:!gate&&!net.spectator?[...player(S).hand]:[],playerValue:!gate&&!net.spectator?bjValue(player(S).hand):null,dealerValue:dealer.length?(S.dealerRevealed||S.phase==='over'?bjValue(S.dealer):bjValue([S.dealer[0]])):0,bet:player(S)?.bet||0,chips:player(S)?.chips||0,status:player(S)?.status||''};
+    data.blackjack={phase:S.phase,dealer,dealerRevealed:!!S.dealerRevealed,hand:!gate&&!net.spectator?[...player(S).hand]:[],playerValue:!gate&&!net.spectator?bjValue(player(S).hand):null,dealerValue:dealer.length?(S.dealerRevealed||S.phase==='over'?bjValue(S.dealer):bjValue([S.dealer[0]])):0,deckCount:S.deck.length,bet:player(S)?.bet||0,chips:player(S)?.chips||0,status:player(S)?.status||''};
    }
    if(S.id==='bataille'){
     data.battle={number:S.battleNumber,winner:S.battleWinner,pot:S.battlePot,counts:S.players.map(p=>p.hand.length),reveals:(S.battleReveal||[]).map(r=>r.hidden?{owner:r.owner,hidden:true}:{owner:r.owner,hidden:false,card:r.card})};
