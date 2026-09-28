@@ -154,6 +154,7 @@ test('Three.js hardening adapts mobile quality, motion and reusable geometry',as
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  const css=await readFile(path.join(root,'shared/table-3d.css'),'utf8');
  const html=await readFile(path.join(root,'jeux.html'),'utf8');
+ const loader=await readFile(path.join(root,'shared/table-3d-loader.js'),'utf8');
  assert.match(source,/dataset\.motion!=='off'/);
  assert.doesNotMatch(source,/const motionAllowed=.*&&motionAllowed\(\)/);
  assert.match(source,/prefers-reduced-motion: reduce/);
@@ -211,6 +212,8 @@ test('Three.js hardening adapts mobile quality, motion and reusable geometry',as
  assert.match(html,/\.game-layout \.playing-card \.corner\{font-size:clamp\(16px,calc\(var\(--cardw\)\*\.27\),21px\)/);
  assert.match(html,/async function table3dApplyWindowMode\(target\)/);
  assert.match(html,/table3dRefreshLayout/);
+ assert.match(loader,/const failed=renderer;view\.fallback\('webgl-failed',error\)/);
+ assert.match(loader,/renderer=null/);
 });
 
 
