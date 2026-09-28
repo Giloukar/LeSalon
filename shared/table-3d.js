@@ -235,6 +235,7 @@ export function createTable3DRenderer({onFatal}={}){
     canvas.addEventListener('pointerup',onPointerUp);
     canvas.addEventListener('pointercancel',onPointerCancel);
     canvas.addEventListener('lostpointercapture',onLostPointerCapture);
+    canvas.addEventListener('wheel',onWheel,{passive:false});
     canvas.addEventListener('pointerleave',()=>setHover(null));
     canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();onFatal?.(new Error('Contexte WebGL perdu'));});
     window.addEventListener('blur',onWindowBlur);
@@ -1847,10 +1848,32 @@ export function createTable3DRenderer({onFatal}={}){
     });
     startMotion();return true;
   }
+  function normalizeAngleDelta(delta){
+    let d=Number(delta)||0;while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;return d;
+  }
+  function rotateDraggedObject(delta){
+    const d=drag;if(!d?.mesh||!Number.isFinite(delta)||Math.abs(delta)<.0001)return false;
+    d.manualRotation=Number.isFinite(d.manualRotation)?d.manualRotation:d.mesh.rotation.z;
+    d.manualRotation+=delta;d.mesh.rotation.z=d.manualRotation;d.rotated=true;d.moved=true;
+    (d.companions||[]).forEach((c,i)=>{c.mesh.rotation.z=d.manualRotation+(i-(d.companions.length-1)/2)*.018});
+    draw();return true;
+  }
+  function onWheel(e){
+    if(!active)return;
+    if(drag?.mesh){
+      const direction=Math.sign(e.deltaY||e.deltaX||0);if(!direction)return;
+      if(rotateDraggedObject(direction*-Math.PI/18)){e.preventDefault();return}
+    }
+    const obj=hit(e);if(!obj?.userData?.persistLocalPose)return;
+    stopTossForMesh(obj);
+    const direction=Math.sign(e.deltaY||e.deltaX||0);if(!direction)return;
+    obj.rotation.z+=direction*-Math.PI/18;
+    const home=obj.userData.home||meshTransform(obj);saveLocalPose(obj,home);updateLocalPoseResetButton();draw();e.preventDefault();
+  }
   function beginLooseCardDrag(obj,e,kind){
     const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()},gestureEnabled=!!(current?.canInteract&&LIVE_CARD_GAMES.has(current?.gameId)&&(['card-select','special-select'].includes(kind)||kind==='cactus-quick')),companions=groupedDragCompanions(obj,kind);
     stopTossForMesh(obj);companions.forEach(c=>stopTossForMesh(c.mesh));
-    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind,loose:true,mesh:obj,cardId:obj.userData.cardId,tileId:obj.userData.tileId,index:obj.userData.index,owner:obj.userData.owner,tapEnabled:!!obj.userData.tapEnabled,gestureEnabled,gestureStarted:false,gestureHome:home.position.clone(),companions,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),moved:false,home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
+    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind,loose:true,mesh:obj,cardId:obj.userData.cardId,tileId:obj.userData.tileId,index:obj.userData.index,owner:obj.userData.owner,tapEnabled:!!obj.userData.tapEnabled,gestureEnabled,gestureStarted:false,gestureHome:home.position.clone(),companions,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),manualRotation:obj.rotation.z,rotated:false,twist:null,moved:false,home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
     host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
   }
   function moveLooseCardDrag(e){
@@ -1863,7 +1886,8 @@ export function createTable3DRenderer({onFatal}={}){
       const rawWorld=new THREE.Vector3(p.x-(d.lastWorld?.x??d.mesh.position.x),0,p.z-(d.lastWorld?.z??d.mesh.position.z)).multiplyScalar(16.67/dt);
       d.worldVelocity??=new THREE.Vector3();d.worldVelocity.lerp(rawWorld,.46);d.lastWorld?.set?.(p.x,1.05,p.z);
       d.mesh.position.set(p.x,1.05,p.z);
-      d.mesh.rotation.set(-Math.PI/2,clampMotion(-d.velocityY*.012,-.20,.20),clampMotion(dx*.0028,-.24,.24));
+      const lean=clampMotion((e.clientX-d.lastX)*.0018,-.08,.08);
+      d.mesh.rotation.set(-Math.PI/2,clampMotion(-d.velocityY*.012,-.20,.20),(Number.isFinite(d.manualRotation)?d.manualRotation:d.home.rotation.z)+lean);
       d.mesh.scale.copy(d.home.scale).multiplyScalar(1.045);
       (d.companions||[]).forEach((c,i)=>{
         const side=(i%2?1:-1)*(.055+Math.floor(i/2)*.028),back=.055+(i+1)*.032,target=new THREE.Vector3(d.mesh.position.x+side,d.mesh.position.y+.018*(i+1),d.mesh.position.z+back);
@@ -1927,6 +1951,10 @@ export function createTable3DRenderer({onFatal}={}){
   function rummiDropDestination(position){return rummiDropTarget(position)?.dest??null}
   function onPointerDown(e){
     if(!active)return;
+    if(drag?.mesh&&e.pointerId!==drag.pointerId&&e.pointerType==='touch'){
+      const angle=Math.atan2(e.clientY-drag.lastY,e.clientX-drag.lastX);
+      drag.twist={pointerId:e.pointerId,lastAngle:angle};capturePointer(e.pointerId);e.preventDefault();return;
+    }
     const obj=hit(e);setHover(obj);if(!obj)return;
     if(!current?.canInteract&&!obj.userData.looseManip)return;
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'deck',startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
@@ -1938,19 +1966,23 @@ export function createTable3DRenderer({onFatal}={}){
     }
     if(obj.userData.kind!=='card')return;
     const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()},canPlay=!!obj.userData.playable;
-    stopTossForMesh(obj);drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card',mesh:obj,cardId:obj.userData.cardId,canPlay,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),moved:false,overDrop:false,gestureHome:home.position.clone(),home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
+    stopTossForMesh(obj);drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card',mesh:obj,cardId:obj.userData.cardId,canPlay,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),manualRotation:obj.rotation.z,rotated:false,twist:null,moved:false,overDrop:false,gestureHome:home.position.clone(),home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
     if(canPlay)emitLocalCardGesture('start',0,0);host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
   }
   function onPointerMove(e){
     if(!active)return;
     if(!drag){setHover(hit(e));return}
+    if(drag.twist?.pointerId===e.pointerId){
+      const angle=Math.atan2(e.clientY-drag.lastY,e.clientX-drag.lastX),delta=normalizeAngleDelta(angle-drag.twist.lastAngle);
+      drag.twist.lastAngle=angle;rotateDraggedObject(delta);e.preventDefault();return;
+    }
     if(e.pointerId!==drag.pointerId)return;
     if(drag.loose){moveLooseCardDrag(e);return}
     if(drag.kind!=='card')return;
     const now=performance.now(),dt=Math.max(8,now-(drag.lastAt||now)),dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;if(!drag.moved&&Math.hypot(dx,dy)>6)drag.moved=true;
     if(!drag.moved)return;
     drag.velocityX=(e.clientX-drag.lastX)/dt*16.67;drag.velocityY=(e.clientY-drag.lastY)/dt*16.67;drag.lastX=e.clientX;drag.lastY=e.clientY;drag.lastAt=now;
-    updatePointer(e);const p=new THREE.Vector3();if(raycaster.ray.intersectPlane(dragPlane,p)){const rawWorld=new THREE.Vector3(p.x-(drag.lastWorld?.x??drag.mesh.position.x),0,p.z-(drag.lastWorld?.z??drag.mesh.position.z)).multiplyScalar(16.67/dt);drag.worldVelocity??=new THREE.Vector3();drag.worldVelocity.lerp(rawWorld,.46);drag.lastWorld?.set?.(p.x,1.02,p.z);drag.mesh.position.set(p.x,1.02,p.z);drag.mesh.rotation.set(-Math.PI/2,clampMotion(-drag.velocityY*.010,-.16,.16),(dx*.0025));}
+    updatePointer(e);const p=new THREE.Vector3();if(raycaster.ray.intersectPlane(dragPlane,p)){const rawWorld=new THREE.Vector3(p.x-(drag.lastWorld?.x??drag.mesh.position.x),0,p.z-(drag.lastWorld?.z??drag.mesh.position.z)).multiplyScalar(16.67/dt);drag.worldVelocity??=new THREE.Vector3();drag.worldVelocity.lerp(rawWorld,.46);drag.lastWorld?.set?.(p.x,1.02,p.z);drag.mesh.position.set(p.x,1.02,p.z);const lean=clampMotion((e.clientX-drag.lastX)*.0016,-.07,.07);drag.mesh.rotation.set(-Math.PI/2,clampMotion(-drag.velocityY*.010,-.16,.16),(Number.isFinite(drag.manualRotation)?drag.manualRotation:drag.home.rotation.z)+lean);}
     const near=drag.canPlay&&Math.hypot(drag.mesh.position.x-1.25,drag.mesh.position.z-.05)<cardDropRadius(drag);drag.overDrop=near;dropMarker.material.opacity=near ? .82 : .2;
     if(drag.canPlay){const gesture=eightGestureCoordinates(drag.mesh,drag.gestureHome);emitLocalCardGesture('move',gesture.progress,gesture.lateral)}draw();e.preventDefault();
   }
@@ -1959,7 +1991,7 @@ export function createTable3DRenderer({onFatal}={}){
     const d=drag;drag=null;host?.classList.remove('is-dragging');dropMarker.material.opacity=.2;
     if(d.loose&&d.kind!=='card')dropMarker.visible=false;
     if(cancelled){if(d.kind==='card'&&d.canPlay||d.loose&&d.gestureStarted)emitLocalCardGesture('cancel',0,0);if(d.loose)returnManipulatedCard(d,{snap:document.hidden});else{syncCurrent(current);draw()}return}
-    const tap=Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
+    const tap=!d.rotated&&Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
     if(d.loose&&!tap){
       if(d.kind==='cactus-quick'&&d.gestureStarted){
         if(directCardDropNear(d,'cactus')){emitLocalCardGesture('commit',1,0);current?.interactions?.cactus?.('quick',d.index);return}
@@ -1994,6 +2026,7 @@ export function createTable3DRenderer({onFatal}={}){
         if(current?.interactions?.cardAction?.('collect'))return;
       }
       if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);
+      if(Number.isFinite(d.manualRotation))d.mesh.rotation.z=d.manualRotation;
       if(startFreeToss(d))return;
       if(settlePersistentPlacement(d))return;
       returnManipulatedCard(d);return
@@ -2050,6 +2083,7 @@ export function createTable3DRenderer({onFatal}={}){
     const near=d.canPlay&&d.moved&&(d.overDrop||Math.hypot(d.mesh.position.x-1.25,d.mesh.position.z-.05)<cardDropRadius(d));
     if(d.canPlay&&(!d.moved||near)){emitLocalCardGesture('commit',1,0);current?.interactions?.playCard?.(d.cardId);return}
     if(d.canPlay)emitLocalCardGesture('cancel',0,0);
+    if(Number.isFinite(d.manualRotation))d.mesh.rotation.z=d.manualRotation;
     if(startFreeToss(d))return;
     if(settlePersistentPlacement(d))return;
     returnManipulatedCard(d);
@@ -2059,9 +2093,13 @@ export function createTable3DRenderer({onFatal}={}){
     const d=drag,wasCard=d.kind==='card',wasLoose=!!d.loose;if(wasCard&&d.canPlay||wasLoose&&d.gestureStarted)emitLocalCardGesture('cancel',0,0);drag=null;host?.classList.remove('is-dragging');if(dropMarker)dropMarker.material.opacity=.2;
     if(wasLoose||wasCard){returnManipulatedCard(d,{snap:document.hidden});return}
   }
-  function onPointerUp(e){finishDrag(e,false)}
-  function onPointerCancel(e){cancelActiveDrag(e.pointerId)}
-  function onLostPointerCapture(e){cancelActiveDrag(e.pointerId)}
+  function releaseTwistPointer(e){
+    if(!drag?.twist||drag.twist.pointerId!==e.pointerId)return false;
+    drag.twist=null;return true;
+  }
+  function onPointerUp(e){if(releaseTwistPointer(e))return;finishDrag(e,false)}
+  function onPointerCancel(e){if(releaseTwistPointer(e))return;cancelActiveDrag(e.pointerId)}
+  function onLostPointerCapture(e){if(releaseTwistPointer(e))return;cancelActiveDrag(e.pointerId)}
   function onWindowBlur(){cancelActiveDrag()}
   function onVisibilityChange(){if(document.hidden)cancelActiveDrag()}
 
@@ -2075,7 +2113,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function destroy(){
     deactivate();clearObjects();
-    canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);canvas?.removeEventListener('lostpointercapture',onLostPointerCapture);window.removeEventListener('blur',onWindowBlur);window.removeEventListener('salon:remote-card-gesture',onRemoteCardGesture);document.removeEventListener('visibilitychange',onVisibilityChange);assetUnsubscribe?.();assetUnsubscribe=null;
+    canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);canvas?.removeEventListener('lostpointercapture',onLostPointerCapture);canvas?.removeEventListener('wheel',onWheel);window.removeEventListener('blur',onWindowBlur);window.removeEventListener('salon:remote-card-gesture',onRemoteCardGesture);document.removeEventListener('visibilitychange',onVisibilityChange);assetUnsubscribe?.();assetUnsubscribe=null;
     cardGeometry.dispose();tileGeometry.dispose();pawnGeometry.dispose();dieGeometry.dispose();rummiTileGeometry.dispose();grainGeometry.dispose();heldPadGeometry.dispose();codeGemGeometry.dispose();intrusDotGeometry.dispose();balloonGeometry.dispose();golfBallGeometry.dispose();cityTileGeometry.dispose();cityHouseGeometry.dispose();cityPegGeometry.dispose();edgeMaterial.dispose();backMaterial.dispose();for(const m of frontMaterials.values())m.dispose();for(const m of tileMaterials.values())m.dispose();for(const m of rummiTileMaterials.values())m.dispose();for(const m of pawnMaterials.values())m.dispose();for(const m of dieFaceMaterials.values())m.dispose();for(const m of cellLabelMaterials.values())m.dispose();for(const m of boxTileMaterials.values())m.dispose();neutralDieMaterial.dispose();rummiBackMaterial.dispose();for(const t of disposableTextures)t.dispose();for(const t of cellLabelTextures)t.dispose();
     tableMesh?.geometry?.dispose();tableMesh?.material?.dispose();dropMarker?.geometry?.dispose();dropMarker?.material?.dispose();renderer?.dispose();
     localPoses.clear();poseSeen.clear();activePoseScope='';localPoseOrder=0;
