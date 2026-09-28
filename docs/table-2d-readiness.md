@@ -475,3 +475,14 @@ Le gagnant d'un pli peut désormais saisir directement l'une des cartes du pli t
 Le relâchement valide appelle uniquement `cardAction('collect')`. Avant cet appel, la couche de présentation mémorise les positions, rotations et échelles exactes des cartes déplacées. Quand l'état confirmé suivant montre que le pli a quitté la table, l'animation de ramassage repart de ces positions réelles au lieu de faire revenir brièvement les cartes au centre.
 
 Un relâchement hors de la zone valide n'envoie aucune action et toutes les cartes du groupe reviennent avec l'inertie locale existante. La logique de gagnant, de score, de manche et de distribution suivante reste entièrement dans le moteur Chasse aux plis.
+
+
+## Lancer libre local des cartes et tuiles
+
+Une manipulation qui ne se termine pas dans une zone de jeu valide n'est plus obligatoirement ramenée immédiatement par une courbe prédéfinie. Le renderer mesure maintenant la vitesse réelle du pointeur dans le plan 3D de la table. Si le relâchement est suffisamment rapide, l'objet conserve cette impulsion localement : il glisse sur le tapis, prend une légère inclinaison et une rotation, ralentit par friction et rebondit de façon amortie sur les bords de la table.
+
+Cette physique est volontairement non autoritative. Elle ne change ni la position logique d'une carte, ni une sélection, ni un groupe Rummikub, ni la révision réseau. Lorsqu'un vrai dépôt légal est détecté — défausse, groupe Rummikub, ramassage de pli, pioche du Pouilleux, etc. — l'action moteur garde toujours la priorité. Le lancer libre n'est utilisé que lorsqu'aucun coup n'a été accepté.
+
+Après immobilisation, l'objet revient doucement à sa position logique courante. Les sélections groupées peuvent être lancées comme un petit paquet avec de légers écarts entre les éléments. Un objet en mouvement peut être repris immédiatement : son animation physique locale est alors interrompue au point exact où il se trouve.
+
+La vitesse de lancer est réduite lorsque l'utilisateur marque une pause avant de relâcher, afin qu'un simple placement précis ne soit pas interprété comme un jet. Le canal multijoueur de présence reste inchangé : aucun vecteur de vitesse, angle, rebond ou position libre n'est transmis aux autres clients.
