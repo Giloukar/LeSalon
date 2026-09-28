@@ -499,6 +499,24 @@ test('manual local object rotation stays presentation-only on wheel and touch tw
  assert.doesNotMatch(source,/drag\.twist[^\n]*publishOnline\(/);
 });
 
+test('local face flipping is persistent and never becomes a game or network action',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/function faceRotationX\(value\)/);
+ assert.match(source,/function flipLocalObject\(mesh\)/);
+ assert.match(source,/function flipDraggedObject\(\)/);
+ assert.match(source,/function onKeyDown\(e\)/);
+ assert.match(source,/String\(e\.key\|\|''\)\.toLowerCase\(\)!=='f'/);
+ assert.match(source,/mesh\.rotation\.x=-faceRotationX\(mesh\.rotation\.x\)/);
+ assert.match(source,/manualFace:faceRotationX\(obj\.rotation\.x\)/);
+ assert.match(source,/Number\.isFinite\(d\.manualFace\)\?d\.manualFace:-Math\.PI\/2/);
+ assert.match(source,/const faceX=mesh\.rotation\.x>0\?Math\.PI\/2:-Math\.PI\/2/);
+ assert.match(source,/canvas\.addEventListener\('keydown',onKeyDown\)/);
+ assert.match(source,/canvas\?\.removeEventListener\('keydown',onKeyDown\)/);
+ assert.doesNotMatch(source,/flipLocalObject[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/flipDraggedObject[^\n]*onlineAct\(/);
+ assert.doesNotMatch(source,/onKeyDown[^\n]*publishOnline\(/);
+});
+
 test('free 3D tabletop manipulation stays presentation-only until an explicit valid action',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/manipAnimations=\[\]/);
