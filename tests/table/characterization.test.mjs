@@ -435,6 +435,36 @@ test('free tabletop toss physics stays local and yields to authoritative drop zo
  assert.doesNotMatch(source,/tossAnimations[^\n]*publishOnline\(/);
 });
 
+test('owned cards and rack tiles can keep local free poses without changing game state',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/const localPoses=new Map\(\)/);
+ assert.match(source,/function poseScope\(payload=current\)/);
+ assert.match(source,/state\?\.startedAt/);
+ assert.match(source,/function applyLocalPose\(mesh/);
+ assert.match(source,/function saveLocalPose\(mesh/);
+ assert.match(source,/function pruneLocalPoses\(\)/);
+ assert.match(source,/persistPose:true/);
+ assert.match(source,/function settlePersistentPlacement\(d\)/);
+ assert.match(source,/if\(a\.mesh\.userData\?\.persistLocalPose\)/);
+ assert.match(source,/function storedLocalPose\(id,type='card'\)/);
+ assert.match(source,/activePoseScope=poseScope\(payload\);poseSeen=new Set\(\)/);
+ assert.match(source,/syncCurrent\(payload\);pruneLocalPoses\(\);draw\(\)/);
+ assert.doesNotMatch(source,/saveLocalPose[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/settlePersistentPlacement[^\n]*onlineAct\(/);
+ assert.doesNotMatch(source,/localPoses[^\n]*publishOnline\(/);
+});
+
+test('authoritative drop handling precedes local free placement fallback',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ const cardDrop=source.indexOf("if(d.kind==='card-select'&&d.gestureStarted&&directCardDropNear(d))");
+ const rummiDrop=source.indexOf("if(d.kind==='rummi-tile'){",cardDrop);
+ const settle=source.indexOf('if(settlePersistentPlacement(d))return',cardDrop);
+ assert.ok(cardDrop>=0&&rummiDrop>cardDrop&&settle>rummiDrop);
+ assert.match(source,/rememberGroupedCardDropOrigins\(d\)/);
+ assert.match(source,/current\?\.interactions\?\.cardDrop\?\.\(d\.cardId\)/);
+ assert.match(source,/current\?\.interactions\?\.rummi\?\.\('drop'/);
+});
+
 test('free 3D tabletop manipulation stays presentation-only until an explicit valid action',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/manipAnimations=\[\]/);
