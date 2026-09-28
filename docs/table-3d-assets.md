@@ -105,3 +105,10 @@ Les transformations ne sont appliquées que lorsqu'elles sont déclarées : les 
 Le chargement est tolérant aux erreurs par asset. Un fichier qui échoue apparaît dans `result.failed` et conserve son placeholder procédural, pendant que les autres modèles du pack sont activés. `result.unload()` ou `SalonTable3DModelPack.unload(id)` retire les factories du pack et revient immédiatement aux placeholders.
 
 L'événement `salon:table-3d-model-pack` publie les phases `loading`, `progress`, `ready` et `unloaded`, ce qui permettra d'ajouter plus tard une interface de progression sans coupler cette interface au renderer.
+
+
+## Rotation locale des poses libres
+
+Les cartes de la main du joueur et les tuiles de son chevalet qui sont manipulables localement peuvent maintenant être tournées directement dans la vue 3D. La molette au-dessus de l'objet applique des pas de 10°, et **Maj + molette** des pas de 30° pour un rangement plus rapide.
+
+La rotation est enregistrée dans la même pose locale que la position libre. Elle reste donc strictement visuelle, privée au client courant et liée à la partie/joueur courant. Elle ne déclenche aucune action moteur ou réseau. Une rotation remet simplement l'objet au-dessus de sa pile locale afin d'éviter les surfaces coplanaires et de conserver un ordre de manipulation naturel.
