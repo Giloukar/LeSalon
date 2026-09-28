@@ -439,3 +439,12 @@ La scène expose également les commandes autoritatives déjà existantes : **Va
 La projection 3D ne reçoit que deux informations supplémentaires du joueur actif : le nombre d'annulations disponibles et le booléen `canCommit`. Aucune information privée adverse n'est ajoutée. Tous les contrôles appellent `rummi('draw'|'commit'|'undoStep'|'undo')` ; aucune règle de combinaison, d'ouverture à 30 points ou de pendule n'est dupliquée dans Three.js.
 
 Cette couche est construite au-dessus de la manipulation groupée : sélectionner plusieurs tuiles puis saisir l'une d'elles continue de déplacer tout le groupe physique, tandis que la pioche reste un objet isolé qui ne rejoint jamais la sélection.
+
+
+## Pouilleux et Vingt-et-un — manipulation physique
+
+Le Pouilleux accepte désormais une pioche réellement gestuelle : la carte cachée du voisin peut toujours être touchée, mais elle peut aussi être saisie puis ramenée vers la zone de main. Le relâchement ne choisit jamais lui-même la carte côté moteur : il appelle l'adaptateur autoritatif `specialCard('pick', index)` déjà utilisé par le jeu. Après confirmation, la carte rejoint la main visuellement ; si une paire est formée immédiatement, les deux cartes projetées comme défaussées quittent ensuite la main vers une pile de paires dédiée.
+
+Le Vingt-et-un dispose maintenant d'un sabot 3D représentant le nombre de cartes restantes. La distribution initiale, les tirages du joueur et les tirages de la banque partent physiquement de ce sabot. Les cartes déjà présentes se recentrent par animation au lieu de sauter lorsque la main s'agrandit. La carte cachée de la banque reste un dos de carte dans la projection ; lors de sa révélation, le dos effectue un mouvement de retournement avant de laisser apparaître la face projetée.
+
+Aucune carte privée supplémentaire n'est exposée : le seul nouveau champ de projection du Vingt-et-un est `deckCount`, qui ne contient qu'un nombre. Toutes les actions restent celles du moteur existant.
