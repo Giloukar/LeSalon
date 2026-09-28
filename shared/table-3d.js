@@ -639,6 +639,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(manipAnimations.some(a=>a.done))manipAnimations=manipAnimations.filter(a=>!a.done);
     for(const a of tossAnimations){
       if(a.done)continue;
+      if(now<a.start){running=true;continue}
       const dt=Math.max(.25,Math.min(2,(now-(a.lastAt||now))/16.67));a.lastAt=now;
       const drag=Math.pow(.925,dt),spinDrag=Math.pow(.91,dt);
       a.velocity.multiplyScalar(drag);a.spin*=spinDrag;
@@ -1727,8 +1728,9 @@ export function createTable3DRenderer({onFatal}={}){
   }
   const TOSSABLE_KINDS=new Set(['card','loose-card','card-select','special-select','cactus-quick','cactus-swap','cactus-target','maid-pick','battle-card','trick-collect','rummi-tile','rummi-draw']);
   function stopTossForMesh(mesh){
-    if(!mesh||!tossAnimations.length)return;
-    tossAnimations=tossAnimations.filter(a=>a.mesh!==mesh);
+    if(!mesh)return;
+    if(tossAnimations.length)tossAnimations=tossAnimations.filter(a=>a.mesh!==mesh);
+    if(manipAnimations.length)manipAnimations=manipAnimations.filter(a=>a.mesh!==mesh);
   }
   function freeTossVelocity(d){
     const v=d?.worldVelocity?.clone?.()||new THREE.Vector3();
