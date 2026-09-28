@@ -1894,7 +1894,6 @@ export function createTable3DRenderer({onFatal}={}){
     const companions=localStackCompanions(d.mesh);if(!companions.length)return false;
     clearStackHold(d);
     if(d.gestureStarted){emitLocalCardGesture('cancel',0,0);d.gestureStarted=false}
-    if(d.kind==='card'&&d.canPlay)emitLocalCardGesture('cancel',0,0);
     d.gestureEnabled=false;d.stackMode=true;d.companions=companions;
     companions.forEach(c=>stopTossForMesh(c.mesh));
     d.mesh.scale.copy(d.home.scale).multiplyScalar(1.055);
@@ -2004,8 +2003,8 @@ export function createTable3DRenderer({onFatal}={}){
     }
     if(obj.userData.kind!=='card')return;
     const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()},canPlay=!!obj.userData.playable;
-    stopTossForMesh(obj);drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card',mesh:obj,cardId:obj.userData.cardId,canPlay,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),manualRotation:obj.rotation.z,rotated:false,twist:null,stackMode:false,stackTimer:0,moved:false,overDrop:false,gestureHome:home.position.clone(),home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
-    armLocalStackDrag(drag,e);if(canPlay&&!drag.stackMode)emitLocalCardGesture('start',0,0);host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
+    stopTossForMesh(obj);drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card',mesh:obj,cardId:obj.userData.cardId,canPlay,gestureStarted:false,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),manualRotation:obj.rotation.z,rotated:false,twist:null,stackMode:false,stackTimer:0,moved:false,overDrop:false,gestureHome:home.position.clone(),home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
+    armLocalStackDrag(drag,e);if(canPlay&&!drag.stackMode){emitLocalCardGesture('start',0,0);drag.gestureStarted=true}host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
   }
   function onPointerMove(e){
     if(!active)return;
@@ -2124,7 +2123,7 @@ export function createTable3DRenderer({onFatal}={}){
       if(tap)current?.interactions?.box?.(d.kind==='box-roll'?'roll':d.kind==='box-toggle'?'toggle':'close',d.kind==='box-roll'?d.count:d.number);return;
     }
     if(d.stackMode){
-      if(d.canPlay)emitLocalCardGesture('cancel',0,0);
+      if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);
       if(Number.isFinite(d.manualRotation))d.mesh.rotation.z=d.manualRotation;
       if(startFreeToss(d))return;if(settlePersistentPlacement(d))return;returnManipulatedCard(d);return;
     }
@@ -2138,7 +2137,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function cancelActiveDrag(pointerId=null){
     if(!drag||(pointerId!==null&&drag.pointerId!==pointerId))return;
-    const d=drag,wasCard=d.kind==='card',wasLoose=!!d.loose;clearStackHold(d);if(wasCard&&d.canPlay||wasLoose&&d.gestureStarted)emitLocalCardGesture('cancel',0,0);drag=null;host?.classList.remove('is-dragging','is-stack-dragging');if(dropMarker)dropMarker.material.opacity=.2;
+    const d=drag,wasCard=d.kind==='card',wasLoose=!!d.loose;clearStackHold(d);if(wasCard&&d.gestureStarted||wasLoose&&d.gestureStarted)emitLocalCardGesture('cancel',0,0);drag=null;host?.classList.remove('is-dragging','is-stack-dragging');if(dropMarker)dropMarker.material.opacity=.2;
     if(wasLoose||wasCard){returnManipulatedCard(d,{snap:document.hidden});return}
   }
   function releaseTwistPointer(e){
