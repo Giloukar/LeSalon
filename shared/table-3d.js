@@ -1362,7 +1362,7 @@ export function createTable3DRenderer({onFatal}={}){
         discardMesh.visible=false;
         queueCardFlight(cardMesh(incomingBack?null:incomingCard,{back:incomingBack}),incomingFrom,incomingTo,{
           duration:500,lift:.64,fromRot:pending?.incomingRot??(swap.source==='take'&&previous.discardId?(visualHash(previous.discardId)-.5)*.12:-.03),toRot:slot.rotation,bank:.13,roll:.11,
-          fromScale:pending?.incomingScale||new THREE.Vector3(swap.source==='take'?.82:.82,swap.source==='take'?.82:.82,swap.source==='take'?.82:.82),toScale:new THREE.Vector3(slot.scale,slot.scale,slot.scale),
+          fromScale:pending?.incomingScale||new THREE.Vector3(.82,.82,.82),toScale:new THREE.Vector3(slot.scale,slot.scale,slot.scale),
           onDone:()=>{if(targetVisual)targetVisual.visible=true}
         });
         queueCardFlight(cardMesh(data.discard,{back:false}),outgoingFrom,discardTo,{
@@ -1374,7 +1374,7 @@ export function createTable3DRenderer({onFatal}={}){
       }else if(drawnAppeared&&drawnMesh){
         drawnMesh.visible=false;
         const from=data.source==='take'?new THREE.Vector3(0,TABLE_Y+.25,.1):new THREE.Vector3(-1.35,TABLE_Y+.25,.1),to=new THREE.Vector3(1.35,TABLE_Y+.25,.1);
-        const flight=cardMesh(data.source==='take'?data.drawn:null,{back:data.source!=='discard'});
+        const flight=cardMesh(data.source==='take'?data.drawn:null,{back:data.source!=='take'});
         queueCardFlight(flight,from,to,{duration:500,lift:.58,fromRot:data.source==='take'?(visualHash(data.drawn.id)-.5)*.12:-.03,toRot:0,bank:.13,roll:.11,onDone:()=>{drawnMesh.visible=true}});
       }else if(discardChanged&&previous.drawnId&&snapshot.discardId===previous.drawnId&&discardMesh){
         discardMesh.visible=false;
@@ -1397,6 +1397,7 @@ export function createTable3DRenderer({onFatal}={}){
         queueCardFlight(flight,from,to,{duration:520,lift:.62,fromRot:(visualHash(previous.discardId)-.5)*.12,toRot:0,bank:.13,roll:(actor%2?-.09:.09)});
       }
     }
+    if(previous&&snapshot.lastSwap?.serial&&snapshot.lastSwap.serial!==previous.lastSwap?.serial&&!motionAllowed())pendingCactusSwap=null;
     lastCactusSnapshot=snapshot;
 
     if(payload.canInteract&&data.turn===viewer){
@@ -1408,7 +1409,7 @@ export function createTable3DRenderer({onFatal}={}){
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     if(title)title.textContent='VUE 3D · CACTUS';
     if(status)status.textContent=data.caller!==null?'Dernier tour · Cactus annoncé':data.phase==='peek'?'Mémorisez vos deux cartes':data.phase==='draw'?'Pioche ou défausse':data.phase==='swap'?'Échangez une carte':data.phase==='power'?'Pouvoir du 8':data.phase==='reveal'?'Mémorisez la carte':'Table synchronisée';
-    if(help)help.textContent=data.phase==='peek'||data.phase==='reveal'?'Utilisez « C’est mémorisé » sous la table':data.phase==='draw'?'Cliquez la pioche ou la défausse · vos cartes permettent aussi le jet rapide':data.phase==='swap'?'Cliquez une de vos cartes pour l’échanger':data.phase==='power'?'Cliquez une de vos cartes pour la regarder':'Les cartes restent cachées comme dans la vue 2D';
+    if(help)help.textContent=data.phase==='peek'||data.phase==='reveal'?'Utilisez « C’est mémorisé » sous la table':data.phase==='draw'?'Cliquez la pioche ou la défausse · vos cartes permettent aussi le jet rapide':data.phase==='swap'?'Glissez la carte piochée sur une carte à remplacer, ou tirez cette carte vers la pioche':data.phase==='power'?'Cliquez une de vos cartes pour la regarder':'Les cartes restent cachées comme dans la vue 2D';
   }
   function syncEcho(payload){
     clearObjects();dropMarker.visible=false;
@@ -1916,7 +1917,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='battle-card'){if(tap){pendingBattleOrigin={position:d.mesh.position.clone(),rotation:d.mesh.rotation.z,scale:d.mesh.scale.clone()};if(!current?.interactions?.specialCard?.('battle'))pendingBattleOrigin=null}return}
     if(d.kind==='battle-action'){if(tap)current?.interactions?.specialCard?.('battle');return}
     if(d.kind==='cactus-quick'){if(tap)current?.interactions?.cactus?.('quick',d.index);return}
-    if(d.kind==='cactus-swap'){if(tap){const data=current?.viewData?.cactus,viewer=Number(data?.viewer),count=Math.max(1,data?.players?.length||1),slot=cactusCardSlot(viewer,count,viewer,d.index,TABLE_Y+.25);pendingCactusSwap={index:d.index,outgoingFrom:d.mesh.position.clone(),outgoingRot:d.mesh.rotation.z,outgoingScale:d.mesh.scale.clone(),incomingFrom:new THREE.Vector3(1.35,TABLE_Y+.25,.1),incomingRot:0,incomingScale:new THREE.Vector3(.88,.88,.88)};if(!current?.interactions?.cactus?.('swap',d.index))pendingCactusSwap=null}return}
+    if(d.kind==='cactus-swap'){if(tap){const data=current?.viewData?.cactus,viewer=Number(data?.viewer),count=Math.max(1,data?.players?.length||1);pendingCactusSwap={index:d.index,outgoingFrom:d.mesh.position.clone(),outgoingRot:d.mesh.rotation.z,outgoingScale:d.mesh.scale.clone(),incomingFrom:new THREE.Vector3(1.35,TABLE_Y+.25,.1),incomingRot:0,incomingScale:new THREE.Vector3(.88,.88,.88)};if(!current?.interactions?.cactus?.('swap',d.index))pendingCactusSwap=null}return}
     if(d.kind==='cactus-target'){if(tap)current?.interactions?.cactus?.('target',d.index);return}
     if(d.kind==='cactus-draw'){if(tap)current?.interactions?.cactus?.('draw');return}
     if(d.kind==='cactus-take'){if(tap)current?.interactions?.cactus?.('take');return}
