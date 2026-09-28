@@ -1976,7 +1976,7 @@ export function createTable3DRenderer({onFatal}={}){
     canvas?.focus?.({preventScroll:true});
     if(drag?.mesh&&e.pointerId!==drag.pointerId&&e.pointerType==='touch'){
       const angle=Math.atan2(e.clientY-drag.lastY,e.clientX-drag.lastX);
-      drag.twist={pointerId:e.pointerId,lastAngle:angle};capturePointer(e.pointerId);e.preventDefault();return;
+      drag.twist={pointerId:e.pointerId,lastAngle:angle,startX:e.clientX,startY:e.clientY,startedAt:performance.now(),moved:false};capturePointer(e.pointerId);e.preventDefault();return;
     }
     const obj=hit(e);setHover(obj);if(!obj)return;
     if(!current?.canInteract&&!obj.userData.looseManip)return;
@@ -1996,8 +1996,12 @@ export function createTable3DRenderer({onFatal}={}){
     if(!active)return;
     if(!drag){setHover(hit(e));return}
     if(drag.twist?.pointerId===e.pointerId){
-      const angle=Math.atan2(e.clientY-drag.lastY,e.clientX-drag.lastX),delta=normalizeAngleDelta(angle-drag.twist.lastAngle);
-      drag.twist.lastAngle=angle;rotateDraggedObject(delta);e.preventDefault();return;
+      const twist=drag.twist,angle=Math.atan2(e.clientY-drag.lastY,e.clientX-drag.lastX),delta=normalizeAngleDelta(angle-twist.lastAngle);
+      const distance=Math.hypot(e.clientX-twist.startX,e.clientY-twist.startY);
+      twist.lastAngle=angle;
+      if(!twist.moved&&distance>9)twist.moved=true;
+      if(twist.moved)rotateDraggedObject(delta);
+      e.preventDefault();return;
     }
     if(e.pointerId!==drag.pointerId)return;
     if(drag.loose){moveLooseCardDrag(e);return}
@@ -2116,11 +2120,12 @@ export function createTable3DRenderer({onFatal}={}){
     const d=drag,wasCard=d.kind==='card',wasLoose=!!d.loose;if(wasCard&&d.canPlay||wasLoose&&d.gestureStarted)emitLocalCardGesture('cancel',0,0);drag=null;host?.classList.remove('is-dragging');if(dropMarker)dropMarker.material.opacity=.2;
     if(wasLoose||wasCard){returnManipulatedCard(d,{snap:document.hidden});return}
   }
-  function releaseTwistPointer(e){
+  function releaseTwistPointer(e,{allowFlip=false}={}){
     if(!drag?.twist||drag.twist.pointerId!==e.pointerId)return false;
-    drag.twist=null;return true;
+    const twist=drag.twist,quickTap=allowFlip&&!twist.moved&&performance.now()-twist.startedAt<280&&Math.hypot(e.clientX-twist.startX,e.clientY-twist.startY)<9;
+    drag.twist=null;if(quickTap)flipDraggedObject();return true;
   }
-  function onPointerUp(e){if(releaseTwistPointer(e))return;finishDrag(e,false)}
+  function onPointerUp(e){if(releaseTwistPointer(e,{allowFlip:true}))return;finishDrag(e,false)}
   function onPointerCancel(e){if(releaseTwistPointer(e))return;cancelActiveDrag(e.pointerId)}
   function onLostPointerCapture(e){if(releaseTwistPointer(e))return;cancelActiveDrag(e.pointerId)}
   function onWindowBlur(){cancelActiveDrag()}
