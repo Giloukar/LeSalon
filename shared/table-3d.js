@@ -320,13 +320,13 @@ export function createTable3DRenderer({onFatal}={}){
     mesh.position.set(x,y,z);mesh.rotation.set(-Math.PI/2,0,rot);mesh.scale.setScalar(scale);objects.add(mesh);return mesh;
   }
   function handCardSlot(count,index){
-    const total=Math.max(1,count),rows=total<=8?1:total<=16?2:3,perRow=Math.ceil(total/rows),row=Math.floor(index/perRow),start=row*perRow,rowCount=Math.min(perRow,total-start),local=index-start;
-    const baseScale=rows===1?Math.max(.82,1-Math.max(0,total-6)*.04):rows===2?.88:.64;
-    const fitScale=rowCount<=1?baseScale:Math.min(baseScale,(8.8-(rowCount-1)*.10)/(rowCount*CARD_W));
-    const scale=Math.max(.56,fitScale),spacing=rowCount<=1?0:CARD_W*scale+.10,t=rowCount<=1?.5:local/(rowCount-1);
-    const x=(local-(rowCount-1)/2)*spacing,fan=(t-.5)*-.08;
-    const z=rows===1?2.66+Math.abs(t-.5)*.08:rows===2?1.35+row*1.60:1.0+row*1.10;
-    return{x,z,fan,scale,row,local,yOffset:row*.012+local*.0015};
+    const total=Math.max(1,count),rows=total<=7?1:total<=14?2:3,perRow=Math.ceil(total/rows),row=Math.floor(index/perRow),start=row*perRow,rowCount=Math.min(perRow,total-start),local=index-start;
+    const dense=rows>1,baseScale=rows===1?Math.max(.84,1-Math.max(0,total-5)*.035):rows===2?.72:.60,widthLimit=rows===1?8.7:rows===2?7.2:6.6;
+    const fitScale=rowCount<=1?baseScale:Math.min(baseScale,(widthLimit-(rowCount-1)*.11)/(rowCount*CARD_W));
+    const scale=Math.max(rows===3?.54:.62,fitScale),spacing=rowCount<=1?0:CARD_W*scale+(dense?.13:.11),t=rowCount<=1?.5:local/(rowCount-1);
+    const x=(local-(rowCount-1)/2)*spacing,fan=dense?0:(t-.5)*-.08;
+    const z=rows===1?2.58+Math.abs(t-.5)*.06:rows===2?.93+row*1.25:.66+row*.96;
+    return{x,z,fan,scale,row,local,yOffset:row*.014+local*.0015};
   }
   function eightOpponentSeat(total,index){
     if(total<=1)return{x:0,z:-2.34};
