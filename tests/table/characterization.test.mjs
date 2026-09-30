@@ -572,7 +572,7 @@ test('remote free-card visuals are pruned to the authoritative hand count',async
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/function remoteLooseLimit\(actor\)/);
  assert.match(source,/current\?\.state\?\.players\?\.\[actor\]\?\.hand/);
- assert.match(source,/Math\.max\(0,Math\.min\(24,count\)\)/);
+ assert.match(source,/Math\.max\(0,Math\.min\(54,count\)\)/);
  assert.match(source,/function trimRemoteLooseCards\(actor=null\)/);
  assert.match(source,/while\(entries\.length>limit\)/);
  assert.match(source,/removeRemoteLooseCard\(key,entry\)/);
