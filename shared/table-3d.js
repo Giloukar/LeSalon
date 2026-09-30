@@ -584,28 +584,32 @@ export function createTable3DRenderer({onFatal}={}){
     return rows;
   }
   function rummiBoardLayout(groups){
-    const active=(groups||[]).map((group,index)=>({group,index})).filter(x=>x.group?.length),width=9.35,depth=3.55,gap=.18,packed=rummiPackRows(active,width,gap),rows=Math.max(1,packed.length),cellD=depth/rows,baseZ=-2.05,cells=new Array(active.length);
+    const active=(groups||[]).map((group,index)=>({group,index})).filter(x=>x.group?.length),width=9.55,depth=3.75,gap=.16,minZ=-2.90,maxZ=.85,packed=rummiPackRows(active,width,gap),rows=Math.max(1,packed.length),cellD=depth/rows,baseZ=minZ+cellD/2,cells=new Array(active.length),tileCount=active.reduce((sum,entry)=>sum+(entry.group?.length||0),0);
     packed.forEach((row,rowIndex)=>{
       const widths=row.orders.map(order=>rummiDesiredGroupWidth(active[order]?.group)),total=widths.reduce((sum,value)=>sum+value,0)+gap*Math.max(0,widths.length-1);
       let cursor=-total/2;
       row.orders.forEach((order,col)=>{
-        const cellW=widths[col];cells[order]={x:cursor+cellW/2,z:baseZ+rowIndex*cellD,width:cellW,depth:cellD,row:rowIndex,col};cursor+=cellW+gap;
+        const cellW=widths[col],z=minZ+(rowIndex+.5)*cellD;cells[order]={x:cursor+cellW/2,z,width:cellW,depth:cellD,row:rowIndex,col};cursor+=cellW+gap;
       });
     });
-    return{active,rows,cellD,baseZ,width,depth,gap,cells};
+    return{active,rows,cellD,baseZ,minZ,maxZ,width,depth,gap,cells,tileCount};
   }
   function rummiLayoutCell(layout,order){
-    return layout?.cells?.[order]||{x:0,z:layout?.baseZ??-2.05,width:layout?.width??9.35,depth:layout?.cellD??3.55,row:0,col:0};
+    return layout?.cells?.[order]||{x:0,z:layout?.baseZ??-1.0,width:layout?.width??9.55,depth:layout?.cellD??3.75,row:0,col:0};
   }
   function rummiGroupSlot(layout,order,length,tileIndex){
-    const cell=rummiLayoutCell(layout,order),natural=.66,widthScale=(cell.width-.16)/(Math.max(1,length)*natural),depthScale=(Math.max(.42,cell.depth-.12))/.9;
-    const scale=Math.max(.38,Math.min(.96,widthScale,depthScale)),spacing=natural*scale;
+    const cell=rummiLayoutCell(layout,order),natural=.66,widthScale=(cell.width-.16)/(Math.max(1,length)*natural),depthScale=(Math.max(.22,cell.depth-.06))/.9;
+    const scale=Math.max(.24,Math.min(.96,widthScale,depthScale)),spacing=natural*scale;
     return{x:cell.x+(tileIndex-(length-1)/2)*spacing,z:cell.z,scale,row:cell.row,col:cell.col,cellW:cell.width,cellD:cell.depth};
   }
+  function rummiRackLayout(count){
+    const total=Math.max(1,count),rows=total<=10?1:total<=20?2:total<=32?3:total<=50?4:5,perRow=Math.ceil(total/rows),depth=2.15,minZ=1.25,maxZ=minZ+depth,rowPitch=depth/rows;
+    return{total,rows,perRow,depth,minZ,maxZ,rowPitch};
+  }
   function rummiRackSlot(count,index){
-    const total=Math.max(1,count),rows=total<=10?1:total<=20?2:3,perRow=Math.ceil(total/rows),row=Math.floor(index/perRow),start=row*perRow,rowCount=Math.min(perRow,total-start),local=index-start;
-    const scale=rows===1?.92:rows===2?.82:.72,spacing=.68*scale,t=rowCount<=1?.5:local/(rowCount-1);
-    return{x:(local-(rowCount-1)/2)*spacing,z:2.05+row*.78+Math.abs(t-.5)*.04,scale,row,yOffset:row*.012+local*.001};
+    const layout=rummiRackLayout(count),row=Math.floor(index/layout.perRow),start=row*layout.perRow,rowCount=Math.min(layout.perRow,layout.total-start),local=index-start;
+    const baseScale=layout.rows===1?.92:layout.rows===2?.78:layout.rows===3?.66:layout.rows===4?.55:.46,widthScale=rowCount<=1?baseScale:8.2/(rowCount*.68),depthScale=Math.max(.34,(layout.rowPitch-.08)/.9),scale=Math.max(.32,Math.min(baseScale,widthScale,depthScale)),spacing=.68*scale,t=rowCount<=1?.5:local/(rowCount-1);
+    return{x:(local-(rowCount-1)/2)*spacing,z:layout.minZ+(row+.5)*layout.rowPitch+Math.abs(t-.5)*.025,scale,row,yOffset:row*.012+local*.001};
   }
   function eightSnapshot(payload,deckCount,top){
     const s=payload?.state,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0,own=s?.players?.[viewer]?.hand||[];
@@ -1389,8 +1393,9 @@ export function createTable3DRenderer({onFatal}={}){
   function syncRummikub(payload){
     clearObjects();dropMarker.visible=false;
     const data=payload.viewData?.rummi;if(!data){lastRummiSnapshot=null;return}
-    const selected=new Set(data.selectedIds||[]),oldIds=new Set(data.refTableIds||[]),groups=data.table||[],layout=rummiBoardLayout(groups),currentVisuals=new Map();
-    setCameraPose(0,8.65+Math.max(0,layout.rows-2)*.45,10.45+Math.max(0,layout.rows-2)*.35,0,.2,-.18);
+    const selected=new Set(data.selectedIds||[]),oldIds=new Set(data.refTableIds||[]),groups=data.table||[],layout=rummiBoardLayout(groups),hand=data.hand||[],rackLayout=rummiRackLayout(hand.length),currentVisuals=new Map();
+    const density=Math.max(layout.rows,rackLayout.rows,Math.ceil((layout.tileCount+hand.length)/24)),cameraExtra=Math.max(0,density-2);
+    setCameraPose(0,8.65+cameraExtra*.42,10.45+cameraExtra*.38,0,.2,-.28);
 
     layout.active.forEach(({group,index:gi},order)=>{
       group.forEach((tile,ti)=>{
@@ -1409,7 +1414,7 @@ export function createTable3DRenderer({onFatal}={}){
       const empty=makeLabel('TABLE COMMUNE · PREMIÈRE COMBINAISON','#dbea9e');empty.position.set(0,1.0,-.65);empty.scale.set(4.9,.8,1);objects.add(empty);
     }
 
-    const hand=data.hand||[],drawPos=new THREE.Vector3(4.55,TABLE_Y+.43,2.35),deckCount=Math.max(0,Number(data.deckCount)||0);
+    const drawPos=new THREE.Vector3(4.55,TABLE_Y+.43,2.35),deckCount=Math.max(0,Number(data.deckCount)||0);
     if(deckCount){
       const visiblePile=Math.min(4,deckCount);
       for(let i=0;i<visiblePile;i++){
@@ -2178,9 +2183,9 @@ export function createTable3DRenderer({onFatal}={}){
       }
     }
     if(best)return best;
-    if(position.z>=1.72&&Math.abs(position.x)<=4.45)return{dest:'hand',x:Math.max(-3.4,Math.min(3.4,position.x)),z:2.18,score:0};
-    const edge=Math.min(.68,Math.max(.28,layout.cellD*.45)),tableMinZ=layout.baseZ-edge,tableMaxZ=layout.baseZ+(layout.rows-1)*layout.cellD+edge;
-    if(position.z>=tableMinZ&&position.z<=tableMaxZ&&Math.abs(position.x)<=4.65)return{dest:'new',x:position.x,z:position.z,score:0};
+    const rack=rummiRackLayout(data.hand?.length||0);
+    if(position.z>=rack.minZ-.12&&position.z<=rack.maxZ+.20&&Math.abs(position.x)<=4.45)return{dest:'hand',x:Math.max(-3.4,Math.min(3.4,position.x)),z:Math.max(rack.minZ,Math.min(rack.maxZ,position.z)),score:0};
+    if(position.z>=layout.minZ&&position.z<=layout.maxZ&&Math.abs(position.x)<=4.78)return{dest:'new',x:position.x,z:position.z,score:0};
     return null;
   }
   function rummiDropDestination(position){return rummiDropTarget(position)?.dest??null}
