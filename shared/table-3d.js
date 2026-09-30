@@ -383,7 +383,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function remoteLooseLimit(actor){
     const hand=current?.state?.players?.[actor]?.hand,count=Array.isArray(hand)?hand.length:0;
-    return Math.max(0,Math.min(24,count));
+    return Math.max(0,Math.min(54,count));
   }
   function trimRemoteLooseCards(actor=null){
     const actors=actor===null?[...new Set([...remoteLooseCards.values()].map(entry=>entry.actor))]:[actor];let changed=false;
