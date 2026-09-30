@@ -285,6 +285,29 @@ async function loadPuff() {
       // opaque blanchirait le DOM derrière le col et masquerait l’afficheur.
       m.transparent = true; m.opacity = innerGlass ? .16 : .09; m.depthWrite = false;
     }
+    if (o.name === "Transparent_outer_sleeve_and_neck") {
+      // The floating canvas uses low alpha for clear plastic. Compensate only
+      // the mouthpiece's surface reflections so its gloss is not faded too.
+      m.onBeforeCompile = shader => {
+        shader.uniforms.mouthpieceSpecularGain = { value: 1.5 / m.opacity };
+        shader.vertexShader = shader.vertexShader
+          .replace('#include <common>', '#include <common>\nvarying float vPuffHeight;')
+          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvPuffHeight = position.y;');
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', '#include <common>\nvarying float vPuffHeight;\nuniform float mouthpieceSpecularGain;')
+          .replace('vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;', `
+            float mouthpiece = smoothstep(0.107, 0.111, vPuffHeight);
+            totalSpecular *= mix(1.0, mouthpieceSpecularGain, mouthpiece);
+            vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;
+          `)
+          .replace('#include <opaque_fragment>', `
+            #include <opaque_fragment>
+            float reflectedHighlight = max(totalSpecular.r, max(totalSpecular.g, totalSpecular.b));
+            gl_FragColor.a = max(gl_FragColor.a, mouthpiece * clamp(reflectedHighlight * 0.7, 0.0, 0.85));
+          `);
+      };
+      m.customProgramCacheKey = () => 'puff-mouthpiece-gloss-v1';
+    }
   });
   if (!decorMats.size) throw new Error("Puff: matériau d’habillage absent du modèle");
   // Seul l’habillage change : le socle argenté et l’embout transparent restent fixes.
