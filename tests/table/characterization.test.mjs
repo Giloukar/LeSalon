@@ -191,8 +191,8 @@ test('Three.js hardening adapts mobile quality, motion and reusable geometry',as
  assert.match(source,/lostpointercapture/);
  assert.match(source,/function capturePointer\(id\)\{try\{/);
  assert.match(source,/cardDropRadius/);
- assert.match(source,/const baseScale=rows===1\?Math\.max\(\.82,1-Math\.max\(0,total-6\)\*\.04\):rows===2\?\.88:\.64/);
- assert.match(source,/spacing=rowCount<=1\?0:CARD_W\*scale\+\.10/);
+ assert.match(source,/const dense=rows>1,baseScale=rows===1\?Math\.max\(\.84,1-Math\.max\(0,total-5\)\*\.035\):rows===2\?\.72:\.60/);
+ assert.match(source,/spacing=rowCount<=1\?0:CARD_W\*scale\+\(dense\?\.13:\.11\)/);
  assert.match(source,/const farFill=new THREE\.DirectionalLight/);
  assert.match(source,/const farGlow=new THREE\.PointLight/);
  assert.match(source,/function eightOpponentSeat\(total,index\)/);
