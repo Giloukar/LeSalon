@@ -378,12 +378,28 @@ export function createTable3DRenderer({onFatal}={}){
     if(index<0)return null;return eightOpponentSeat(opponents.length,index);
   }
   function currentEightOpponentSeat(actor){return currentCardOpponentSeat(actor)}
+  function removeRemoteLooseCard(key,entry){
+    if(!entry)return false;socialCards.remove(entry.mesh);disposeTemporaryTree(entry.mesh);remoteLooseCards.delete(key);return true;
+  }
+  function remoteLooseLimit(actor){
+    const hand=current?.state?.players?.[actor]?.hand,count=Array.isArray(hand)?hand.length:0;
+    return Math.max(0,Math.min(54,count));
+  }
+  function trimRemoteLooseCards(actor=null){
+    const actors=actor===null?[...new Set([...remoteLooseCards.values()].map(entry=>entry.actor))]:[actor];let changed=false;
+    for(const id of actors){
+      const entries=[...remoteLooseCards].filter(([,entry])=>entry.actor===id).sort((a,b)=>(a[1].start||0)-(b[1].start||0)),limit=remoteLooseLimit(id);
+      while(entries.length>limit){const [key,entry]=entries.shift();changed=removeRemoteLooseCard(key,entry)||changed}
+    }
+    return changed;
+  }
   function clearRemoteLooseCards(actor=null){
+    let changed=false;
     for(const [key,entry] of [...remoteLooseCards]){
       if(actor!==null&&entry.actor!==actor)continue;
-      socialCards.remove(entry.mesh);remoteLooseCards.delete(key);
+      changed=removeRemoteLooseCard(key,entry)||changed;
     }
-    draw();
+    if(changed)draw();
   }
   function remoteThrowTarget(seat,lateral,forward){
     const from=new THREE.Vector3(seat.x,TABLE_Y+.18,seat.z+.10),toCenter=new THREE.Vector3(-from.x,0,-from.z),len=Math.max(.001,Math.hypot(toCenter.x,toCenter.z));
@@ -397,7 +413,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.action!=='throw')return;const seat=currentCardOpponentSeat(actor);if(!seat)return;
     const token=String(d.token||'');if(!token)return;const key=actor+'|'+token;const old=remoteLooseCards.get(key);if(old?.mesh)socialCards.remove(old.mesh);
     const mesh=cardMesh(null,{back:true});mesh.scale.setScalar(.74);mesh.rotation.set(-Math.PI/2,0,0);const from=new THREE.Vector3(seat.x,TABLE_Y+.24,seat.z+.10),to=remoteThrowTarget(seat,Number(d.lateral)||0,Number(d.forward)||0);
-    mesh.position.copy(from);socialCards.add(mesh);remoteLooseCards.set(key,{mesh,actor,from,to,start:performance.now(),duration:520+Math.round(Math.max(0,Math.min(1,Number(d.speed)||0))*360),rotation:Math.max(-Math.PI,Math.min(Math.PI,Number(d.rotation)||0)),landed:false});startMotion();
+    mesh.position.copy(from);socialCards.add(mesh);remoteLooseCards.set(key,{mesh,actor,from,to,start:performance.now(),duration:520+Math.round(Math.max(0,Math.min(1,Number(d.speed)||0))*360),rotation:Math.max(-Math.PI,Math.min(Math.PI,Number(d.rotation)||0)),landed:false});trimRemoteLooseCards(actor);startMotion();
   }
   function onRemoteCardGesture(event){
     const game=current?.gameId,d=event?.detail||{};
@@ -1860,7 +1876,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function render(payload){
     current=payload;if(!active)return;
-    init();if(remoteLooseGame!==String(payload?.gameId||'')){clearRemoteLooseCards();remoteLooseGame=String(payload?.gameId||'')}resetCameraForGame(payload?.gameId);
+    init();if(remoteLooseGame!==String(payload?.gameId||'')){clearRemoteLooseCards();remoteLooseGame=String(payload?.gameId||'')}else trimRemoteLooseCards();resetCameraForGame(payload?.gameId);
     if(payload.gated){
       resizeObserver?.disconnect();resizeObserver=null;host?.remove();host=null;
       document.documentElement.removeAttribute('data-table-3d-game');document.documentElement.removeAttribute('data-table-3d-phase');return;
