@@ -159,6 +159,22 @@ test('dense Rummikub layout keeps every board and rack tile inside adaptive visi
  assert.doesNotMatch(source,/rummiPackRows[^\n]*dispatch\(/);
 });
 
+test('3D text labels reuse a bounded texture cache instead of reallocating every refresh',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/labelMaterials=new Map\(\)/);
+ assert.match(source,/labelGeneration=0/);
+ assert.match(source,/function labelMaterial\(text,accent='#dbea9e'\)/);
+ assert.match(source,/hit\.lastUsed=labelGeneration/);
+ assert.match(source,/labelMaterials\.set\(key,\{material,texture,lastUsed:labelGeneration\}\)/);
+ assert.match(source,/function pruneLabelCache\(limit=128\)/);
+ assert.match(source,/entry\.lastUsed<labelGeneration/);
+ assert.match(source,/entry\.material\.dispose\(\);entry\.texture\.dispose\(\);labelMaterials\.delete\(key\)/);
+ assert.match(source,/labelGeneration\+\+/);
+ assert.match(source,/syncCurrent\(payload\);pruneLocalPoses\(\);pruneLabelCache\(\)/);
+ assert.match(source,/new THREE\.Sprite\(labelMaterial\(text,accent\)\)/);
+ assert.doesNotMatch(source,/sp\.userData\.temporaryMaterial=mat;sp\.userData\.temporaryTexture=tex/);
+});
+
 test('Three.js hardening adapts mobile quality, motion and reusable geometry',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  const css=await readFile(path.join(root,'shared/table-3d.css'),'utf8');
