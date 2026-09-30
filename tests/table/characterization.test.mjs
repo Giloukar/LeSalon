@@ -568,6 +568,20 @@ test('free thrown cards are shared anonymously and can be arranged back into han
  assert.doesNotMatch(html,/card-tabletop[^\n]*(cardId|rank|suit)/);
 });
 
+test('remote free-card visuals are pruned to the authoritative hand count',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/function remoteLooseLimit\(actor\)/);
+ assert.match(source,/current\?\.state\?\.players\?\.\[actor\]\?\.hand/);
+ assert.match(source,/Math\.max\(0,Math\.min\(24,count\)\)/);
+ assert.match(source,/function trimRemoteLooseCards\(actor=null\)/);
+ assert.match(source,/while\(entries\.length>limit\)/);
+ assert.match(source,/removeRemoteLooseCard\(key,entry\)/);
+ assert.match(source,/trimRemoteLooseCards\(actor\);startMotion\(\)/);
+ assert.match(source,/else trimRemoteLooseCards\(\);resetCameraForGame/);
+ assert.doesNotMatch(source,/trimRemoteLooseCards[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/trimRemoteLooseCards[^\n]*onlineAct\(/);
+});
+
 test('tabletop throw packets expose motion but never card identity',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','online');const r=await t.page.evaluate(()=>{net.gameId='huit';const packet={type:'card-tabletop',matchId:net.matchId,revision:net.revision,gameId:'huit',action:'throw',token:7,lateral:.4,forward:.65,rotation:.2,speed:.7,cardId:'secret',rank:8,suit:'H'};const clean=tabletopCardClean(packet,0);const arrange=tabletopCardClean({...packet,action:'arrange'},0);return{clean,arrange};});assert.equal(r.clean.action,'throw');assert.equal(r.clean.token,7);assert.equal(Object.hasOwn(r.clean,'cardId'),false);assert.equal(Object.hasOwn(r.clean,'rank'),false);assert.equal(Object.hasOwn(r.clean,'suit'),false);assert.deepEqual(Object.keys(r.arrange).sort(),['action','actor','gameId','matchId','revision','type'].sort());}finally{await browser.close();}});
 
 test('free 3D camera orbit, zoom, pinch and reset stay presentation-only',async()=>{
