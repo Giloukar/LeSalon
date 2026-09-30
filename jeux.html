@@ -3709,7 +3709,13 @@ if(window.SalonTableView){
   }
  },true);
  window.addEventListener('salon:table-view-change',e=>{
-  if(e.detail?.mode!=='3d')table3dSetPresentation(null);
+  if(e.detail?.mode!=='3d'){
+   table3dSetPresentation(null);
+   void table3dExitNativeFullscreen();
+   if(['prepare-failed','activate-failed','render-failed','renderer-unavailable','webgl-failed','unsupported-game'].includes(e.detail?.reason)){
+    toast('La vue 3D a rencontré un problème. La partie continue en 2D.');
+   }
+  }
   tableViewMountControl();
  });
  const TABLE3D_BASE_CELEBRATE=celebrate;
