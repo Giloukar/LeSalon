@@ -93,14 +93,18 @@ const pack = await window.SalonTable3DModelPack.load({
 Chaque entrée accepte :
 
 - `src` : chemin GLB/GLTF ;
-- `scale` : facteur uniforme ou tableau `[x, y, z]` ;
-- `rotationDeg` : rotation de correction en degrés ;
-- `offset` : décalage local `[x, y, z]` ;
+- `fit: 'canonical'` : ajuste automatiquement le modèle en conservant ses proportions pour qu'il rentre dans les dimensions canoniques du `kind` ;
+- `origin: 'center'` ou `origin: 'floor-center'` : recentre automatiquement l'origine géométrique, soit au centre du modèle, soit au centre de sa base ;
+- `scale` : facteur uniforme ou tableau `[x, y, z]` ; avec `fit: 'canonical'`, il devient un multiplicateur fin appliqué après l'ajustement automatique ;
+- `rotationDeg` : rotation de correction en degrés, appliquée avant le calcul de l'encombrement canonique ;
+- `offset` : décalage local `[x, y, z]`, appliqué après le recentrage ;
 - `scaleFrom` : nom d'un champ numérique du contexte à multiplier à l'échelle courante, utile par exemple pour le ballon ;
 - `tintFrom` : nom d'un champ couleur du contexte, utile pour les pions et marqueurs ;
 - `configure(object, context)` : hook optionnel lorsque le manifest est défini en JavaScript et qu'une adaptation plus spécifique est nécessaire.
 
 Les transformations ne sont appliquées que lorsqu'elles sont déclarées : les transformations natives du fichier restent donc intactes par défaut. Avec le chargeur GLB intégré, le modèle corrigé est placé dans un `THREE.Group` externe. Le renderer déplace, tourne et redimensionne ce wrapper, ce qui évite d'écraser les corrections internes du fichier ou du manifest.
+
+Pour les modèles que tu vas produire, la voie recommandée sera désormais `fit: 'canonical'` avec `origin: 'floor-center'` pour les objets posés sur la table (pions, dés, maisons) et `origin: 'center'` pour les cartes et tuiles. Cela évite d'avoir à exporter chaque GLB exactement à l'échelle interne attendue : le fichier doit surtout conserver de bonnes proportions, un axe Y vertical et une géométrie propre. Les dimensions finales sont imposées par le contrat du renderer.
 
 Le chargement est tolérant aux erreurs par asset. Un fichier qui échoue apparaît dans `result.failed` et conserve son placeholder procédural, pendant que les autres modèles du pack sont activés. `result.unload()` ou `SalonTable3DModelPack.unload(id)` retire les factories du pack et revient immédiatement aux placeholders.
 

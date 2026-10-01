@@ -44,18 +44,50 @@ function tintObject(root,color){
   for(const mat of materials)mat?.color?.set?.(color);
  });
 }
+function canonicalDimensions(size={}){
+ const edge=Number(size.edge),radius=Number(size.radius),width=Number(size.width),height=Number(size.height),depth=Number(size.depth);
+ if(Number.isFinite(edge)&&edge>0)return[edge,edge,edge];
+ return[
+  Number.isFinite(width)&&width>0?width:Number.isFinite(radius)&&radius>0?radius*2:null,
+  Number.isFinite(height)&&height>0?height:Number.isFinite(radius)&&radius>0?radius*2:null,
+  Number.isFinite(depth)&&depth>0?depth:Number.isFinite(radius)&&radius>0?radius*2:null
+ ];
+}
+function fitCanonical(object,entry,context){
+ if(entry.fit!=='canonical')return object;
+ const Box3=context?.THREE?.Box3;if(typeof Box3!=='function')return object;
+ const box=new Box3().setFromObject(object),size={x:0,y:0,z:0};box.getSize?.(size);
+ const target=canonicalDimensions(context?.canonicalSize||{}),actual=[Number(size.x),Number(size.y),Number(size.z)],ratios=[];
+ for(let i=0;i<3;i++)if(Number.isFinite(target[i])&&target[i]>0&&Number.isFinite(actual[i])&&actual[i]>1e-9)ratios.push(target[i]/actual[i]);
+ if(ratios.length){const factor=Math.min(...ratios);if(Number.isFinite(factor)&&factor>0)object.scale?.multiplyScalar?.(factor)}
+ return object;
+}
+function recenterCanonical(object,entry,context){
+ const origin=entry.origin;if(!origin)return object;
+ const Box3=context?.THREE?.Box3;if(typeof Box3!=='function')return object;
+ const aligned=new Box3().setFromObject(object),center={x:0,y:0,z:0};aligned.getCenter?.(center);
+ if(origin==='center')object.position?.set?.((object.position?.x||0)-center.x,(object.position?.y||0)-center.y,(object.position?.z||0)-center.z);
+ else if(origin==='floor-center')object.position?.set?.((object.position?.x||0)-center.x,(object.position?.y||0)-Number(aligned.min?.y||0),(object.position?.z||0)-center.z);
+ return object;
+}
 function applyTransform(object,entry,context){
+ if(entry.rotationDeg!==undefined){
+  const rotation=vec3(entry.rotationDeg,[0,0,0]);object.rotation?.set?.(rotation[0]*Math.PI/180,rotation[1]*Math.PI/180,rotation[2]*Math.PI/180);
+ }
+ fitCanonical(object,entry,context);
  if(entry.scale!==undefined){
-  const scale=vec3(entry.scale,[1,1,1]);object.scale?.set?.(scale[0],scale[1],scale[2]);
+  const scale=vec3(entry.scale,[1,1,1]);
+  if(entry.fit==='canonical'){if(object.scale){object.scale.x*=scale[0];object.scale.y*=scale[1];object.scale.z*=scale[2]}}
+  else object.scale?.set?.(scale[0],scale[1],scale[2]);
  }
  if(entry.scaleFrom&&Number.isFinite(Number(context?.[entry.scaleFrom]))){
   const multiplier=Number(context[entry.scaleFrom]);object.scale?.multiplyScalar?.(multiplier);
  }
- if(entry.rotationDeg!==undefined){
-  const rotation=vec3(entry.rotationDeg,[0,0,0]);object.rotation?.set?.(rotation[0]*Math.PI/180,rotation[1]*Math.PI/180,rotation[2]*Math.PI/180);
- }
+ recenterCanonical(object,entry,context);
  if(entry.offset!==undefined){
-  const offset=vec3(entry.offset,[0,0,0]);object.position?.set?.(offset[0],offset[1],offset[2]);
+  const offset=vec3(entry.offset,[0,0,0]);
+  if(entry.fit==='canonical'||entry.origin)object.position?.set?.((object.position?.x||0)+offset[0],(object.position?.y||0)+offset[1],(object.position?.z||0)+offset[2]);
+  else object.position?.set?.(offset[0],offset[1],offset[2]);
  }
  if(entry.tintFrom)tintObject(object,context?.[entry.tintFrom]);
  if(typeof entry.configure==='function'){
