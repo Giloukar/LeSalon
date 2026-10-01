@@ -5,6 +5,11 @@ const registry=window.SalonTable3DAssets;
 if(!registry){console.warn('[Le Salon 3D] model-pack loader disabled: asset registry missing');return}
 
 const activePacks=new Map();
+const REQUIRED_SEMANTIC_SLOTS=Object.freeze({
+ card:Object.freeze(['salon-card-front','salon-card-back','salon-card-edge']),
+ die:Object.freeze(['salon-die-xp','salon-die-xn','salon-die-yp','salon-die-yn','salon-die-zp','salon-die-zn']),
+ 'rummikub-tile':Object.freeze(['salon-tile-front','salon-tile-back','salon-tile-edge'])
+});
 let packCounter=0,runtimePromise=null;
 
 function normalizeKind(kind){return String(kind||'').trim().toLowerCase()}
@@ -34,6 +39,31 @@ function cloneMaterials(root){
   if(Array.isArray(node.material))node.material=node.material.map(m=>m?.clone?.()||m);
   else node.material=node.material.clone?.()||node.material;
  });
+}
+function normalizeSemanticSlot(value){
+ const raw=String(value||'').trim().toLowerCase().replace(/\.\d+$/,'').replace(/[_\s]+/g,'-').replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'');
+ if(!raw)return'';return raw.startsWith('salon-')?raw:'salon-'+raw;
+}
+function inspectTemplate(template,kind){
+ const key=normalizeKind(kind),required=REQUIRED_SEMANTIC_SLOTS[key]||[],inspectable=typeof template?.traverse==='function';
+ if(!inspectable)return{kind:key,meshCount:0,triangles:0,materialCount:0,slots:[],missingSlots:[],warnings:[]};
+ const slots=new Set(),materials=new Set();let meshCount=0,triangles=0;
+ template.traverse(node=>{
+  if(!node?.isMesh)return;meshCount++;
+  const nodeSlot=normalizeSemanticSlot(node.userData?.salonSlot||node.name);if(required.includes(nodeSlot))slots.add(nodeSlot);
+  const list=Array.isArray(node.material)?node.material:node.material?[node.material]:[];
+  for(const mat of list){materials.add(mat);const slot=normalizeSemanticSlot(mat?.name);if(required.includes(slot))slots.add(slot)}
+  const count=Number(node.geometry?.index?.count??node.geometry?.attributes?.position?.count??0);if(Number.isFinite(count)&&count>0)triangles+=Math.floor(count/3);
+ });
+ const missingSlots=required.filter(slot=>!slots.has(slot)),warnings=[];
+ if(!meshCount)warnings.push('no-mesh');
+ if(missingSlots.length)warnings.push('missing-semantic-slots');
+ return{kind:key,meshCount,triangles,materialCount:materials.size,slots:[...slots].sort(),missingSlots,warnings};
+}
+function inspect(kind,object){return inspectTemplate(object,kind)}
+function requirements(kind=null){
+ if(kind!==null&&kind!==undefined)return[...(REQUIRED_SEMANTIC_SLOTS[normalizeKind(kind)]||[])];
+ return Object.fromEntries(Object.entries(REQUIRED_SEMANTIC_SLOTS).map(([key,value])=>[key,[...value]]));
 }
 function tintObject(root,color){
  if(color===undefined||color===null||color==='')return;
@@ -129,14 +159,14 @@ function unload(id){
  return true;
 }
 function unloadAll(){for(const id of [...activePacks.keys()])unload(id)}
-function active(){return [...activePacks.values()].map(pack=>({id:pack.id,kinds:[...pack.kinds]}))}
+function active(){return [...activePacks.values()].map(pack=>({id:pack.id,kinds:[...pack.kinds],diagnostics:(pack.diagnostics||[]).map(x=>({...x,slots:[...x.slots],missingSlots:[...x.missingSlots],warnings:[...x.warnings]}))}))}
 
 async function load(manifest,options={}){
  const pack=normalizeManifest(manifest);
  unload(pack.id);
  const loadModel=typeof options.loadModel==='function'?options.loadModel:defaultLoadModel;
  const cloneModel=typeof options.cloneModel==='function'?options.cloneModel:null,wrapModel=typeof options.wrapModel==='function'?options.wrapModel:null;
- const disposers=[],loadedKinds=[],failed=[];
+ const disposers=[],loadedKinds=[],failed=[],diagnostics=[];
  emit({type:'loading',id:pack.id,total:pack.assets.length,loaded:0,failed:0});
  let completed=0;
  const results=await Promise.all(pack.assets.map(async entry=>{
@@ -149,7 +179,7 @@ async function load(manifest,options={}){
     const visual=applyTransform(instance,entry,context||{});
     return record.wrap?.(visual,context||{},entry)||visual;
    };
-   return{entry,factory};
+   return{entry,factory,diagnostic:inspectTemplate(record.template,entry.kind)};
   }catch(error){return{entry,error}}
  }));
  for(const result of results){
@@ -157,15 +187,15 @@ async function load(manifest,options={}){
   if(result.error){
    failed.push({kind:result.entry.kind,src:result.entry.src,error:String(result.error?.message||result.error)});
   }else{
-   disposers.push(registry.register(result.entry.kind,result.factory));loadedKinds.push(result.entry.kind);
+   disposers.push(registry.register(result.entry.kind,result.factory));loadedKinds.push(result.entry.kind);if(result.diagnostic)diagnostics.push(result.diagnostic);
   }
   emit({type:'progress',id:pack.id,total:pack.assets.length,loaded:loadedKinds.length,failed:failed.length,completed});
  }
- activePacks.set(pack.id,{id:pack.id,kinds:new Set(loadedKinds),disposers});
- const outcome={id:pack.id,loadedKinds:[...loadedKinds],failed:failed.map(x=>({...x})),unload:()=>unload(pack.id)};
- emit({type:'ready',id:pack.id,loadedKinds:[...loadedKinds],failed:outcome.failed});
+ activePacks.set(pack.id,{id:pack.id,kinds:new Set(loadedKinds),disposers,diagnostics});
+ const outcome={id:pack.id,loadedKinds:[...loadedKinds],failed:failed.map(x=>({...x})),diagnostics:diagnostics.map(x=>({...x,slots:[...x.slots],missingSlots:[...x.missingSlots],warnings:[...x.warnings]})),unload:()=>unload(pack.id)};
+ emit({type:'ready',id:pack.id,loadedKinds:[...loadedKinds],failed:outcome.failed,diagnostics:outcome.diagnostics});
  return outcome;
 }
 
-window.SalonTable3DModelPack=Object.freeze({load,unload,unloadAll,active});
+window.SalonTable3DModelPack=Object.freeze({load,unload,unloadAll,active,inspect,requirements});
 })();

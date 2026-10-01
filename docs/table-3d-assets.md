@@ -130,6 +130,20 @@ Pour les modèles que tu vas produire, la voie recommandée sera désormais `fit
 
 Le chargement est tolérant aux erreurs par asset. Un fichier qui échoue apparaît dans `result.failed` et conserve son placeholder procédural, pendant que les autres modèles du pack sont activés. `result.unload()` ou `SalonTable3DModelPack.unload(id)` retire les factories du pack et revient immédiatement aux placeholders.
 
+## Diagnostic avant intégration
+
+Le chargeur fournit maintenant un diagnostic non bloquant pour chaque modèle chargé. `result.diagnostics` indique le nombre de meshes, le nombre approximatif de triangles, le nombre de matériaux, les slots sémantiques trouvés et ceux qui manquent. Pour une carte, un dé ou une tuile Rummikub, un slot manquant apparaît dans `missingSlots` et ajoute `missing-semantic-slots` à `warnings` sans casser la partie.
+
+`SalonTable3DModelPack.requirements('card')` renvoie les slots attendus pour une famille et `SalonTable3DModelPack.inspect(kind, object3D)` permet de contrôler un modèle déjà chargé avant même de l'enregistrer. Cette étape est prévue pour valider immédiatement les GLB que tu produiras, au lieu de découvrir un problème de nommage après leur intégration.
+
+Exemple de contrôle :
+
+```js
+const result = await SalonTable3DModelPack.load(manifest);
+console.table(result.diagnostics);
+// missingSlots doit être [] pour card, die et rummikub-tile.
+```
+
 L'événement `salon:table-3d-model-pack` publie les phases `loading`, `progress`, `ready` et `unloaded`, ce qui permettra d'ajouter plus tard une interface de progression sans coupler cette interface au renderer.
 
 
