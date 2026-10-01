@@ -916,7 +916,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(animateDice)lastDiceKey=diceKey;
     values.forEach((value,i)=>{
       const die=dieMesh(value);die.position.set(-.52+i*1.04,TABLE_Y+.72,.05);
-      if(payload.canInteract&&!s.goosePending){die.userData={kind:'goose-roll',interactive:true};interactive.push(die)}
+      if(payload.canInteract&&!s.goosePending){die.userData={...die.userData,kind:'goose-roll',interactive:true,home:{scale:die.scale.clone()}};interactive.push(die)}
       objects.add(die);
       if(animateDice&&motionAllowed()){const h=visualHash(diceKey+'|'+i);die.rotation.set(5+h*4,7+h*5,4+h*6);diceAnimations.push({mesh:die,start:performance.now(),duration:620+i*80,rx:die.rotation.x,ry:die.rotation.y,rz:die.rotation.z})}
     });
@@ -936,7 +936,10 @@ export function createTable3DRenderer({onFatal}={}){
     dice.forEach((value,i)=>{
       const die=rolls?dieMesh(value):blankDieMesh(),x=(i-2)*1.35,z=held[i]?.42:0;
       die.position.set(x,TABLE_Y+.78,z);die.scale.setScalar(held[i]?1.06:1);
-      if(payload.canInteract&&rolls>0&&rolls<3){die.userData={kind:'yam-hold',index:i,interactive:true};interactive.push(die)}
+      if(payload.canInteract&&rolls<3){
+        const kind=rolls===0?'yam-roll':'yam-hold';
+        die.userData={...die.userData,kind,index:i,interactive:true,home:{scale:die.scale.clone()}};interactive.push(die);
+      }
       objects.add(die);
       if(held[i]){
         const pad=new THREE.Mesh(heldPadGeometry,tileMaterial('goose',true));pad.position.set(x,TABLE_Y+.36,z);objects.add(pad);
@@ -949,7 +952,7 @@ export function createTable3DRenderer({onFatal}={}){
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     if(title)title.textContent='VUE 3D · YAM';
     if(status)status.textContent=rolls?'Lancer '+rolls+' / 3 · '+held.filter(Boolean).length+' dé'+(held.filter(Boolean).length>1?'s':'')+' conservé'+(held.filter(Boolean).length>1?'s':''):'Cinq dés prêts';
-    if(help)help.textContent=rolls&&rolls<3?'Touchez un dé pour le conserver · catégories et score restent synchronisés dessous':rolls>=3?'Trois lancers joués · choisissez une catégorie dessous':'Lancez les cinq dés';
+    if(help)help.textContent=rolls&&rolls<3?'Touchez un dé pour le conserver · catégories et score restent synchronisés dessous':rolls>=3?'Trois lancers joués · choisissez une catégorie dessous':'Touchez directement un dé ou le bouton LANCER';
     if(diceAnimations.length)startMotion();
   }
 
@@ -1842,7 +1845,7 @@ export function createTable3DRenderer({onFatal}={}){
       const tag=makeLabel((pl.name||'Joueur')+' · '+pl.cash+' ¤'+(pl.jailed?' · détenu':''),i===s.turn?'#dbea9e':'#d8ded9');tag.scale.set(1.65,.31,1);tag.position.set(pawn.position.x,TABLE_Y+.92,pawn.position.z);objects.add(tag);
     });
     const dice=Array.isArray(data.dice)?data.dice:[1,1],key='city|'+(s?.moves??0)+'|'+dice.join('-'),animate=s?.moves>0&&key!==lastDiceKey;if(animate)lastDiceKey=key;
-    dice.forEach((value,i)=>{const die=dieMesh(value);die.position.set(-.52+i*1.04,TABLE_Y+.78,.05);objects.add(die);if(animate&&motionAllowed()){const h=visualHash(key+'|'+i);die.rotation.set(5+h*4,7+h*5,4+h*6);diceAnimations.push({mesh:die,start:performance.now(),duration:620+i*70,rx:die.rotation.x,ry:die.rotation.y,rz:die.rotation.z})}});
+    dice.forEach((value,i)=>{const die=dieMesh(value);die.position.set(-.52+i*1.04,TABLE_Y+.78,.05);if(payload.canInteract&&data.canRoll){die.userData={...die.userData,kind:'city-roll',interactive:true,home:{scale:die.scale.clone()}};interactive.push(die)}objects.add(die);if(animate&&motionAllowed()){const h=visualHash(key+'|'+i);die.rotation.set(5+h*4,7+h*5,4+h*6);diceAnimations.push({mesh:die,start:performance.now(),duration:620+i*70,rx:die.rotation.x,ry:die.rotation.y,rz:die.rotation.z})}});
     if(payload.canInteract){
       const phaseActions=[];
       if(data.canRoll)phaseActions.push(['LANCER LES DÉS','roll','#dbea9e']);
@@ -1920,7 +1923,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(hovered===mesh)return;
     if(hovered&&!drag){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale);}
     hovered=mesh;
-    if(hovered&&!drag&&['card','card-select','maid-pick','battle-card','trick-collect','special-select','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-draw','rummi-dest','intrus-spot','code-cycle'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
+    if(hovered&&!drag&&['card','card-select','maid-pick','battle-card','trick-collect','special-select','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-draw','rummi-dest','intrus-spot','code-cycle','goose-roll','yam-roll','yam-hold','city-roll'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
     draw();
   }
   function capturePointer(id){try{canvas?.setPointerCapture?.(id)}catch(_){}}
