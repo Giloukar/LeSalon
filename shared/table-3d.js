@@ -2200,7 +2200,7 @@ export function createTable3DRenderer({onFatal}={}){
     }
     const authoritative=!!(d.overDrop||d.rummiDrop||d.drawToRack||d.maidToHand||d.battleToCenter||d.trickToHand);
     d.localSnap=!authoritative&&!d.stackMode&&!(d.companions?.length)&&d.mesh.userData?.persistLocalPose?localPoseSnapTarget(d.mesh,d.mesh.position):null;
-    if(d.localSnap)showDropMarkerAt(d.localSnap.x,d.localSnap.z,true);
+    if(d.localSnap)showDropMarkerAt(d.localSnap.x,d.localSnap.z,true);else if(!authoritative)showDropMarkerAt(0,0,false);
     draw();e.preventDefault();return true;
   }
   function cardDropRadius(d){return d?.pointerType==='touch'||matchMedia('(pointer: coarse)').matches?1.9:1.5}
