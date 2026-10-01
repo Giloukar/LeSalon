@@ -65,7 +65,7 @@ test('Yam and Métropole expose direct physical dice controls without bypassing 
  assert.match(source,/current\?\.interactions\?\.yam\?\.\(d\.kind==='yam-hold'\?'hold':'roll'/);
  assert.match(source,/current\?\.interactions\?\.city\?\.\('roll'\)/);
  assert.match(source,/current\?\.interactions\?\.goose\?\.\(d\.kind==='goose-roll'\?'roll':'choose'/);
- assert.match(source,/\'goose-roll\',\'yam-roll\',\'yam-hold\',\'city-roll\'/);
+ assert.match(source,/const interactiveHover=!!hovered\?\.userData\?\.interactive/);
  assert.doesNotMatch(source,/kind==='yam-roll'[^\n]*Math\.random/);
  assert.doesNotMatch(source,/kind==='city-roll'[^\n]*Math\.random/);
 });
@@ -188,6 +188,20 @@ test('3D text labels reuse a bounded texture cache instead of reallocating every
  assert.match(source,/syncCurrent\(payload\);pruneLocalPoses\(\);pruneLabelCache\(\)/);
  assert.match(source,/new THREE\.Sprite\(labelMaterial\(text,accent\)\)/);
  assert.doesNotMatch(source,/sp\.userData\.temporaryMaterial=mat;sp\.userData\.temporaryTexture=tex/);
+});
+
+test('3D interactive objects expose consistent hover and pointer affordances',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ const css=await readFile(path.join(root,'shared/table-3d.css'),'utf8');
+ assert.match(source,/sp\.userData\.home\?\?=\{scale:sp\.scale\.clone\(\)\}/);
+ assert.match(source,/const interactiveHover=!!hovered\?\.userData\?\.interactive,dragHover=interactiveHover&&!!hovered\?\.userData\?\.looseManip/);
+ assert.match(source,/classList\.toggle\('has-action-hover',interactiveHover&&!dragHover\)/);
+ assert.match(source,/classList\.toggle\('has-object-hover',dragHover\)/);
+ assert.match(source,/if\(hovered&&!drag&&interactiveHover\)/);
+ assert.match(source,/classList\.remove\('has-action-hover','has-object-hover'\)/);
+ assert.match(css,/\.table-3d-host\.has-action-hover canvas\{cursor:pointer\}/);
+ assert.match(css,/\.table-3d-host\.has-object-hover canvas\{cursor:grab\}/);
+ assert.match(css,/\.table-3d-host\.is-dragging canvas,.table-3d-host\.is-camera-dragging canvas\{cursor:grabbing\}/);
 });
 
 test('Three.js hardening adapts mobile quality, motion and reusable geometry',async()=>{

@@ -332,7 +332,7 @@ export function createTable3DRenderer({onFatal}={}){
     child?.traverse?.(o=>{o.userData?.temporaryGeometry?.dispose?.();o.userData?.temporaryMaterial?.dispose?.();o.userData?.temporaryTexture?.dispose?.()});
   }
   function clearObjects(){
-    labelGeneration++;
+    labelGeneration++;hovered=null;host?.classList.remove('has-action-hover','has-object-hover');
     interactive.length=0;diceAnimations.length=0;pawnAnimations.length=0;cardAnimations.length=0;manipAnimations.length=0;tossAnimations.length=0;
     if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
     for(const child of [...objects.children]){objects.remove(child);disposeTemporaryTree(child)}
@@ -753,7 +753,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function cellLabel(n){const sp=new THREE.Sprite(cellLabelMaterial(n));sp.scale.set(.48,.34,1);return sp}
   function actionSprite(text,kind,data={},accent='#dbea9e'){
-    const sp=makeLabel(text,accent);sp.scale.set(2.55,.58,1);sp.userData={...sp.userData,kind,interactive:true,...data};interactive.push(sp);return sp;
+    const sp=makeLabel(text,accent);sp.scale.set(2.55,.58,1);sp.userData={...sp.userData,kind,interactive:true,...data};sp.userData.home??={scale:sp.scale.clone()};interactive.push(sp);return sp;
   }
   function blankDieMesh(){
     const external=externalAsset('die',{value:null,blank:true,canonicalSize:{edge:.68}});if(external)return external;
@@ -1921,9 +1921,12 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function setHover(mesh){
     if(hovered===mesh)return;
-    if(hovered&&!drag){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale);}
+    if(hovered&&!drag){const h=hovered.userData.home;if(h?.scale)hovered.scale.copy(h.scale);}
     hovered=mesh;
-    if(hovered&&!drag&&['card','card-select','maid-pick','battle-card','trick-collect','special-select','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','rummi-tile','rummi-draw','rummi-dest','intrus-spot','code-cycle','goose-roll','yam-roll','yam-hold','city-roll'].includes(hovered.userData.kind)){const h=hovered.userData.home;if(h)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
+    const interactiveHover=!!hovered?.userData?.interactive,dragHover=interactiveHover&&!!hovered?.userData?.looseManip;
+    host?.classList.toggle('has-action-hover',interactiveHover&&!dragHover);
+    host?.classList.toggle('has-object-hover',dragHover);
+    if(hovered&&!drag&&interactiveHover){const h=hovered.userData.home;if(h?.scale)hovered.scale.copy(h.scale).multiplyScalar(1.055)}
     draw();
   }
   function capturePointer(id){try{canvas?.setPointerCapture?.(id)}catch(_){}}
