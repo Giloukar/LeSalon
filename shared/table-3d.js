@@ -177,14 +177,26 @@ export function createTable3DRenderer({onFatal}={}){
     if(saved){const display=localPoseDisplay(key,saved);mesh.position.copy(display.position);mesh.rotation.copy(display.rotation);mesh.scale.copy(display.scale);mesh.userData.home=cloneTransform(display)}
     return key;
   }
-  function freePoseForMesh(mesh,home=mesh?.userData?.home){
-    if(!mesh||!home)return null;
-    const y=Number(mesh.userData?.localPoseFloorY??TABLE_Y+.12),position=new THREE.Vector3(clampMotion(mesh.position.x,-5.05,5.05),y,clampMotion(mesh.position.z,-3.08,3.08));
-    return{position,rotation:new THREE.Euler(faceRotationX(mesh.rotation.x),0,mesh.rotation.z),scale:home.scale.clone()};
+  function localPoseSnapTarget(mesh,position=mesh?.position){
+    const key=mesh?.userData?.localPoseKey;if(!key||!position||!activePoseScope)return null;
+    const prefix=activePoseScope+'|',kind=key.slice(prefix.length).split('|')[0],limit=kind==='tile'?.38:.52;let best=null;
+    for(const [otherKey,other] of localPoses){
+      if(otherKey===key||!otherKey.startsWith(prefix)||otherKey.slice(prefix.length).split('|')[0]!==kind)continue;
+      const dx=other.position.x-position.x,dz=other.position.z-position.z,score=Math.hypot(dx,dz*.82);
+      if(score>limit||best&&score>=best.score)continue;
+      best={key:otherKey,x:other.position.x,z:other.position.z,rotation:other.rotation.z,score};
+    }
+    return best;
   }
-  function saveLocalPose(mesh,home=mesh?.userData?.home,{order=null}={}){
+  function freePoseForMesh(mesh,home=mesh?.userData?.home,{snap=false}={}){
+    if(!mesh||!home)return null;
+    const y=Number(mesh.userData?.localPoseFloorY??TABLE_Y+.12),position=new THREE.Vector3(clampMotion(mesh.position.x,-5.05,5.05),y,clampMotion(mesh.position.z,-3.08,3.08)),rotation=new THREE.Euler(faceRotationX(mesh.rotation.x),0,mesh.rotation.z);
+    if(snap){const anchor=localPoseSnapTarget(mesh,position);if(anchor){position.x=anchor.x;position.z=anchor.z;rotation.z=anchor.rotation}}
+    return{position,rotation,scale:home.scale.clone()};
+  }
+  function saveLocalPose(mesh,home=mesh?.userData?.home,{order=null,snap=false}={}){
     const key=mesh?.userData?.localPoseKey;if(!key)return null;
-    const pose=freePoseForMesh(mesh,home);if(!pose)return null;
+    const pose=freePoseForMesh(mesh,home,{snap});if(!pose)return null;
     pose.order=Number.isFinite(order)?order:++localPoseOrder;if(Number.isFinite(order))localPoseOrder=Math.max(localPoseOrder,order);
     localPoses.set(key,cloneTransform(pose));poseSeen.add(key);
     const display=localPoseDisplay(key,pose);mesh.userData.home=cloneTransform(display);return display;
@@ -1996,11 +2008,11 @@ export function createTable3DRenderer({onFatal}={}){
   function settlePersistentPlacement(d){
     const items=[{mesh:d?.mesh,home:d?.home,index:0},...(d?.companions||[]).map((c,i)=>({mesh:c.mesh,home:c.home,index:i+1}))];
     if(!items.some(item=>item.mesh?.userData?.persistLocalPose))return false;
-    const now=performance.now();
+    const now=performance.now(),magnetic=!d.stackMode&&items.length===1;
     items.forEach(item=>{
       if(!item.mesh||!item.home)return;
       if(!item.mesh.userData?.persistLocalPose){restoreManipulatedMesh(item.mesh,item.home,d,{index:item.index});return}
-      const from=meshTransform(item.mesh),poseOrder=d.stackMode?localPoses.get(item.mesh.userData?.localPoseKey)?.order:null,pose=saveLocalPose(item.mesh,item.home,{order:poseOrder});if(!pose)return;
+      const from=meshTransform(item.mesh),poseOrder=d.stackMode?localPoses.get(item.mesh.userData?.localPoseKey)?.order:null,pose=saveLocalPose(item.mesh,item.home,{order:poseOrder,snap:magnetic});if(!pose)return;
       manipAnimations.push({
         mesh:item.mesh,from:from.position,
         control:from.position.clone().lerp(pose.position,.5).add(new THREE.Vector3(0,.10+item.index*.012,0)),
@@ -2186,6 +2198,9 @@ export function createTable3DRenderer({onFatal}={}){
       d.trickToHand=d.mesh.position.z>=1.42&&Math.abs(d.mesh.position.x)<=4.45;
       showDropMarkerAt(Math.max(-2.8,Math.min(2.8,d.mesh.position.x)),2.20,d.trickToHand);
     }
+    const authoritative=!!(d.overDrop||d.rummiDrop||d.drawToRack||d.maidToHand||d.battleToCenter||d.trickToHand);
+    d.localSnap=!authoritative&&!d.stackMode&&!(d.companions?.length)&&d.mesh.userData?.persistLocalPose?localPoseSnapTarget(d.mesh,d.mesh.position):null;
+    if(d.localSnap)showDropMarkerAt(d.localSnap.x,d.localSnap.z,true);else if(!authoritative)showDropMarkerAt(0,0,false);
     draw();e.preventDefault();return true;
   }
   function cardDropRadius(d){return d?.pointerType==='touch'||matchMedia('(pointer: coarse)').matches?1.9:1.5}

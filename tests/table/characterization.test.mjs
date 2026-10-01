@@ -554,6 +554,23 @@ test('authoritative drop handling precedes local free placement fallback',async(
  assert.match(source,/current\?\.interactions\?\.rummi\?\.\('drop'/);
 });
 
+test('nearby local cards magnetically snap into neat physical stacks without becoming game actions',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/function localPoseSnapTarget\(mesh,position=mesh\?\.position\)/);
+ assert.match(source,/limit=kind==='tile'\?\.38:\.52/);
+ assert.match(source,/score=Math\.hypot\(dx,dz\*\.82\)/);
+ assert.match(source,/function freePoseForMesh\(mesh,home=mesh\?\.userData\?\.home,\{snap=false\}=\{\}\)/);
+ assert.match(source,/if\(snap\)\{const anchor=localPoseSnapTarget\(mesh,position\)/);
+ assert.match(source,/rotation\.z=anchor\.rotation/);
+ assert.match(source,/saveLocalPose\(item\.mesh,item\.home,\{order:poseOrder,snap:magnetic\}\)/);
+ assert.match(source,/magnetic=!d\.stackMode&&items\.length===1/);
+ assert.match(source,/d\.localSnap=.*localPoseSnapTarget\(d\.mesh,d\.mesh\.position\)/);
+ assert.match(source,/showDropMarkerAt\(d\.localSnap\.x,d\.localSnap\.z,true\)/);
+ assert.doesNotMatch(source,/localPoseSnapTarget[^\n]*dispatch\(/);
+ assert.doesNotMatch(source,/localPoseSnapTarget[^\n]*onlineAct\(/);
+ assert.doesNotMatch(source,/localPoseSnapTarget[^\n]*publishOnline\(/);
+});
+
 test('persistent local poses stack cleanly and expose a local-only reset',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/localPoseOrder=0/);
@@ -686,7 +703,7 @@ test('local pose stacks can be moved as local-only packets without becoming game
 
 test('local whole-stack movement preserves existing pose order',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
- assert.match(source,/function saveLocalPose\(mesh,home=mesh\?\.userData\?\.home,\{order=null\}=\{\}\)/);
+ assert.match(source,/function saveLocalPose\(mesh,home=mesh\?\.userData\?\.home,\{order=null,snap=false\}=\{\}\)/);
  assert.match(source,/pose\.order=Number\.isFinite\(order\)\?order:\+\+localPoseOrder/);
  assert.match(source,/localPoseOrder=Math\.max\(localPoseOrder,order\)/);
  assert.match(source,/sort\(\(a,b\)=>\(Number\(a\.pose\.order\)\|\|0\)-\(Number\(b\.pose\.order\)\|\|0\)\)/);
