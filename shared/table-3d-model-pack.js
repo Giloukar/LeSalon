@@ -84,7 +84,9 @@ function applyTransform(object,entry,context){
   const multiplier=Number(context[entry.scaleFrom]);object.scale?.multiplyScalar?.(multiplier);
  }
  if(entry.offset!==undefined){
-  const offset=vec3(entry.offset,[0,0,0]);object.position?.set?.((object.position?.x||0)+offset[0],(object.position?.y||0)+offset[1],(object.position?.z||0)+offset[2]);
+  const offset=vec3(entry.offset,[0,0,0]);
+  if(entry.fit==='canonical'||entry.origin)object.position?.set?.((object.position?.x||0)+offset[0],(object.position?.y||0)+offset[1],(object.position?.z||0)+offset[2]);
+  else object.position?.set?.(offset[0],offset[1],offset[2]);
  }
  if(entry.tintFrom)tintObject(object,context?.[entry.tintFrom]);
  if(typeof entry.configure==='function'){
