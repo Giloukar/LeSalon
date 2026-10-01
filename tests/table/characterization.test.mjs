@@ -703,7 +703,7 @@ test('local pose stacks can be moved as local-only packets without becoming game
 
 test('local whole-stack movement preserves existing pose order',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
- assert.match(source,/function saveLocalPose\(mesh,home=mesh\?\.userData\?\.home,\{order=null\}=\{\}\)/);
+ assert.match(source,/function saveLocalPose\(mesh,home=mesh\?\.userData\?\.home,\{order=null,snap=false\}=\{\}\)/);
  assert.match(source,/pose\.order=Number\.isFinite\(order\)\?order:\+\+localPoseOrder/);
  assert.match(source,/localPoseOrder=Math\.max\(localPoseOrder,order\)/);
  assert.match(source,/sort\(\(a,b\)=>\(Number\(a\.pose\.order\)\|\|0\)-\(Number\(b\.pose\.order\)\|\|0\)\)/);
