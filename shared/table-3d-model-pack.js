@@ -54,20 +54,20 @@ function canonicalDimensions(size={}){
  ];
 }
 function fitCanonical(object,entry,context){
- const wantsFit=entry.fit==='canonical',origin=entry.origin;
- if(!wantsFit&&!origin)return object;
+ if(entry.fit!=='canonical')return object;
  const Box3=context?.THREE?.Box3;if(typeof Box3!=='function')return object;
  const box=new Box3().setFromObject(object),size={x:0,y:0,z:0};box.getSize?.(size);
- if(wantsFit){
-  const target=canonicalDimensions(context?.canonicalSize||{}),actual=[Number(size.x),Number(size.y),Number(size.z)],ratios=[];
-  for(let i=0;i<3;i++)if(Number.isFinite(target[i])&&target[i]>0&&Number.isFinite(actual[i])&&actual[i]>1e-9)ratios.push(target[i]/actual[i]);
-  if(ratios.length){const factor=Math.min(...ratios);if(Number.isFinite(factor)&&factor>0)object.scale?.multiplyScalar?.(factor)}
- }
- if(origin){
-  const aligned=new Box3().setFromObject(object),center={x:0,y:0,z:0};aligned.getCenter?.(center);
-  if(origin==='center')object.position?.set?.((object.position?.x||0)-center.x,(object.position?.y||0)-center.y,(object.position?.z||0)-center.z);
-  else if(origin==='floor-center')object.position?.set?.((object.position?.x||0)-center.x,(object.position?.y||0)-Number(aligned.min?.y||0),(object.position?.z||0)-center.z);
- }
+ const target=canonicalDimensions(context?.canonicalSize||{}),actual=[Number(size.x),Number(size.y),Number(size.z)],ratios=[];
+ for(let i=0;i<3;i++)if(Number.isFinite(target[i])&&target[i]>0&&Number.isFinite(actual[i])&&actual[i]>1e-9)ratios.push(target[i]/actual[i]);
+ if(ratios.length){const factor=Math.min(...ratios);if(Number.isFinite(factor)&&factor>0)object.scale?.multiplyScalar?.(factor)}
+ return object;
+}
+function recenterCanonical(object,entry,context){
+ const origin=entry.origin;if(!origin)return object;
+ const Box3=context?.THREE?.Box3;if(typeof Box3!=='function')return object;
+ const aligned=new Box3().setFromObject(object),center={x:0,y:0,z:0};aligned.getCenter?.(center);
+ if(origin==='center')object.position?.set?.((object.position?.x||0)-center.x,(object.position?.y||0)-center.y,(object.position?.z||0)-center.z);
+ else if(origin==='floor-center')object.position?.set?.((object.position?.x||0)-center.x,(object.position?.y||0)-Number(aligned.min?.y||0),(object.position?.z||0)-center.z);
  return object;
 }
 function applyTransform(object,entry,context){
@@ -83,6 +83,7 @@ function applyTransform(object,entry,context){
  if(entry.scaleFrom&&Number.isFinite(Number(context?.[entry.scaleFrom]))){
   const multiplier=Number(context[entry.scaleFrom]);object.scale?.multiplyScalar?.(multiplier);
  }
+ recenterCanonical(object,entry,context);
  if(entry.offset!==undefined){
   const offset=vec3(entry.offset,[0,0,0]);
   if(entry.fit==='canonical'||entry.origin)object.position?.set?.((object.position?.x||0)+offset[0],(object.position?.y||0)+offset[1],(object.position?.z||0)+offset[2]);
