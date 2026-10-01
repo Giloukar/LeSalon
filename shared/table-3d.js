@@ -135,12 +135,30 @@ export function createTable3DRenderer({onFatal}={}){
     });
     return obj;
   }
+  function semanticMaterialSlot(value){
+    const raw=String(value||'').trim().toLowerCase().replace(/\.\d+$/,'').replace(/[_\s]+/g,'-').replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'');
+    if(!raw)return'';return raw.startsWith('salon-')?raw:'salon-'+raw;
+  }
+  function bindSemanticMaterials(root,bindings){
+    if(!root||!bindings)return root;
+    root.traverse?.(node=>{
+      if(!node?.isMesh)return;
+      const nodeSlot=semanticMaterialSlot(node.userData?.salonSlot||node.name),nodeMaterial=bindings[nodeSlot];
+      if(nodeMaterial){node.material=nodeMaterial;return}
+      if(Array.isArray(node.material))node.material=node.material.map(mat=>bindings[semanticMaterialSlot(mat?.name)]||mat);
+      else{const replacement=bindings[semanticMaterialSlot(node.material?.name)];if(replacement)node.material=replacement}
+    });
+    return root;
+  }
   function cardMesh(card,{back=false,id=null,interactiveCard=false,playable=false}={}){
     const userData={kind:'card',cardId:id,interactive:interactiveCard,playable};
     const visual=card?Object.freeze({suit:card.suit,rank:card.rank,joker:!!card.joker,hidden:!!card.hidden}):null;
-    const external=externalAsset('card',{card:visual,back,id,playable,canonicalSize:{width:CARD_W,height:CARD_H,depth:CARD_D}},userData);
-    if(external){if(interactiveCard)interactive.push(external);return external}
-    const mats=[edgeMaterial,edgeMaterial,edgeMaterial,edgeMaterial,back?backMaterial:frontMaterial(card),backMaterial];
+    const external=externalAsset('card',{card:visual,back,id,playable,canonicalSize:{width:CARD_W,height:CARD_H,depth:CARD_D}},userData),face=back?backMaterial:frontMaterial(card);
+    if(external){
+      bindSemanticMaterials(external,{'salon-card-front':face,'salon-card-back':backMaterial,'salon-card-edge':edgeMaterial});
+      if(interactiveCard)interactive.push(external);return external;
+    }
+    const mats=[edgeMaterial,edgeMaterial,edgeMaterial,edgeMaterial,face,backMaterial];
     const mesh=new THREE.Mesh(cardGeometry,mats);
     mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData=userData;
     if(interactiveCard)interactive.push(mesh);
@@ -741,10 +759,19 @@ export function createTable3DRenderer({onFatal}={}){
     },512,512);cellLabelTextures.push(tex);
     const mat=new THREE.MeshStandardMaterial({map:tex,roughness:.72});dieFaceMaterials.set(n,mat);return mat;
   }
+  function dieFaceValues(value){
+    const v=Math.max(1,Math.min(6,Number(value)||1)),pairs=[[1,6],[2,5],[3,4]],remaining=pairs.filter(pair=>!pair.includes(v));
+    return[remaining[0][0],remaining[0][1],v,7-v,remaining[1][0],remaining[1][1]];
+  }
+  function bindDieMaterials(root,values){
+    const keys=['salon-die-xp','salon-die-xn','salon-die-yp','salon-die-yn','salon-die-zp','salon-die-zn'],bindings={};
+    keys.forEach((key,i)=>bindings[key]=values[i]===null?neutralDieMaterial:dieFaceMaterial(values[i]));
+    return bindSemanticMaterials(root,bindings);
+  }
   function dieMesh(value){
-    const v=Math.max(1,Math.min(6,Number(value)||1)),external=externalAsset('die',{value:v,blank:false,canonicalSize:{edge:.68}});
-    if(external)return external;
-    const sides=[2,5,v,7-v,3,4].map(dieFaceMaterial),mesh=new THREE.Mesh(dieGeometry,sides);mesh.castShadow=true;mesh.receiveShadow=true;return mesh;
+    const v=Math.max(1,Math.min(6,Number(value)||1)),values=dieFaceValues(v),external=externalAsset('die',{value:v,blank:false,canonicalSize:{edge:.68}});
+    if(external)return bindDieMaterials(external,values);
+    const sides=values.map(dieFaceMaterial),mesh=new THREE.Mesh(dieGeometry,sides);mesh.castShadow=true;mesh.receiveShadow=true;return mesh;
   }
   function cellLabelMaterial(n){
     if(cellLabelMaterials.has(n))return cellLabelMaterials.get(n);
@@ -756,7 +783,7 @@ export function createTable3DRenderer({onFatal}={}){
     const sp=makeLabel(text,accent);sp.scale.set(2.55,.58,1);sp.userData={...sp.userData,kind,interactive:true,...data};sp.userData.home??={scale:sp.scale.clone()};interactive.push(sp);return sp;
   }
   function blankDieMesh(){
-    const external=externalAsset('die',{value:null,blank:true,canonicalSize:{edge:.68}});if(external)return external;
+    const external=externalAsset('die',{value:null,blank:true,canonicalSize:{edge:.68}});if(external)return bindDieMaterials(external,[null,null,null,null,null,null]);
     const mesh=new THREE.Mesh(dieGeometry,neutralDieMaterial);mesh.castShadow=true;mesh.receiveShadow=true;return mesh;
   }
   function boxTileMaterial(closed=false,selected=false){
@@ -775,14 +802,17 @@ export function createTable3DRenderer({onFatal}={}){
     const mat=new THREE.MeshStandardMaterial({map:tex,roughness:.76,emissive:selected?0x33370d:0x000000,emissiveIntensity:selected?.28:0});rummiTileMaterials.set(key,mat);return mat;
   }
   function rummiTileMesh(tile,selected=false,interactiveTile=false){
-    const userData={kind:'rummi-tile',tileId:tile.id,interactive:interactiveTile},visual=Object.freeze({num:tile?.num,color:tile?.color,joker:!!tile?.joker});
+    const userData={kind:'rummi-tile',tileId:tile.id,interactive:interactiveTile},visual=Object.freeze({num:tile?.num,color:tile?.color,joker:!!tile?.joker}),front=rummiTileMaterial(tile,selected);
     const external=externalAsset('rummikub-tile',{tile:visual,selected,hidden:false,canonicalSize:{width:.62,height:.9,depth:.085}},userData);
-    if(external){if(interactiveTile)interactive.push(external);return external}
-    const front=rummiTileMaterial(tile,selected),mats=[edgeMaterial,edgeMaterial,edgeMaterial,edgeMaterial,front,rummiBackMaterial],mesh=new THREE.Mesh(rummiTileGeometry,mats);mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData=userData;if(interactiveTile)interactive.push(mesh);return mesh;
+    if(external){
+      bindSemanticMaterials(external,{'salon-tile-front':front,'salon-tile-back':rummiBackMaterial,'salon-tile-edge':edgeMaterial});
+      if(interactiveTile)interactive.push(external);return external;
+    }
+    const mats=[edgeMaterial,edgeMaterial,edgeMaterial,edgeMaterial,front,rummiBackMaterial],mesh=new THREE.Mesh(rummiTileGeometry,mats);mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData=userData;if(interactiveTile)interactive.push(mesh);return mesh;
   }
   function rummiHiddenTileMesh(){
     const external=externalAsset('rummikub-tile',{tile:null,selected:false,hidden:true,canonicalSize:{width:.62,height:.9,depth:.085}},{kind:'rummi-hidden',interactive:false});
-    if(external)return external;
+    if(external)return bindSemanticMaterials(external,{'salon-tile-front':rummiBackMaterial,'salon-tile-back':rummiBackMaterial,'salon-tile-edge':edgeMaterial});
     const mesh=new THREE.Mesh(rummiTileGeometry,rummiBackMaterial);mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData={kind:'rummi-hidden',interactive:false};return mesh;
   }
   function worldForCell(n,coords){

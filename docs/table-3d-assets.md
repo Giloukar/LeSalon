@@ -26,6 +26,28 @@ Une factory doit retourner synchroniquement un `THREE.Object3D` neuf ou cloné. 
 
 Chaque contexte contient également `THREE`, `kind` et `canonicalSize`.
 
+## Emplacements sémantiques pour cartes, dés et tuiles
+
+Pour les trois modèles les plus réutilisés, le renderer sait maintenant injecter lui-même les visuels de jeu dans un GLB. Tu peux donc fabriquer **un seul modèle de carte**, **un seul modèle de dé** et **un seul modèle de tuile Rummikub** : les valeurs, couleurs et faces restent pilotées par le moteur.
+
+Dans Blender, donne les noms suivants soit au matériau concerné, soit à un mesh séparé. Les suffixes automatiques Blender comme `.001` sont acceptés.
+
+| Modèle | Nom sémantique | Rôle |
+| --- | --- | --- |
+| Carte | `salon-card-front` | face visible, remplacée par la texture de la carte courante |
+| Carte | `salon-card-back` | dos commun |
+| Carte | `salon-card-edge` | tranche |
+| Tuile | `salon-tile-front` | numéro/couleur/joker courant |
+| Tuile | `salon-tile-back` | dos de tuile |
+| Tuile | `salon-tile-edge` | tranche |
+| Dé | `salon-die-xp` / `salon-die-xn` | faces +X / -X |
+| Dé | `salon-die-yp` / `salon-die-yn` | faces +Y / -Y, la face +Y porte le résultat |
+| Dé | `salon-die-zp` / `salon-die-zn` | faces +Z / -Z |
+
+Les matériaux qui ne portent aucun de ces noms restent entièrement ceux du GLB : tu peux donc conserver librement le relief, les biseaux, le plastique, le métal, les détails latéraux, etc. Pour le dé, les six valeurs 1 à 6 sont toujours présentes une seule fois et les faces opposées restent complémentaires à 7. Le renderer ne choisit jamais un résultat : il ne fait qu'afficher la valeur déjà fournie par le moteur.
+
+Pour les cartes et tuiles, le plus simple est de séparer la face, le dos et la tranche en trois matériaux. Pour le dé, garde six zones de matériau correspondant aux axes ci-dessus ; tu peux modéliser un cube très arrondi et détaillé, tandis que les points sont fournis dynamiquement par les matériaux du renderer.
+
 ## Exemple de branchement d’un GLB déjà chargé
 
 ```js

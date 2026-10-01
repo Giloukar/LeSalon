@@ -16,7 +16,7 @@ view.register('3d',{
   available(){return webglAvailable()&&supportedHere()},
   async prepare(){
     if(!webglAvailable())throw new Error('WebGL indisponible');
-    modulePromise??=import(new URL('./table-3d.js?v=58',SRC).href);
+    modulePromise??=import(new URL('./table-3d.js?v=59',SRC).href);
     const mod=await modulePromise;
     renderer??=mod.createTable3DRenderer({
       onFatal(error){
