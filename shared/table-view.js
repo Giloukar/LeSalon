@@ -9,6 +9,7 @@ let active=BASE_MODE;
 let requestId=0;
 let lastPayload=null;
 let destroyed=false;
+let transitionToken=0;
 
 function readPreferred(){
   try{
@@ -34,20 +35,30 @@ function emit(detail){
 function setDataset(mode){
   try{document.documentElement.dataset.tableView=mode}catch(_){}
 }
+function beginVisualTransition(){
+  const token=++transitionToken;
+  try{document.documentElement.dataset.tableViewTransition='1'}catch(_){}
+  return token;
+}
+function endVisualTransition(token){
+  const clear=()=>{if(token!==transitionToken)return;try{document.documentElement.removeAttribute('data-table-view-transition')}catch(_){}};
+  if(typeof requestAnimationFrame==='function')requestAnimationFrame(()=>requestAnimationFrame(clear));else setTimeout(clear,34);
+}
 function safeDeactivate(mode){
   const r=renderer(mode);
   try{r?.deactivate?.()}catch(error){console.warn('Table view deactivate failed',error)}
 }
 function fallback(reason,error){
-  const previous=active;
+  const previous=active,transition=beginVisualTransition();
   requestId++;
-  if(previous!==BASE_MODE)safeDeactivate(previous);
   active=BASE_MODE;
   setDataset(BASE_MODE);
-  emit({mode:BASE_MODE,previous,preferred,reason:reason||'fallback',error:error?String(error?.message||error):''});
   if(lastPayload&&previous!==BASE_MODE){
     try{renderer(BASE_MODE)?.render?.(lastPayload)}catch(_){}
   }
+  if(previous!==BASE_MODE)safeDeactivate(previous);
+  emit({mode:BASE_MODE,previous,preferred,reason:reason||'fallback',error:error?String(error?.message||error):''});
+  endVisualTransition(transition);
   return BASE_MODE;
 }
 function register(mode,adapter){
@@ -81,24 +92,27 @@ async function setMode(mode,{persistPreference=true,reason='user'}={}){
   }
   if(id!==requestId)return{ok:false,mode:active,reason:'superseded'};
 
-  const previous=active;
-  if(previous!==BASE_MODE)safeDeactivate(previous);
-  try{r?.activate?.({mode,previous,lastPayload})}
-  catch(error){
-    fallback('activate-failed',error);
-    return{ok:false,mode:active,reason:'activate-failed',error};
-  }
-
-  active=mode;
-  setDataset(mode);
-  if(lastPayload&&mode!==BASE_MODE){
-    try{r?.render?.(lastPayload)}
-    catch(error){
-      fallback('render-failed',error);
+  const previous=active,transition=beginVisualTransition();
+  if(mode===BASE_MODE){
+    active=BASE_MODE;setDataset(BASE_MODE);
+    try{r?.activate?.({mode,previous,lastPayload});if(lastPayload)r?.render?.(lastPayload)}
+    catch(error){endVisualTransition(transition);return{ok:false,mode:active,reason:'activate-failed',error}}
+    if(previous!==BASE_MODE)safeDeactivate(previous);
+  }else{
+    try{
+      r?.activate?.({mode,previous,lastPayload});
+      if(lastPayload)r?.render?.(lastPayload);
+    }catch(error){
+      try{r?.deactivate?.()}catch(_){}
+      active=BASE_MODE;setDataset(BASE_MODE);endVisualTransition(transition);
       return{ok:false,mode:active,reason:'render-failed',error};
     }
+    if(id!==requestId){try{r?.deactivate?.()}catch(_){}endVisualTransition(transition);return{ok:false,mode:active,reason:'superseded'}}
+    if(previous!==BASE_MODE)safeDeactivate(previous);
+    active=mode;setDataset(mode);
   }
   emit({mode,previous,preferred,reason});
+  endVisualTransition(transition);
   return{ok:true,mode};
 }
 function render(payload){
