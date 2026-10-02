@@ -193,7 +193,10 @@ test('Métropole 3D animates confirmed pawn movement without simulating city rul
  assert.match(source,/rolled=total>=2&&total<=12\?\(from\+total\)%24:to/);
  assert.match(source,/if\(to!==rolled\)cells\.push\(to\)/);
  assert.match(source,/changedPlayers\.length===1\?changedPlayers\[0\]:-1/);
- assert.match(source,/pawnAnimations\.push\(\{mesh:pawn,points,start:performance\.now\(\),duration:Math\.min\(1700,Math\.max\(520,points\.length\*120\)\),lift:\.12\}\)/);
+ assert.match(source,/const duration=Math\.min\(1700,Math\.max\(520,Math\.max\(2,points\.length\)\*120\)\)/);
+ assert.match(source,/pawnAnimations\.push\(\{mesh:pawn,points,start:performance\.now\(\),duration,lift:\.12\}\)/);
+ assert.match(source,/const tagPoints=points\.map\(p=>new THREE\.Vector3\(p\.x,TABLE_Y\+\.92,p\.z\)\)/);
+ assert.match(source,/pawnAnimations\.push\(\{mesh:tag,points:tagPoints,start:performance\.now\(\),duration,lift:\.04\}\)/);
  assert.match(source,/if\(diceAnimations\.length\|\|pawnAnimations\.length\)startMotion\(\)/);
  assert.match(source,/if\(payload\?\.gameId!=='metropole'\)lastCitySnapshot=null/);
  assert.doesNotMatch(source,/function cityMovementRoute[\s\S]{0,900}dispatch\(/);
