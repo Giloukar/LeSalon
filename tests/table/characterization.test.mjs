@@ -65,6 +65,7 @@ test('2D/3D switching keeps a visual guard until the target renderer is ready',a
 test('3D hand sorting reuses the 2D sort preference for cards and Rummikub',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8'),html=await readFile(path.join(root,'jeux.html'),'utf8');
  assert.match(html,/data=\{playableIds:\[\],sortByColor:!!sortByColor\}/);
+ assert.match(html,/data\.sortEnabled=!!\(S&&!gate&&!net\.spectator&&sortableIds\.has\(S\.id\)\)/);
  assert.match(html,/data\.sortedHand=clone\(visualHand\)/);
  assert.match(html,/sort\(\)\{[\s\S]*sortByColor=!sortByColor;renderGame\(true\);return true/);
  assert.match(source,/data-table-3d-sort/);
