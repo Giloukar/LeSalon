@@ -230,6 +230,7 @@ test('Métropole 3D can send and answer property trade offers through the author
  assert.match(source,/ACCEPTER · \+/);
  assert.match(source,/REFUSER/);
  const t=await table();browser=t.browser;try{
+  await setup(t.page,'metropole','online');
   const offered=await t.page.evaluate(async()=>{
    await SalonTableView.setMode('2d',{persistPreference:false});
    net.gameId='metropole';net.state.turn=0;net.state.phase='end';net.state.trade=null;net.state.offersThisTurn=0;
