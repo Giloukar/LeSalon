@@ -3294,7 +3294,10 @@ if(window.SalonTableView){
   const mine=S&&S.id==='huit'&&!gate&&!net.spectator?player(S).hand:[],data={playableIds:[],sortByColor:!!sortByColor};
   const sortableIds=new Set(['huit','rummikub','president','menteur','suites','plis','encheres','pouilleux','quatrevingtdixneuf','vingtetun']);
   data.sortEnabled=!!(S&&!gate&&!net.spectator&&sortableIds.has(S.id));
-  if(S?.id==='huit'&&canPlay()&&!showSuit)data.playableIds=mine.filter(c=>eightLegal(S,c)).map(c=>c.id);
+  if(S?.id==='huit'){
+   if(canPlay()&&!showSuit)data.playableIds=mine.filter(c=>eightLegal(S,c)).map(c=>c.id);
+   data.eightSuitChoice=showSuit?{cardId:String(showSuit)}:null;
+  }
   if(S?.id==='oie'){
    const d=S.goosePending?.dice||[],steps=d.length===2?[d[0],d[1],d[0]+d[1]]:[];
    data.boardCoords=CELL_COORDS.map(p=>p.slice());data.gooseCells=[...GEESE];data.gooseChoices=steps.map(n=>({steps:n,target:legacyGooseTarget(player(S).pos,n)}));data.choiceTargets=data.gooseChoices.map(x=>x.target);
@@ -3515,15 +3518,17 @@ if(window.SalonTableView){
    spectator:!!net.spectator,
    gated:!!gate,
    privateIndex:S?privateIndex():0,
-   canInteract:!!(S&&((S.id==='cactus'&&!net.spectator)||(canPlay()&&(S.id!=='huit'||!showSuit)))),
+   canInteract:!!(S&&((S.id==='cactus'&&!net.spectator)||canPlay())),
    viewData:data,
    interactions:{
     sort(){
      if(!S||gate||net.spectator||!sortableIds.has(S.id))return false;
      sortByColor=!sortByColor;renderGame(true);return true;
     },
-    playCard(id){if(!S||S.id!=='huit'||!canPlay())return false;const c=player(S).hand.find(c=>c.id===id);if(!c)return false;eightPlayCardUI(c);return true},
-    draw(){if(!S||S.id!=='huit'||!canPlay())return false;dispatch({type:'draw'});return true},
+    playCard(id){if(!S||S.id!=='huit'||!canPlay()||showSuit)return false;const c=player(S).hand.find(c=>c.id===id);if(!c)return false;eightPlayCardUI(c);return true},
+    chooseSuit(suit){if(!S||S.id!=='huit'||!canPlay()||!showSuit||!SUITS.includes(suit))return false;dispatch({type:'card',id:showSuit,suit});return true},
+    cancelSuit(){if(!S||S.id!=='huit'||!canPlay()||!showSuit)return false;showSuit=null;renderGame(false);return true},
+    draw(){if(!S||S.id!=='huit'||!canPlay()||showSuit)return false;dispatch({type:'draw'});return true},
     goose(type,steps){if(!S||S.id!=='oie'||!canPlay())return false;const action=type==='choose'?{type:'gooseChoose',steps}:type==='reroll'?{type:'gooseReroll'}:{type:'roll'};dispatch(action);return true},
     yam(type,value){
      if(!S||S.id!=='yam'||!canPlay())return false;
