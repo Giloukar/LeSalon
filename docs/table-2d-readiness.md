@@ -572,3 +572,10 @@ Un déplacement normal suit les cases successives du plateau, y compris le passa
 Vingt-et-un, Enchères et Ferme la boîte n’obligent plus à revenir aux contrôles HTML pour lancer la manche suivante. Lorsque l’état entre en `roundEnd`, la vue 3D reste interactive uniquement pour le joueur autorisé à avancer : en ligne, il s’agit de l’hôte ; en local/solo, le joueur courant peut continuer directement.
 
 La scène affiche respectivement **Main suivante**, **Enchère suivante** ou **Passage suivant**. Ces trois contrôles utilisent un adaptateur commun `nextRound()` qui appelle uniquement `dispatch({type:'nextRound'})`. Redistribution des cartes, progression des compteurs, changement de joueur, scores et réinitialisation des phases restent donc intégralement gérés par les moteurs existants.
+
+
+## Métropole — négociations de propriétés directement en 3D
+
+Les rachats entre joueurs n’obligent plus à ouvrir le formulaire HTML. Lorsqu’une rue adverse est éligible selon `cityOfferAllowed()`, elle peut être sélectionnée sur le plateau 3D. Le prix proposé est alors un brouillon purement local à la vue : il peut être ajusté par pas de 10 ou 100 crédits, dans la limite des liquidités et de 99 999 crédits, sans modifier l’état de partie ni envoyer de paquet réseau.
+
+Le bouton **Proposer** transmet ensuite exactement `tradeOffer { index, price }` au moteur existant. Le propriétaire voit l’offre sur sa table 3D et peut **Accepter** ou **Refuser** ; ces commandes repassent par `tradeAccept` et `tradeReject`. Les contrôles d’éligibilité, le maximum de trois offres, le transfert d’argent et de propriété, les hypothèques, le délai autoritaire de 45 secondes et l’expiration restent intégralement gérés par le moteur et l’hôte.
