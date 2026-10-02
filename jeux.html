@@ -3233,7 +3233,7 @@ function table3dRefreshLayout(){
  requestAnimationFrame(()=>{try{window.dispatchEvent(new Event('resize'))}catch{}requestAnimationFrame(()=>{try{window.dispatchEvent(new Event('resize'))}catch{}})});
 }
 function table3dSetPresentation(mode){
- if(mode!=='full'&&mode!=='embedded'){document.documentElement.removeAttribute('data-table3d-presentation');table3dRefreshLayout();return}
+ if(mode!=='full'&&mode!=='embedded'){table3dPresentation=null;document.documentElement.removeAttribute('data-table3d-presentation');table3dRefreshLayout();return}
  table3dPresentation=mode;document.documentElement.dataset.table3dPresentation=mode;table3dRefreshLayout();
 }
 function table3dNativeFullscreenSafe(){
@@ -3700,7 +3700,17 @@ if(window.SalonTableView){
   document.documentElement.removeAttribute('data-table-3d-game');
   return TABLE_VIEW_SHOW_HOME();
  };
- window.addEventListener('salon:table-3d-window',e=>{void table3dApplyWindowMode(e.detail?.mode)});
+ window.addEventListener('salon:table-3d-window',e=>{
+  const target=e.detail?.mode;
+  void table3dApplyWindowMode(target).then(ok=>{
+   if(ok&&view==='game'&&window.SalonTableView?.getMode?.()==='3d')renderGame(false);
+  });
+ });
+ document.addEventListener('fullscreenchange',()=>{
+  if(window.SalonTableView?.getMode?.()!=='3d')return;
+  if(document.fullscreenElement)return;
+  if(table3dPresentation==='full'&&table3dNativeFullscreenSafe())table3dSetPresentation('embedded');
+ });
  document.addEventListener('click',async e=>{
   const b=e.target.closest?.('[data-table-view-mode]');if(!b)return;
   e.preventDefault();e.stopImmediatePropagation();
