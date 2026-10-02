@@ -293,10 +293,10 @@ test('Three.js hardening adapts mobile quality, motion and reusable geometry',as
  assert.match(source,/camera\.fov=aspect<\.62\?42:aspect<\.82\?40:aspect<\.95\?39:aspect>1\.8\?37:39/);
  assert.equal((source.match(/setCameraPose\(/g)||[]).length>=18,true);
  assert.match(source,/function device3DProfile\(\)/);
- assert.match(source,/pixelCap=constrained\?1\.35:coarse\?1\.8:memory<=6\?1\.7:2\.2/);
- assert.match(source,/textureScale=constrained\?\.76:coarse\?\.94:memory<=6\?\.9:1\.08/);
- assert.match(source,/shadowSize=constrained\?768:coarse\?1024:memory<=6\?1024:1536/);
- assert.match(source,/anisotropy=constrained\?3:coarse\?6:8/);
+ assert.match(source,/pixelCap=constrained\?1\.35:memory<=6\?1\.72:coarse\?1\.95:2\.35/);
+ assert.match(source,/textureScale=constrained\?\.76:memory<=6\?\.94:coarse\?1\.04:1\.16/);
+ assert.match(source,/shadowSize=constrained\?768:memory<=6\?1024:coarse\?1280:1792/);
+ assert.match(source,/anisotropy=constrained\?3:memory<=6\?6:coarse\?8:10/);
  assert.match(source,/ACESFilmicToneMapping/);
  assert.match(source,/generateMipmaps=false/);
  assert.match(source,/profile\.shadowSize/);
