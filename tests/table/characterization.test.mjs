@@ -185,6 +185,20 @@ test('Métropole 3D roll delegates to the authoritative host action path',async(
 
 test('Métropole 3D exposes the full authoritative turn and property action surface',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'metropole','online');const r=await t.page.evaluate(async()=>{let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});net.gameId='metropole';net.state.turn=0;net.state.phase='buy';net.state.offer=1;net.state.owners[1]=-1;net.state.houses[1]=0;net.state.mortgaged[1]=false;net.state.players[0].cash=1200;S=projectGame(net.state,0);renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const before={cash:net.state.players[0].cash,revision:net.revision,price:seen.viewData.city.board[1].price,canBuy:seen.viewData.city.canBuy,manageCount:seen.viewData.city.manage.length};const bought=seen.interactions.city('buy');const afterBuy={cash:net.state.players[0].cash,owner:net.state.owners[1],phase:net.state.phase,revision:net.revision};const manage=seen.viewData.city.manage[1];const mortgaged=seen.interactions.city('mortgage',1);return{before,bought,afterBuy,manage,mortgaged,afterMortgage:{cash:net.state.players[0].cash,mortgaged:net.state.mortgaged[1],revision:net.revision}};});assert.equal(r.before.canBuy,true);assert.equal(r.before.manageCount,24);assert.equal(r.bought,true);assert.equal(r.afterBuy.owner,0);assert.equal(r.afterBuy.cash,r.before.cash-r.before.price);assert.equal(r.afterBuy.phase,'end');assert.equal(r.afterBuy.revision,r.before.revision+1);assert.equal(r.manage.canMortgage,true);assert.equal(r.mortgaged,true);assert.equal(r.afterMortgage.mortgaged,true);assert.equal(r.afterMortgage.cash,r.afterBuy.cash+r.manage.mortgageGain);assert.equal(r.afterMortgage.revision,r.afterBuy.revision+1);}finally{await browser.close();}});
 
+test('Métropole 3D animates confirmed pawn movement without simulating city rules',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/lastCitySnapshot=null/);
+ assert.match(source,/function cityPawnOffset\(index\)/);
+ assert.match(source,/function cityMovementRoute\(from,to,dice,offset\)/);
+ assert.match(source,/rolled=total>=2&&total<=12\?\(from\+total\)%24:to/);
+ assert.match(source,/if\(to!==rolled\)cells\.push\(to\)/);
+ assert.match(source,/changedPlayers\.length===1\?changedPlayers\[0\]:-1/);
+ assert.match(source,/pawnAnimations\.push\(\{mesh:pawn,points,start:performance\.now\(\),duration:Math\.min\(1700,Math\.max\(520,points\.length\*120\)\),lift:\.12\}\)/);
+ assert.match(source,/if\(diceAnimations\.length\|\|pawnAnimations\.length\)startMotion\(\)/);
+ assert.match(source,/if\(payload\?\.gameId!=='metropole'\)lastCitySnapshot=null/);
+ assert.doesNotMatch(source,/function cityMovementRoute[\s\S]{0,900}dispatch\(/);
+});
+
 test('Métropole renderer keeps every management decision inside the 3D surface',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  const html=await readFile(path.join(root,'jeux.html'),'utf8');
