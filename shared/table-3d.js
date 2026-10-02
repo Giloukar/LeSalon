@@ -640,7 +640,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function rummiDesiredGroupWidth(group){
     const length=Math.max(1,Number(group?.length)||1),natural=.66;
-    return Math.min(9.35,Math.max(1.64,length*natural+.18));
+    return Math.min(4.58,Math.max(1.64,length*natural*.62+.16));
   }
   function rummiPackRows(active,width=9.35,gap=.18){
     const rows=[];let row={orders:[],desired:0};
@@ -668,8 +668,8 @@ export function createTable3DRenderer({onFatal}={}){
     return layout?.cells?.[order]||{x:0,z:layout?.baseZ??-1.0,width:layout?.width??9.55,depth:layout?.cellD??3.75,row:0,col:0};
   }
   function rummiGroupSlot(layout,order,length,tileIndex){
-    const cell=rummiLayoutCell(layout,order),natural=.66,widthScale=(cell.width-.16)/(Math.max(1,length)*natural),depthScale=(Math.max(.22,cell.depth-.06))/.9;
-    const scale=Math.max(.24,Math.min(.96,widthScale,depthScale)),spacing=natural*scale;
+    const cell=rummiLayoutCell(layout,order),natural=.66,widthScale=(cell.width-.16)/(Math.max(1,length)*natural),depthScale=Math.max(.48,(Math.max(.22,cell.depth-.06))/.9);
+    const scale=Math.max(.48,Math.min(.96,widthScale,depthScale)),spacing=natural*scale;
     return{x:cell.x+(tileIndex-(length-1)/2)*spacing,z:cell.z,scale,row:cell.row,col:cell.col,cellW:cell.width,cellD:cell.depth};
   }
   function rummiRackLayout(count){
