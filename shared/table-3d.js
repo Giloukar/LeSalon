@@ -83,7 +83,7 @@ export function createTable3DRenderer({onFatal}={}){
   const cardFinish={roughness:.43,metalness:0,bumpMap:paperGrain,bumpScale:.00030};
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,...cardFinish});
-  let objects=new THREE.Group(),cardFx=new THREE.Group(),socialCards=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,cameraControl={yaw:0,pitch:0,zoom:1},cameraDrag=null,cameraGame='',lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,lastBattleSnapshot=null,lastCitySnapshot=null,pendingMaidPickOrigin=null,pendingBattleOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map(),remoteLooseCards=new Map(),remoteLooseGame='';
+  let objects=new THREE.Group(),cardFx=new THREE.Group(),socialCards=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,cameraControl={yaw:0,pitch:0,zoom:1},cameraDrag=null,cameraGame='',lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,lastBattleSnapshot=null,lastCitySnapshot=null,lastBoxSnapshot=null,pendingMaidPickOrigin=null,pendingBattleOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map(),remoteLooseCards=new Map(),remoteLooseGame='';
   const localPoses=new Map();let activePoseScope='',poseSeen=new Set(),localPoseOrder=0,localThrowCounter=0,labelGeneration=0;
 
   function cameraViewChanged(){
@@ -1058,14 +1058,24 @@ export function createTable3DRenderer({onFatal}={}){
 
   function syncBox(payload){
     clearObjects();dropMarker.visible=false;
-    const s=payload.state,dice=payload.viewData?.boxDice||s?.boxDice||[],open=new Set(payload.viewData?.boxNumbers||s?.boxNumbers||[]),selected=new Set(payload.viewData?.boxSelected||[]),stage=payload.viewData?.boxStage||s?.boxStage||'roll';
+    const s=payload.state,dice=payload.viewData?.boxDice||s?.boxDice||[],open=new Set(payload.viewData?.boxNumbers||s?.boxNumbers||[]),selected=new Set(payload.viewData?.boxSelected||[]),stage=payload.viewData?.boxStage||s?.boxStage||'roll',previousBox=lastBoxSnapshot,previousOpen=new Set(previousBox?.open||[]);
     setCameraPose(0,6.9,8.4,0,.28,.05);
+    let closedOrder=0;
     for(let n=1;n<=9;n++){
-      const isOpen=open.has(n),isSelected=selected.has(n),x=(n-5)*1.05;
+      const isOpen=open.has(n),isSelected=selected.has(n),x=(n-5)*1.05,newlyClosed=!!previousBox&&previousBox.round===Number(s?.boxRound||0)&&previousOpen.has(n)&&!isOpen;
       const tile=new THREE.Mesh(tileGeometry,boxTileMaterial(!isOpen,isSelected));tile.scale.set(1,.22,1.18);tile.position.set(x,TABLE_Y+(isOpen?.42:.31),-1.15);tile.rotation.x=isOpen?-.34:0;tile.castShadow=true;tile.receiveShadow=true;
       if(isOpen&&s?.phase!=='roundEnd'&&stage==='choose'&&payload.canInteract){tile.userData={kind:'box-toggle',number:n,interactive:true};interactive.push(tile)}
-      objects.add(tile);const label=cellLabel(n);label.scale.set(.58,.4,1);label.position.set(x,TABLE_Y+(isOpen?.62:.39),-1.12);objects.add(label);
+      objects.add(tile);
+      const label=cellLabel(n);label.scale.set(.58,.4,1);label.position.set(x,TABLE_Y+(isOpen?.62:.39),-1.12);objects.add(label);
+      if(newlyClosed&&motionAllowed()){
+        const delay=closedOrder++*55,start=performance.now()+delay,tileTo=tile.position.clone(),tileRot=tile.rotation.clone(),tileScale=tile.scale.clone(),tileFrom=new THREE.Vector3(x,TABLE_Y+.42,-1.15),labelTo=label.position.clone(),labelFrom=new THREE.Vector3(x,TABLE_Y+.62,-1.12);
+        tile.position.copy(tileFrom);tile.rotation.x=-.34;
+        manipAnimations.push({mesh:tile,from:tileFrom,control:new THREE.Vector3(x,TABLE_Y+.56,-1.15),to:tileTo,fromRot:new THREE.Euler(-.34,0,0),toRot:tileRot,fromScale:tileScale,toScale:tileScale.clone(),start,duration:390,done:false});
+        label.position.copy(labelFrom);
+        manipAnimations.push({mesh:label,from:labelFrom,control:new THREE.Vector3(x,TABLE_Y+.70,-1.12),to:labelTo,fromRot:label.rotation.clone(),toRot:label.rotation.clone(),fromScale:label.scale.clone(),toScale:label.scale.clone(),start,duration:390,done:false});
+      }
     }
+    lastBoxSnapshot={open:[...open],round:Number(s?.boxRound||0),phase:s?.phase||'',moves:Number(s?.moves||0)};
     const key='box|'+(s?.moves??0)+'|'+dice.join('-'),animate=dice.length>0&&key!==lastDiceKey;if(animate)lastDiceKey=key;
     dice.forEach((value,i)=>{
       const die=dieMesh(value);die.position.set((i-(dice.length-1)/2)*1.1,TABLE_Y+.82,.45);objects.add(die);
@@ -1083,7 +1093,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(title)title.textContent='VUE 3D · FERME LA BOÎTE';
     if(status)status.textContent=s?.phase==='roundEnd'?'Passage terminé · score enregistré':stage==='choose'?'Total '+dice.reduce((a,b)=>a+b,0)+' · '+open.size+' volets ouverts':'Passage '+(s?.boxRound||1)+' / 3';
     if(help)help.textContent=s?.phase==='roundEnd'?(payload.viewData?.boxCanNextRound?'Passez au passage suivant directement depuis la table':'L’hôte lancera le passage suivant'):stage==='choose'?'Touchez les volets dont la somme égale les dés puis confirmez':'Lancez deux dés · un seul devient disponible quand 7, 8 et 9 sont fermés';
-    if(diceAnimations.length)startMotion();
+    if(diceAnimations.length||manipAnimations.length)startMotion();
   }
 
   function syncSpecialCards(payload){
@@ -2047,6 +2057,7 @@ export function createTable3DRenderer({onFatal}={}){
 
   function syncCurrent(payload){
     if(payload?.gameId!=='metropole')lastCitySnapshot=null;
+    if(payload?.gameId!=='boite')lastBoxSnapshot=null;
     if(payload?.gameId==='golf')syncGolf(payload);
     else if(payload?.gameId==='code')syncCode(payload);
     else if(payload?.gameId==='intrus')syncIntrus(payload);
@@ -2590,7 +2601,7 @@ export function createTable3DRenderer({onFatal}={}){
 
   function activate(){active=true;init()}
   function deactivate(){
-    cancelCameraDrag();cancelActiveDrag();active=false;hovered=null;wordSelection=[];wordDraftKey='';codeDraft=[0,1,2];codeDraftKey='';golfAim={angle:0,power:50};golfAimKey='';lastGolfKey='';cityFocusIndex=null;cityOfferDraft=0;cityOfferDraftKey='';lastCitySnapshot=null;diceAnimations.length=0;pawnAnimations.length=0;manipAnimations.length=0;
+    cancelCameraDrag();cancelActiveDrag();active=false;hovered=null;wordSelection=[];wordDraftKey='';codeDraft=[0,1,2];codeDraftKey='';golfAim={angle:0,power:50};golfAimKey='';lastGolfKey='';cityFocusIndex=null;cityOfferDraft=0;cityOfferDraftKey='';lastCitySnapshot=null;lastBoxSnapshot=null;diceAnimations.length=0;pawnAnimations.length=0;manipAnimations.length=0;
     if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
     tossAnimations.length=0;clearRemoteLooseCards();remoteLooseGame='';
     resizeObserver?.disconnect();resizeObserver=null;host?.remove();host=null;
