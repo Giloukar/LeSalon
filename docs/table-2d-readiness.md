@@ -544,3 +544,10 @@ Les cellules calculées sont la source unique pour le rendu, les boutons d'ajout
 Pendant la phase `swap`, la carte tirée devient un objet manipulable dans la scène 3D. Elle peut être saisie puis glissée directement sur l’une des cartes de la main : le renderer ne fait qu’identifier le slot visé et appelle l’action Cactus autoritative `swap(index)` déjà utilisée par l’interface existante.
 
 Lorsque la carte vient réellement de la pioche, elle peut aussi être glissée vers la défausse centrale pour appeler l’action `discard`. Une carte prise depuis la défausse ne peut pas être rejetée par ce raccourci, conformément aux règles existantes. Un relâchement hors de toute zone valide n’envoie aucune action et remet simplement la carte à sa position visuelle. Les échanges, la carte rejetée et les effets éventuels — notamment le pouvoir du 8 — restent entièrement calculés par le moteur Cactus.
+
+
+## 8 Américain — choix de couleur directement en 3D
+
+Le choix déclenché par un 8 ou un Joker reste maintenant dans la table 3D. Dès que le moteur demande une couleur, les cartes et la pioche sont temporairement verrouillées et quatre commandes ♠, ♥, ♦ et ♣ apparaissent sur la table, avec une commande d’annulation. Le clic appelle exactement l’action de carte existante avec la couleur choisie ; aucune règle n’est dupliquée dans Three.js.
+
+La carte qui a ouvert le choix reste légèrement mise en évidence pendant cette étape. Une fois la couleur choisie, le moteur reprend le tour normal et les interactions physiques de la main et de la pioche sont réactivées.
