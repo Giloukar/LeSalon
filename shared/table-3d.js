@@ -21,8 +21,8 @@ const visualHash=str=>{
 const motionAllowed=()=>document.documentElement.dataset.motion!=='off'&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
 function device3DProfile(){
   const dpr=Math.max(1,Number(globalThis.devicePixelRatio)||1),coarse=matchMedia('(pointer: coarse)').matches,memory=Number(globalThis.navigator?.deviceMemory||8),constrained=memory<=4;
-  const pixelCap=constrained?1.35:coarse?1.8:memory<=6?1.7:2.2,textureScale=constrained?.76:coarse?.94:memory<=6?.9:1.08;
-  const shadowSize=constrained?768:coarse?1024:memory<=6?1024:1536,anisotropy=constrained?3:coarse?6:8;
+  const pixelCap=constrained?1.35:memory<=6?1.72:coarse?1.95:2.35,textureScale=constrained?.76:memory<=6?.94:coarse?1.04:1.16;
+  const shadowSize=constrained?768:memory<=6?1024:coarse?1280:1792,anisotropy=constrained?3:memory<=6?6:coarse?8:10;
   return{coarse,memory,constrained,pixelRatio:Math.min(dpr,pixelCap),textureScale,shadowSize,anisotropy};
 }
 const targetPixelRatio=()=>device3DProfile().pixelRatio;
@@ -74,7 +74,7 @@ export function createTable3DRenderer({onFatal}={}){
   let codeDraft=[0,1,2],codeDraftKey='';
   let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='',cityFocusIndex=null;
   const paperGrain=canvasTexture(drawPaperGrain,128,128);paperGrain.colorSpace=THREE.NoColorSpace;paperGrain.wrapS=paperGrain.wrapT=THREE.RepeatWrapping;paperGrain.repeat.set(5,7);disposableTextures.push(paperGrain);
-  const cardFinish={roughness:.48,metalness:0,bumpMap:paperGrain,bumpScale:.00024};
+  const cardFinish={roughness:.43,metalness:0,bumpMap:paperGrain,bumpScale:.00030};
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,...cardFinish});
   let objects=new THREE.Group(),cardFx=new THREE.Group(),socialCards=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,cameraControl={yaw:0,pitch:0,zoom:1},cameraDrag=null,cameraGame='',lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,lastBattleSnapshot=null,pendingMaidPickOrigin=null,pendingBattleOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map(),remoteLooseCards=new Map(),remoteLooseGame='';
