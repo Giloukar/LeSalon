@@ -454,6 +454,20 @@ test('Cactus physical quick throw commits only through the existing engine inter
  assert.doesNotMatch(source,/cactus-quick[^\n]*onlineAct\(/);
 });
 
+
+test('Eight 3D keeps suit choice on the table instead of falling back to HTML controls',async()=>{
+ const page=await readFile(path.join(root,'jeux.html'),'utf8');
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(page,/data\.eightSuitChoice=showSuit\?\{cardId:String\(showSuit\)\}:null/);
+ assert.match(page,/chooseSuit\(suit\).*dispatch\(\{type:'card',id:showSuit,suit\}\)/s);
+ assert.match(page,/cancelSuit\(\).*showSuit=null;renderGame\(false\)/s);
+ assert.match(page,/playCard\(id\).*\|\|showSuit\)return false/s);
+ assert.match(source,/const suitChoice=payload\.viewData\?\.eightSuitChoice\|\|null,choosingSuit=!!suitChoice\?\.cardId/);
+ assert.match(source,/const canDrawTop=!choosingSuit/);
+ assert.match(source,/actionSprite\(symbol\+' '\+name,'eight-suit',\{suit\}/);
+ assert.match(source,/current\?\.interactions\?\.chooseSuit\?\.\(d\.suit\)/);
+ assert.match(source,/current\?\.interactions\?\.cancelSuit\?\.\(\)/);
+});
 test('Cactus drawn card can be dragged to swap or discard through existing engine actions',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/canManipulateDrawn=!!\(payload\.canInteract&&data\.turn===viewer&&data\.phase==='swap'\)/);
