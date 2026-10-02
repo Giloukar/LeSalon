@@ -224,7 +224,10 @@ test('dense Rummikub layout keeps every board and rack tile inside adaptive visi
  assert.match(source,/depthScale=\(Math\.max\(\.22,cell\.depth-\.06\)\)\/\.9/);
  assert.match(source,/scale=Math\.max\(\.24,Math\.min\(\.96,widthScale,depthScale\)\)/);
  assert.match(source,/function rummiRackLayout\(count\)/);
- assert.match(source,/rows=total<=10\?1:total<=20\?2:total<=32\?3:total<=50\?4:5/);
+ assert.match(source,/rows=total<=12\?1:total<=24\?2:total<=36\?3:total<=52\?4:5/);
+ assert.match(source,/depth=3\.15,minZ=1\.60,maxZ=minZ\+depth/);
+ assert.match(source,/baseScale=layout\.rows===1\?\.92:layout\.rows===2\?\.84:layout\.rows===3\?\.78:layout\.rows===4\?\.72:\.68/);
+ assert.match(source,/scale=Math\.max\(\.58,Math\.min\(baseScale,widthScale,depthScale\)\)/);
  assert.match(source,/layout\.minZ\+\(row\+\.5\)\*layout\.rowPitch/);
  assert.match(source,/density=Math\.max\(layout\.rows,rackLayout\.rows,Math\.ceil\(\(layout\.tileCount\+hand\.length\)\/24\)\)/);
  assert.match(source,/position\.z>=layout\.minZ&&position\.z<=layout\.maxZ/);
@@ -305,9 +308,10 @@ test('Three.js hardening adapts mobile quality, motion and reusable geometry',as
  assert.match(source,/lostpointercapture/);
  assert.match(source,/function capturePointer\(id\)\{try\{/);
  assert.match(source,/cardDropRadius/);
- assert.match(source,/rows=total<=9\?1:total<=20\?2:total<=30\?3:total<=40\?4:5/);
- assert.match(source,/baseScale=rows===1\?\.86:rows===2\?\.82:rows===3\?\.76:rows===4\?\.70:\.66/);
- assert.match(source,/spacing=rowCount<=1\?0:CARD_W\*scale\+\.11/);
+ assert.match(source,/rows=total<=10\?1:total<=22\?2:total<=36\?3:total<=52\?4:5/);
+ assert.match(source,/scale=rows===1\?\.88:rows===2\?\.85:rows===3\?\.82:rows===4\?\.79:\.76/);
+ assert.match(source,/naturalSpacing=CARD_W\*scale\+\.10/);
+ assert.match(source,/Math\.min\(naturalSpacing,widthLimit\/Math\.max\(1,rowCount-1\)\)/);
  assert.match(source,/const farFill=new THREE\.DirectionalLight/);
  assert.match(source,/const farGlow=new THREE\.PointLight/);
  assert.match(source,/function eightOpponentSeat\(total,index\)/);
@@ -464,11 +468,12 @@ test('3D cards and Rummikub expose the same value-color sort toggle as 2D',async
 
 test('dense 3D card hands preserve a protected center zone and stable physical card size',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
- assert.match(source,/total<=9\?1:total<=20\?2:total<=30\?3:total<=40\?4:5/);
+ assert.match(source,/total<=10\?1:total<=22\?2:total<=36\?3:total<=52\?4:5/);
  assert.match(source,/fan=dense\?0:/);
- assert.match(source,/firstZ=rows===1\?2\.72:rows===2\?1\.72:rows===3\?1\.52:1\.48/);
- assert.match(source,/lastZ=rows===1\?2\.72:3\.28/);
- assert.match(source,/minScale=rows===1\?\.82:rows===2\?\.76:rows===3\?\.70:rows===4\?\.66:\.62/);
+ assert.match(source,/firstZ=rows===1\?3\.02:rows===2\?2\.34:rows===3\?2\.18:2\.06/);
+ assert.match(source,/lastZ=rows===1\?3\.02:4\.14/);
+ assert.match(source,/scale=rows===1\?\.88:rows===2\?\.85:rows===3\?\.82:rows===4\?\.79:\.76/);
+ assert.match(source,/spacing=rowCount<=1\?0:Math\.min\(naturalSpacing,widthLimit\/Math\.max\(1,rowCount-1\)\)/);
  assert.match(source,/CARD_STACK_SCALE=\.88/);
  assert.equal((source.match(/CARD_STACK_SCALE/g)||[]).length>=5,true);
 });
