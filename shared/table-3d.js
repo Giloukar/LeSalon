@@ -51,6 +51,9 @@ export function createTable3DRenderer({onFatal}={}){
   const disposableTextures=[];
   const cardGeometry=createCardGeometry(THREE);
   const tileGeometry=new THREE.BoxGeometry(.88,.12,.64);
+  const goosePathGeometry=new THREE.BoxGeometry(1,.032,.12);
+  const gooseChoiceRingGeometry=new THREE.RingGeometry(.38,.49,36);
+  const gooseDiceTrayGeometry=new THREE.PlaneGeometry(2.65,1.12);
   const pawnGeometry=new THREE.CylinderGeometry(.16,.24,.46,18);
   const dieGeometry=new THREE.BoxGeometry(.68,.68,.68);
   const rummiTileGeometry=new THREE.BoxGeometry(.62,.9,.085);
@@ -64,6 +67,9 @@ export function createTable3DRenderer({onFatal}={}){
   const cityHouseGeometry=new THREE.BoxGeometry(.19,.25,.19);
   const cityPegGeometry=new THREE.CylinderGeometry(.07,.09,.22,12);
   const edgeMaterial=new THREE.MeshStandardMaterial({color:0xe9e2d1,roughness:.72,metalness:0});
+  const goosePathMaterial=new THREE.MeshStandardMaterial({color:0x7f906d,roughness:.88,metalness:0});
+  const gooseChoiceMaterial=new THREE.MeshBasicMaterial({color:0xe6f5a8,transparent:true,opacity:.82,side:THREE.DoubleSide});
+  const gooseDiceTrayMaterial=new THREE.MeshStandardMaterial({color:0x21392d,roughness:.84,metalness:0,transparent:true,opacity:.94,side:THREE.DoubleSide});
   const tileMaterials=new Map(),rummiTileMaterials=new Map(),pawnMaterials=new Map(),dieFaceMaterials=new Map(),cellLabelMaterials=new Map(),boxTileMaterials=new Map(),labelMaterials=new Map(),cellLabelTextures=[];
   const neutralDieMaterial=new THREE.MeshStandardMaterial({color:0xd8d3c4,roughness:.82,metalness:0});
   const rummiBackMaterial=new THREE.MeshStandardMaterial({color:0x46574b,roughness:.86,metalness:.01});
@@ -220,6 +226,20 @@ export function createTable3DRenderer({onFatal}={}){
     const button=host?.querySelector?.('[data-table-3d-reset-poses]');if(button)button.hidden=!hasActiveLocalPoses();
     const hand=host?.querySelector?.('[data-table-3d-arrange-hand]');if(hand)hand.hidden=!hasActiveLocalCardPoses();
   }
+  function updateSortButton(){
+    const button=host?.querySelector?.('[data-table-3d-sort]');if(!button)return;
+    const available=!!current?.viewData?.sortEnabled&&!!current?.interactions?.sort&&!current?.spectator&&!current?.gated;
+    button.hidden=!available;if(!available)return;
+    const next=current?.viewData?.sortByColor?'valeur':'couleur';
+    button.title='Trier par '+next;button.setAttribute('aria-label','Trier par '+next);
+  }
+  function sortActiveHand(){
+    if(typeof current?.interactions?.sort!=='function')return false;
+    const prefix=activePoseScope+'|',kinds=current?.gameId==='rummikub'?['tile']:['card'];let changed=false;
+    for(const key of [...localPoses.keys()])if(key.startsWith(prefix)&&kinds.some(kind=>key.startsWith(prefix+kind+'|'))){localPoses.delete(key);changed=true}
+    if(changed&&tossAnimations.length)tossAnimations=tossAnimations.filter(a=>!a.mesh?.userData?.cardId&&!a.mesh?.userData?.tileId);
+    return current.interactions.sort();
+  }
   function emitLocalTabletopCard(action,data={}){
     if(!current?.online||current?.spectator||!TABLETOP_CARD_GAMES.has(current?.gameId))return false;
     window.dispatchEvent(new CustomEvent('salon:local-tabletop-card',{detail:{action,gameId:current.gameId,...data}}));return true;
@@ -316,8 +336,9 @@ export function createTable3DRenderer({onFatal}={}){
     const column=document.querySelector('.table-column');if(!column)return null;
     if(!host?.isConnected){
       host=document.createElement('section');host.className='table-3d-host';host.setAttribute('aria-label','Vue 3D de la table');
-      host.innerHTML='<div class="table-3d-window-controls" aria-label="Affichage 3D"><button type="button" class="table-3d-window-button table-3d-hand-reset" data-table-3d-arrange-hand hidden aria-label="Ranger ma main" title="Ranger ma main">▤</button><button type="button" class="table-3d-window-button table-3d-reset" data-table-3d-reset-poses hidden aria-label="Ranger mes objets selon la disposition du jeu" title="Ranger mes objets · local uniquement">↺</button><button type="button" class="table-3d-window-button table-3d-camera-reset" data-table-3d-reset-camera hidden aria-label="Recentrer la caméra 3D" title="Recentrer la caméra">◎</button><button type="button" class="table-3d-window-button table-3d-minimize" data-table-3d-window="embedded" aria-label="Réduire la vue 3D dans la page" title="Réduire la vue 3D">↙</button><button type="button" class="table-3d-window-button table-3d-expand" data-table-3d-window="full" aria-label="Agrandir la vue 3D" title="Plein écran">⛶</button><button type="button" class="table-3d-window-button table-3d-close" data-table-view-mode="2d" aria-label="Revenir à la vue 2D" title="Revenir à la vue 2D">×</button></div><div class="table-3d-hud"><span class="table-3d-accent" data-table-3d-title>VUE 3D</span><span data-table-3d-status>Table synchronisée</span></div><div class="table-3d-help" data-table-3d-help>Glissez le tapis pour tourner la vue · molette sur le tapis pour zoomer</div>';
+      host.innerHTML='<div class="table-3d-window-controls" aria-label="Affichage 3D"><button type="button" class="table-3d-window-button table-3d-sort" data-table-3d-sort hidden aria-label="Trier ma main" title="Trier ma main">⇅</button><button type="button" class="table-3d-window-button table-3d-hand-reset" data-table-3d-arrange-hand hidden aria-label="Ranger ma main" title="Ranger ma main">▤</button><button type="button" class="table-3d-window-button table-3d-reset" data-table-3d-reset-poses hidden aria-label="Ranger mes objets selon la disposition du jeu" title="Ranger mes objets · local uniquement">↺</button><button type="button" class="table-3d-window-button table-3d-camera-reset" data-table-3d-reset-camera hidden aria-label="Recentrer la caméra 3D" title="Recentrer la caméra">◎</button><button type="button" class="table-3d-window-button table-3d-minimize" data-table-3d-window="embedded" aria-label="Réduire la vue 3D dans la page" title="Réduire la vue 3D">↙</button><button type="button" class="table-3d-window-button table-3d-expand" data-table-3d-window="full" aria-label="Agrandir la vue 3D" title="Plein écran">⛶</button><button type="button" class="table-3d-window-button table-3d-close" data-table-view-mode="2d" aria-label="Revenir à la vue 2D" title="Revenir à la vue 2D">×</button></div><div class="table-3d-hud"><span class="table-3d-accent" data-table-3d-title>VUE 3D</span><span data-table-3d-status>Table synchronisée</span></div><div class="table-3d-help" data-table-3d-help>Glissez le tapis pour tourner la vue · molette sur le tapis pour zoomer</div>';
       host.querySelectorAll('[data-table-3d-window]').forEach(button=>button.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.dispatchEvent(new CustomEvent('salon:table-3d-window',{detail:{mode:button.getAttribute('data-table-3d-window')}}))}));
+      host.querySelector('[data-table-3d-sort]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();sortActiveHand()});
       host.querySelector('[data-table-3d-arrange-hand]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();arrangeActiveHand()});
       host.querySelector('[data-table-3d-reset-poses]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();resetActiveLocalPoses()});
       host.querySelector('[data-table-3d-reset-camera]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();resetCameraView()});
@@ -346,6 +367,11 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function placeCard(mesh,x,z,y=TABLE_Y+.07,rot=0,scale=1){
     mesh.position.set(x,y,z);mesh.rotation.set(-Math.PI/2,0,rot);mesh.scale.setScalar(scale);objects.add(mesh);return mesh;
+  }
+  function visualOwnHand(payload,state,viewer){
+    const sorted=payload?.viewData?.sortedHand;
+    if(Array.isArray(sorted))return sorted;
+    return payload?.spectator?[]:(state?.players?.[viewer]?.hand||[]);
   }
   function handCardSlot(count,index){
     const total=Math.max(1,count),rows=total<=9?1:total<=20?2:total<=30?3:total<=40?4:5,perRow=Math.ceil(total/rows),row=Math.floor(index/perRow),start=row*perRow,rowCount=Math.min(perRow,total-start),local=index-start;
@@ -806,6 +832,18 @@ export function createTable3DRenderer({onFatal}={}){
     if(!Number.isInteger(n)||n<=0)return new THREE.Vector3(-4.75,TABLE_Y+.42,3.15);
     const p=coords?.[n-1]||[4,3];return new THREE.Vector3((p[0]-4)*1.07,TABLE_Y+.42,(p[1]-3)*.87);
   }
+  function gooseSpecialName(cell,specials){
+    const labels={bridge:'PONT',inn:'AUBERGE',well:'PUITS',maze:'LABYRINTHE',prison:'PRISON',skull:'MORT',goal:'ARRIVÉE'};
+    for(const [key,value] of Object.entries(specials||{}))if(value===cell)return labels[key]||key.toUpperCase();
+    return '';
+  }
+  function addGoosePath(coords){
+    const count=Math.min(63,coords?.length||0);
+    for(let n=1;n<count;n++){
+      const a=worldForCell(n,coords),b=worldForCell(n+1,coords),dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);if(len<.01)continue;
+      const segment=new THREE.Mesh(goosePathGeometry,goosePathMaterial);segment.position.set((a.x+b.x)/2,TABLE_Y+.025,(a.z+b.z)/2);segment.scale.set(len,1,1);segment.rotation.y=-Math.atan2(dz,dx);segment.receiveShadow=true;objects.add(segment);
+    }
+  }
   function startMotion(){
     if(animationRaf||!motionAllowed())return;
     animationRaf=requestAnimationFrame(motionFrame);
@@ -818,7 +856,7 @@ export function createTable3DRenderer({onFatal}={}){
       if(t<1)running=true;else a.mesh.rotation.set(0,0,0);
     }
     for(const a of pawnAnimations){
-      const t=Math.min(1,(now-a.start)/a.duration),scaled=t*Math.max(1,a.points.length-1),i=Math.min(a.points.length-2,Math.floor(scaled)),u=Math.min(1,scaled-i),p0=a.points[i]||a.points[0],p1=a.points[i+1]||a.points.at(-1);
+      const t=Math.min(1,(now-a.start)/a.duration),travel=t*t*(3-2*t),scaled=travel*Math.max(1,a.points.length-1),i=Math.min(a.points.length-2,Math.floor(scaled)),u=Math.min(1,scaled-i),p0=a.points[i]||a.points[0],p1=a.points[i+1]||a.points.at(-1);
       a.mesh.position.lerpVectors(p0,p1,u);a.mesh.position.y+=Math.sin(u*Math.PI)*(a.lift??.12);
       if(t<1)running=true;else a.mesh.position.copy(a.points.at(-1));
     }
@@ -905,7 +943,10 @@ export function createTable3DRenderer({onFatal}={}){
     clearObjects();dropMarker.visible=false;
     const s=payload.state,coords=payload.viewData?.boardCoords||[],geese=new Set(payload.viewData?.gooseCells||[]),choices=new Set(payload.viewData?.choiceTargets||[]),choiceByTarget=new Map((payload.viewData?.gooseChoices||[]).map(x=>[x.target,x.steps])),grains=new Set(s?.gooseGrains||[]);
     const specials=payload.viewData?.specialCells||{};
-    setCameraPose(0,8.7,8.25,0,.15,0);
+    setCameraPose(0,9.15,8.85,0,.15,.18);
+    addGoosePath(coords);
+    const diceTray=new THREE.Mesh(gooseDiceTrayGeometry,gooseDiceTrayMaterial);diceTray.rotation.x=-Math.PI/2;diceTray.position.set(0,TABLE_Y+.025,3.18);diceTray.receiveShadow=true;objects.add(diceTray);
+    const diceTag=makeLabel('DÉS','#dbea9e');diceTag.position.set(0,.82,3.62);diceTag.scale.set(1.12,.28,1);objects.add(diceTag);
 
     for(let n=1;n<=Math.min(63,coords.length);n++){
       const p=worldForCell(n,coords);let kind='normal';
@@ -914,6 +955,13 @@ export function createTable3DRenderer({onFatal}={}){
       if(choices.has(n)&&payload.canInteract){tile.userData={kind:'goose-choice',steps:choiceByTarget.get(n),interactive:true};interactive.push(tile)}
       objects.add(tile);
       const label=cellLabel(n);label.position.set(p.x,TABLE_Y+.18,p.z);label.rotation.x=-Math.PI/2;objects.add(label);
+      if(choices.has(n)){
+        const ring=new THREE.Mesh(gooseChoiceRingGeometry,gooseChoiceMaterial);ring.rotation.x=-Math.PI/2;ring.position.set(p.x,TABLE_Y+.155,p.z);objects.add(ring);
+      }
+      const specialName=gooseSpecialName(n,specials);
+      if(specialName){
+        const tag=makeLabel(specialName,n===specials.goal?'#e6f5a8':n===specials.skull?'#f0aaa0':'#e7dec2');tag.position.set(p.x,.92,p.z-.34);tag.scale.set(1.42,.30,1);objects.add(tag);
+      }
       if(grains.has(n)){const grain=new THREE.Mesh(grainGeometry,new THREE.MeshStandardMaterial({color:0xf2cf67,emissive:0x8b6b18,emissiveIntensity:.45}));grain.position.set(p.x+.27,TABLE_Y+.34,p.z-.16);grain.userData.temporaryMaterial=grain.material;objects.add(grain)}
     }
 
@@ -921,8 +969,12 @@ export function createTable3DRenderer({onFatal}={}){
     const moveKey=(s?.moves||0)+'|'+(s?.movedPlayer??-1)+'|'+(s?.path||[]).join('-'),animateMove=moveKey!==lastMoveKey&&Array.isArray(s?.path)&&s.path.length>1;
     if(animateMove)lastMoveKey=moveKey;
     (s?.players||[]).forEach((pl,i)=>{
-      const pawn=pawnMesh(colors[i]||['#dbea9e','#aacdf7','#e4ad91','#c9afe7'][i%4]);
+      const pawnColor=colors[i]||['#dbea9e','#aacdf7','#e4ad91','#c9afe7'][i%4],pawn=pawnMesh(pawnColor);
+      if(i===s.turn)pawn.scale.multiplyScalar(1.14);
       const target=worldForCell(pl.pos,coords),offset=new THREE.Vector3(((i%3)-1)*.13,.12,Math.floor(i/3)*.12);target.add(offset);
+      if(i===s.turn){
+        const ring=new THREE.Mesh(gooseChoiceRingGeometry,new THREE.MeshBasicMaterial({color:pawnColor,transparent:true,opacity:.62,side:THREE.DoubleSide}));ring.userData.temporaryMaterial=ring.material;ring.rotation.x=-Math.PI/2;ring.position.set(target.x,TABLE_Y+.17,target.z);ring.scale.setScalar(.72);objects.add(ring);
+      }
       if(animateMove&&i===s.movedPlayer){
         const points=s.path.map(n=>worldForCell(n,coords).add(offset.clone()));pawn.position.copy(points[0]);pawnAnimations.push({mesh:pawn,points,start:performance.now(),duration:Math.min(1700,Math.max(480,points.length*105))});
       }else pawn.position.copy(target);
@@ -932,7 +984,7 @@ export function createTable3DRenderer({onFatal}={}){
     const values=Array.isArray(s?.dice)&&s.dice.length===2?s.dice:[1,1],diceKey=values.join('-')+'|'+(s?.turn??0)+'|'+(s?.goosePending?.rerolls??0)+'|'+(s?.players?.[s?.turn]?.gooseRolls??0),animateDice=diceKey!==lastDiceKey;
     if(animateDice)lastDiceKey=diceKey;
     values.forEach((value,i)=>{
-      const die=dieMesh(value);die.position.set(-.52+i*1.04,TABLE_Y+.72,.05);
+      const die=dieMesh(value);die.position.set(-.52+i*1.04,TABLE_Y+.72,3.18);
       if(payload.canInteract&&!s.goosePending){die.userData={...die.userData,kind:'goose-roll',interactive:true,home:{scale:die.scale.clone()}};interactive.push(die)}
       objects.add(die);
       if(animateDice&&motionAllowed()){const h=visualHash(diceKey+'|'+i);die.rotation.set(5+h*4,7+h*5,4+h*6);diceAnimations.push({mesh:die,start:performance.now(),duration:620+i*80,rx:die.rotation.x,ry:die.rotation.y,rz:die.rotation.z})}
@@ -1009,7 +1061,7 @@ export function createTable3DRenderer({onFatal}={}){
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
 
     if(game==='pouilleux'){
-      const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,ownVisuals=new Map();
+      const own=visualOwnHand(payload,s,viewer),n=own.length,ownVisuals=new Map();
       own.forEach((card,i)=>{
         const slot=handCardSlot(n,i),mesh=cardMesh(card,{back:!!card.hidden});
         placeCard(mesh,slot.x,slot.z,TABLE_Y+.11+slot.yOffset,slot.fan,slot.scale);makeLooseManipulable(mesh,{kind:'loose-card',cardId:card.id,persistPose:true});
@@ -1060,7 +1112,7 @@ export function createTable3DRenderer({onFatal}={}){
     }
 
     if(game==='quatrevingtdixneuf'){
-      const ninety=data.ninety||{},selected=new Set(ninety.selectedIds||[]),selectable=new Set(ninety.selectableIds||[]),legal=new Set(ninety.legalIds||[]),own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,ownVisuals=new Map();
+      const ninety=data.ninety||{},selected=new Set(ninety.selectedIds||[]),selectable=new Set(ninety.selectableIds||[]),legal=new Set(ninety.legalIds||[]),own=visualOwnHand(payload,s,viewer),n=own.length,ownVisuals=new Map();
       const ninetyDrop=cardGestureTarget('quatrevingtdixneuf',TABLE_Y+.025);dropMarker.visible=!!(payload.canInteract&&selectable.size);dropMarker.position.set(ninetyDrop.x,TABLE_Y+.025,ninetyDrop.z);dropMarker.material.opacity=.2;
       own.forEach((card,i)=>{
         const slot=handCardSlot(n,i),chosen=selected.has(card.id),isLegal=legal.has(card.id),mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:selectable.has(card.id),playable:selectable.has(card.id)});
@@ -1280,7 +1332,7 @@ export function createTable3DRenderer({onFatal}={}){
     setCameraPose(0,7.4,9.1,0,.22,.15);
     const selected=new Set(data.selectedIds||[]),selectable=new Set(data.selectableIds||[]),playable=new Set(data.cardPlayableIds||[]);
     const dropTarget=cardGestureTarget(game,TABLE_Y+.025);dropMarker.visible=!!(payload.canInteract&&selectable.size);dropMarker.position.set(dropTarget.x,TABLE_Y+.025,dropTarget.z);dropMarker.material.opacity=.2;
-    const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,ownVisuals=new Map();
+    const own=visualOwnHand(payload,s,viewer),n=own.length,ownVisuals=new Map();
     own.forEach((card,i)=>{
       const slot=handCardSlot(n,i),chosen=selected.has(card.id),canSelect=selectable.has(card.id),legal=playable.has(card.id);
       const mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:canSelect,playable:canSelect});
@@ -1368,7 +1420,7 @@ export function createTable3DRenderer({onFatal}={}){
     setCameraPose(0,7.25,9.25,0,.25,.2);
     const s=payload.state,viewer=Number.isInteger(payload.privateIndex)?payload.privateIndex:0;
     if(!s?.players?.length){lastEightSnapshot=null;return}
-    const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),playable=new Set(payload.viewData?.playableIds||[]),previous=lastEightSnapshot;
+    const own=visualOwnHand(payload,s,viewer),playable=new Set(payload.viewData?.playableIds||[]),previous=lastEightSnapshot;
 
     const n=own.length,ownVisuals=new Map();
     own.forEach((card,i)=>{
@@ -1452,7 +1504,7 @@ export function createTable3DRenderer({onFatal}={}){
   function syncRummikub(payload){
     clearObjects();dropMarker.visible=false;
     const data=payload.viewData?.rummi;if(!data){lastRummiSnapshot=null;return}
-    const selected=new Set(data.selectedIds||[]),oldIds=new Set(data.refTableIds||[]),groups=data.table||[],layout=rummiBoardLayout(groups),hand=data.hand||[],rackLayout=rummiRackLayout(hand.length),currentVisuals=new Map();
+    const selected=new Set(data.selectedIds||[]),oldIds=new Set(data.refTableIds||[]),groups=data.table||[],layout=rummiBoardLayout(groups),hand=Array.isArray(payload.viewData?.sortedHand)?payload.viewData.sortedHand:(data.hand||[]),rackLayout=rummiRackLayout(hand.length),currentVisuals=new Map();
     const density=Math.max(layout.rows,rackLayout.rows,Math.ceil((layout.tileCount+hand.length)/24)),cameraExtra=Math.max(0,density-2);
     setCameraPose(0,8.65+cameraExtra*.42,10.45+cameraExtra*.38,0,.2,-.28);
 
@@ -1926,7 +1978,7 @@ export function createTable3DRenderer({onFatal}={}){
     }
     ensureHost();document.documentElement.dataset.table3dGame=payload.gameId||'';document.documentElement.dataset.table3dPhase=payload.state?.phase||'';
     activePoseScope=poseScope(payload);poseSeen=new Set();
-    syncCurrent(payload);pruneLocalPoses();pruneLabelCache();updateLocalPoseResetButton();updateCameraResetButton();draw();
+    syncCurrent(payload);pruneLocalPoses();pruneLabelCache();updateLocalPoseResetButton();updateSortButton();updateCameraResetButton();draw();
   }
   function draw(){if(active&&renderer&&scene&&camera)renderer.render(scene,camera)}
   function updatePointer(e){
@@ -2439,7 +2491,7 @@ export function createTable3DRenderer({onFatal}={}){
   function destroy(){
     deactivate();clearObjects();
     canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);canvas?.removeEventListener('lostpointercapture',onLostPointerCapture);canvas?.removeEventListener('wheel',onWheel);canvas?.removeEventListener('keydown',onKeyDown);window.removeEventListener('blur',onWindowBlur);window.removeEventListener('salon:remote-card-gesture',onRemoteCardGesture);window.removeEventListener('salon:remote-tabletop-card',onRemoteTabletopCard);document.removeEventListener('visibilitychange',onVisibilityChange);assetUnsubscribe?.();assetUnsubscribe=null;
-    physicalPieces.dispose();cardGeometry.dispose();tileGeometry.dispose();pawnGeometry.dispose();dieGeometry.dispose();rummiTileGeometry.dispose();grainGeometry.dispose();heldPadGeometry.dispose();codeGemGeometry.dispose();intrusDotGeometry.dispose();balloonGeometry.dispose();golfBallGeometry.dispose();cityTileGeometry.dispose();cityHouseGeometry.dispose();cityPegGeometry.dispose();edgeMaterial.dispose();backMaterial.dispose();for(const m of frontMaterials.values())m.dispose();for(const m of tileMaterials.values())m.dispose();for(const m of rummiTileMaterials.values())m.dispose();for(const m of pawnMaterials.values())m.dispose();for(const m of dieFaceMaterials.values())m.dispose();for(const m of cellLabelMaterials.values())m.dispose();for(const m of boxTileMaterials.values())m.dispose();for(const entry of labelMaterials.values()){entry.material.dispose();entry.texture.dispose()}labelMaterials.clear();neutralDieMaterial.dispose();rummiBackMaterial.dispose();for(const t of disposableTextures)t.dispose();for(const t of cellLabelTextures)t.dispose();
+    physicalPieces.dispose();cardGeometry.dispose();tileGeometry.dispose();goosePathGeometry.dispose();gooseChoiceRingGeometry.dispose();gooseDiceTrayGeometry.dispose();goosePathMaterial.dispose();gooseChoiceMaterial.dispose();gooseDiceTrayMaterial.dispose();pawnGeometry.dispose();dieGeometry.dispose();rummiTileGeometry.dispose();grainGeometry.dispose();heldPadGeometry.dispose();codeGemGeometry.dispose();intrusDotGeometry.dispose();balloonGeometry.dispose();golfBallGeometry.dispose();cityTileGeometry.dispose();cityHouseGeometry.dispose();cityPegGeometry.dispose();edgeMaterial.dispose();backMaterial.dispose();for(const m of frontMaterials.values())m.dispose();for(const m of tileMaterials.values())m.dispose();for(const m of rummiTileMaterials.values())m.dispose();for(const m of pawnMaterials.values())m.dispose();for(const m of dieFaceMaterials.values())m.dispose();for(const m of cellLabelMaterials.values())m.dispose();for(const m of boxTileMaterials.values())m.dispose();for(const entry of labelMaterials.values()){entry.material.dispose();entry.texture.dispose()}labelMaterials.clear();neutralDieMaterial.dispose();rummiBackMaterial.dispose();for(const t of disposableTextures)t.dispose();for(const t of cellLabelTextures)t.dispose();
     tableMesh?.geometry?.dispose();tableMesh?.material?.dispose();dropMarker?.geometry?.dispose();dropMarker?.material?.dispose();renderer?.dispose();
     localPoses.clear();poseSeen.clear();activePoseScope='';localPoseOrder=0;localThrowCounter=0;remoteLooseCards.clear();cameraPose=null;cameraControl={yaw:0,pitch:0,zoom:1};cameraDrag=null;cameraGame='';
     renderer=scene=camera=canvas=null;current=null;
