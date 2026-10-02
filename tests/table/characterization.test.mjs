@@ -95,9 +95,9 @@ test('3D round-end controls reuse nextRound for blackjack, auctions and shut-the
     if(gameId==='encheres'){S.bids=S.players.map((_,i)=>({id:'test-bid-'+i,rank:2+i,suit:['S','H','D','C'][i%4]}));S.lastAuction={round:S.bidRound,pot:S.pot,winner:0,cards:clone(S.bids)}}
     let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});
     renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});
-    const before={phase:S.phase,round:S.round,bidRound:S.bidRound,boxTurns:S.boxTurns},flag=gameId==='vingtetun'?seen.viewData.blackjack.canNextRound:gameId==='encheres'?seen.viewData.cardAction.canNextRound:seen.viewData.boxCanNextRound;
+    const before={phase:S.phase,round:S.round,bidRound:S.bidRound,boxTurns:S.boxTurns},canInteract=seen.canInteract,flag=gameId==='vingtetun'?seen.viewData.blackjack.canNextRound:gameId==='encheres'?seen.viewData.cardAction.canNextRound:seen.viewData.boxCanNextRound;
     const ok=seen.interactions.nextRound();
-    return{canInteract:seen.canInteract,flag,ok,before,after:{phase:S.phase,round:S.round,bidRound:S.bidRound,boxTurns:S.boxTurns}};
+    return{canInteract,flag,ok,before,after:{phase:S.phase,round:S.round,bidRound:S.bidRound,boxTurns:S.boxTurns}};
    },id);
    assert.equal(r.canInteract,true,id);assert.equal(r.flag,true,id);assert.equal(r.ok,true,id);assert.notEqual(r.after.phase,'roundEnd',id);
   }
