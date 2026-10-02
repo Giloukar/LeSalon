@@ -30,6 +30,19 @@ test('unavailable 3D leaves the effective renderer in 2D',async()=>{const t=awai
 
 test('returning to 2D cancels a late asynchronous 3D activation',async()=>{const t=await table();browser=t.browser;try{await setup(t.page);const r=await t.page.evaluate(async()=>{let release;SalonTableView.register('3d',{prepare(){return new Promise(resolve=>{release=resolve})},render(){throw Error('late 3D render must not run')}});const pending=SalonTableView.setMode('3d',{persistPreference:false});await Promise.resolve();const back=await SalonTableView.setMode('2d',{persistPreference:false});release();const first=await pending;return{first,back,mode:SalonTableView.getMode(),dataset:document.documentElement.dataset.tableView};});assert.equal(r.back.ok,true);assert.equal(r.first.ok,false);assert.equal(r.first.reason,'superseded');assert.equal(r.mode,'2d');assert.equal(r.dataset,'2d');}finally{await browser.close();}});
 
+test('2D/3D and native-fullscreen changes keep a dark visual guard instead of exposing a blank frame',async()=>{
+ const view=await readFile(path.join(root,'shared/table-view.js'),'utf8'),css=await readFile(path.join(root,'shared/table-3d.css'),'utf8'),html=await readFile(path.join(root,'jeux.html'),'utf8'),loader=await readFile(path.join(root,'shared/table-3d-loader.js'),'utf8');
+ assert.match(view,/function beginVisualTransition\(\)/);
+ assert.match(view,/dataset\.tableViewTransition='1'/);
+ assert.match(view,/function endVisualTransition\(token\)/);
+ assert.match(view,/async function guardTransition\(work\)/);
+ assert.match(view,/guardTransition,/);
+ assert.match(css,/data-table-view-transition="1"/);
+ assert.match(css,/background:#0b110e/);
+ assert.match(html,/SalonTableView\?\.guardTransition\?window\.SalonTableView\.guardTransition\(apply\):apply\(\)/);
+ assert.match(loader,/if\(payload\?\.gated\)\{view\.fallback\('gated-state'\);return\}/);
+});
+
 test('2D and 3D mode changes commit the visible layer atomically',async()=>{
  const source=await readFile(path.join(root,'shared/table-view.js'),'utf8');
  assert.match(source,/active=BASE_MODE;\n\s*setDataset\(BASE_MODE\);\n\s*if\(previous!==BASE_MODE\)safeDeactivate\(previous\)/);
