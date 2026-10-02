@@ -115,7 +115,8 @@ test('Yam and Métropole expose direct physical dice controls without bypassing 
  assert.match(source,/payload\.canInteract&&data\.canRoll/);
  assert.match(source,/kind:'city-roll',interactive:true,home:\{scale:die\.scale\.clone\(\)\}/);
  assert.match(source,/kind:'goose-roll',interactive:true,home:\{scale:die\.scale\.clone\(\)\}/);
- assert.match(source,/current\?\.interactions\?\.yam\?\.\(d\.kind==='yam-hold'\?'hold':'roll'/);
+ assert.match(source,/d\.kind==='yam-roll'\|\|d\.kind==='yam-hold'\|\|d\.kind==='yam-score'/);
+ assert.match(source,/current\?\.interactions\?\.yam\?\.\(d\.kind==='yam-hold'\?'hold':d\.kind==='yam-score'\?'score':'roll'/);
  assert.match(source,/current\?\.interactions\?\.city\?\.\('roll'\)/);
  assert.match(source,/current\?\.interactions\?\.goose\?\.\(d\.kind==='goose-roll'\?'roll':d\.kind==='goose-reroll'\?'reroll':'choose'/);
  assert.match(source,/const interactiveHover=!!hovered\?\.userData\?\.interactive/);
