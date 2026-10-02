@@ -368,11 +368,10 @@ export function createTable3DRenderer({onFatal}={}){
     return [...(tiles||[])].sort((a,b)=>(!!a?.joker)-(!!b?.joker)||(byColor?((a?.color??5)-(b?.color??5)||(a?.num||0)-(b?.num||0)):((a?.num||99)-(b?.num||99)||(a?.color||0)-(b?.color||0))));
   }
   function handCardSlot(count,index){
-    const total=Math.max(1,count),rows=total<=9?1:total<=20?2:total<=30?3:total<=40?4:5,perRow=Math.ceil(total/rows),row=Math.floor(index/perRow),start=row*perRow,rowCount=Math.min(perRow,total-start),local=index-start;
-    const dense=rows>1,baseScale=rows===1?.86:rows===2?.82:rows===3?.76:rows===4?.70:.66,widthLimit=rows===1?9.4:10.35,minScale=rows===1?.82:rows===2?.76:rows===3?.70:rows===4?.66:.62;
-    const fitScale=rowCount<=1?baseScale:Math.min(baseScale,(widthLimit-(rowCount-1)*.11)/(rowCount*CARD_W));
-    const scale=Math.max(minScale,fitScale),spacing=rowCount<=1?0:CARD_W*scale+.11,t=rowCount<=1?.5:local/(rowCount-1);
-    const x=(local-(rowCount-1)/2)*spacing,fan=dense?0:(t-.5)*-.055,firstZ=rows===1?2.72:rows===2?1.72:rows===3?1.52:1.48,lastZ=rows===1?2.72:3.28,rowPitch=rows<=1?0:(lastZ-firstZ)/(rows-1);
+    const total=Math.max(1,count),rows=total<=10?1:total<=22?2:total<=36?3:total<=52?4:5,perRow=Math.ceil(total/rows),row=Math.floor(index/perRow),start=row*perRow,rowCount=Math.min(perRow,total-start),local=index-start;
+    const dense=rows>1,scale=rows===1?.88:rows===2?.85:rows===3?.82:rows===4?.79:.76,widthLimit=rows===1?9.55:10.15;
+    const naturalSpacing=CARD_W*scale+.10,spacing=rowCount<=1?0:Math.min(naturalSpacing,widthLimit/Math.max(1,rowCount-1)),t=rowCount<=1?.5:local/(rowCount-1);
+    const x=(local-(rowCount-1)/2)*spacing,fan=dense?0:(t-.5)*-.055,firstZ=rows===1?3.02:rows===2?2.34:rows===3?2.18:2.06,lastZ=rows===1?3.02:4.14,rowPitch=rows<=1?0:(lastZ-firstZ)/(rows-1);
     const z=firstZ+row*rowPitch;
     return{x,z,fan,scale,row,local,yOffset:row*.032+local*.0015};
   }
@@ -667,12 +666,12 @@ export function createTable3DRenderer({onFatal}={}){
     return{x:cell.x+(tileIndex-(length-1)/2)*spacing,z:cell.z,scale,row:cell.row,col:cell.col,cellW:cell.width,cellD:cell.depth};
   }
   function rummiRackLayout(count){
-    const total=Math.max(1,count),rows=total<=10?1:total<=20?2:total<=32?3:total<=50?4:5,perRow=Math.ceil(total/rows),depth=2.15,minZ=1.25,maxZ=minZ+depth,rowPitch=depth/rows;
+    const total=Math.max(1,count),rows=total<=12?1:total<=24?2:total<=36?3:total<=52?4:5,perRow=Math.ceil(total/rows),depth=3.15,minZ=1.60,maxZ=minZ+depth,rowPitch=depth/rows;
     return{total,rows,perRow,depth,minZ,maxZ,rowPitch};
   }
   function rummiRackSlot(count,index){
     const layout=rummiRackLayout(count),row=Math.floor(index/layout.perRow),start=row*layout.perRow,rowCount=Math.min(layout.perRow,layout.total-start),local=index-start;
-    const baseScale=layout.rows===1?.92:layout.rows===2?.78:layout.rows===3?.66:layout.rows===4?.55:.46,widthScale=rowCount<=1?baseScale:8.2/(rowCount*.68),depthScale=Math.max(.34,(layout.rowPitch-.08)/.9),scale=Math.max(.32,Math.min(baseScale,widthScale,depthScale)),spacing=.68*scale,t=rowCount<=1?.5:local/(rowCount-1);
+    const baseScale=layout.rows===1?.92:layout.rows===2?.84:layout.rows===3?.78:layout.rows===4?.72:.68,widthScale=rowCount<=1?baseScale:8.45/(rowCount*.68),depthScale=Math.max(.58,(layout.rowPitch-.08)/.9),scale=Math.max(.58,Math.min(baseScale,widthScale,depthScale)),spacing=.68*scale,t=rowCount<=1?.5:local/(rowCount-1);
     return{x:(local-(rowCount-1)/2)*spacing,z:layout.minZ+(row+.5)*layout.rowPitch+Math.abs(t-.5)*.025,scale,row,yOffset:row*.012+local*.001};
   }
   function eightSnapshot(payload,deckCount,top){
@@ -1497,8 +1496,8 @@ export function createTable3DRenderer({onFatal}={}){
     clearObjects();dropMarker.visible=false;
     const data=payload.viewData?.rummi;if(!data){lastRummiSnapshot=null;return}
     const selected=new Set(data.selectedIds||[]),oldIds=new Set(data.refTableIds||[]),groups=data.table||[],layout=rummiBoardLayout(groups),hand=orderedTiles(data.hand||[],!!payload.viewData?.sortByColor),rackLayout=rummiRackLayout(hand.length),currentVisuals=new Map();
-    const density=Math.max(layout.rows,rackLayout.rows,Math.ceil((layout.tileCount+hand.length)/24)),cameraExtra=Math.max(0,density-2);
-    setCameraPose(0,8.65+cameraExtra*.42,10.45+cameraExtra*.38,0,.2,-.28);
+    const density=Math.max(layout.rows,rackLayout.rows,Math.ceil((layout.tileCount+hand.length)/24)),cameraExtra=Math.max(0,density-2),rackReach=Math.max(0,rackLayout.maxZ-3.45);
+    setCameraPose(0,8.65+cameraExtra*.42+rackReach*.30,10.45+cameraExtra*.38+rackReach*.55,0,.28,-.18);
 
     layout.active.forEach(({group,index:gi},order)=>{
       group.forEach((tile,ti)=>{
