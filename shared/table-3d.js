@@ -53,6 +53,9 @@ export function createTable3DRenderer({onFatal}={}){
   const disposableTextures=[];
   const cardGeometry=createCardGeometry(THREE);
   const tileGeometry=new THREE.BoxGeometry(.88,.12,.64);
+  const goosePathGeometry=new THREE.BoxGeometry(1,.032,.12);
+  const gooseChoiceRingGeometry=new THREE.RingGeometry(.38,.49,36);
+  const gooseDiceTrayGeometry=new THREE.PlaneGeometry(2.65,1.12);
   const pawnGeometry=new THREE.CylinderGeometry(.16,.24,.46,18);
   const dieGeometry=new THREE.BoxGeometry(.68,.68,.68);
   const rummiTileGeometry=new THREE.BoxGeometry(.62,.9,.085);
@@ -66,6 +69,9 @@ export function createTable3DRenderer({onFatal}={}){
   const cityHouseGeometry=new THREE.BoxGeometry(.19,.25,.19);
   const cityPegGeometry=new THREE.CylinderGeometry(.07,.09,.22,12);
   const edgeMaterial=new THREE.MeshStandardMaterial({color:0xe9e2d1,roughness:.72,metalness:0});
+  const goosePathMaterial=new THREE.MeshStandardMaterial({color:0x7f906d,roughness:.88,metalness:0});
+  const gooseChoiceMaterial=new THREE.MeshBasicMaterial({color:0xe6f5a8,transparent:true,opacity:.82,side:THREE.DoubleSide});
+  const gooseDiceTrayMaterial=new THREE.MeshStandardMaterial({color:0x21392d,roughness:.84,metalness:0,transparent:true,opacity:.94,side:THREE.DoubleSide});
   const tileMaterials=new Map(),rummiTileMaterials=new Map(),pawnMaterials=new Map(),dieFaceMaterials=new Map(),cellLabelMaterials=new Map(),boxTileMaterials=new Map(),labelMaterials=new Map(),cellLabelTextures=[];
   const neutralDieMaterial=new THREE.MeshStandardMaterial({color:0xd8d3c4,roughness:.82,metalness:0});
   const rummiBackMaterial=new THREE.MeshStandardMaterial({color:0x46574b,roughness:.86,metalness:.01});
@@ -826,6 +832,13 @@ export function createTable3DRenderer({onFatal}={}){
     if(!Number.isInteger(n)||n<=0)return new THREE.Vector3(-4.75,TABLE_Y+.42,3.15);
     const p=coords?.[n-1]||[4,3];return new THREE.Vector3((p[0]-4)*1.07,TABLE_Y+.42,(p[1]-3)*.87);
   }
+  function addGoosePath(coords){
+    const count=Math.min(63,coords?.length||0);
+    for(let n=1;n<count;n++){
+      const a=worldForCell(n,coords),b=worldForCell(n+1,coords),dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);if(len<.01)continue;
+      const segment=new THREE.Mesh(goosePathGeometry,goosePathMaterial);segment.position.set((a.x+b.x)/2,TABLE_Y+.025,(a.z+b.z)/2);segment.scale.set(len,1,1);segment.rotation.y=-Math.atan2(dz,dx);segment.receiveShadow=true;objects.add(segment);
+    }
+  }
   function startMotion(){
     if(animationRaf||!motionAllowed())return;
     animationRaf=requestAnimationFrame(motionFrame);
@@ -926,13 +939,18 @@ export function createTable3DRenderer({onFatal}={}){
     const s=payload.state,coords=payload.viewData?.boardCoords||[],geese=new Set(payload.viewData?.gooseCells||[]),choices=new Set(payload.viewData?.choiceTargets||[]),choiceByTarget=new Map((payload.viewData?.gooseChoices||[]).map(x=>[x.target,x.steps])),grains=new Set(s?.gooseGrains||[]);
     const specials=payload.viewData?.specialCells||{},specialDefs={bridge:['⌒','PONT','#d7cf9d'],inn:['☕','AUBERGE','#e6c18f'],well:['◉','PUITS','#b7d5ee'],maze:['⤴','LABYRINTHE','#d4bae8'],prison:['▥','PRISON','#c5cbd2'],skull:['↶','RETOUR','#efa79d'],goal:['♛','ARRIVÉE','#dbea9e']},specialByCell=new Map();
     for(const [key,n] of Object.entries(specials))if(Number.isInteger(n)&&specialDefs[key])specialByCell.set(n,{key,symbol:specialDefs[key][0],label:specialDefs[key][1],accent:specialDefs[key][2]});
-    setCameraPose(0,8.9,8.45,0,.12,0);
+    setCameraPose(0,9.05,8.7,0,.16,.12);
+    addGoosePath(coords);
+    const diceTray=new THREE.Mesh(gooseDiceTrayGeometry,gooseDiceTrayMaterial);diceTray.rotation.x=-Math.PI/2;diceTray.position.set(3.78,TABLE_Y+.025,3.00);diceTray.receiveShadow=true;objects.add(diceTray);
+    const diceTag=makeLabel('DÉS','#dbea9e');diceTag.position.set(3.78,.82,3.42);diceTag.scale.set(1.12,.28,1);objects.add(diceTag);
 
     for(let n=1;n<=Math.min(63,coords.length);n++){
       const p=worldForCell(n,coords),special=specialByCell.get(n);let kind='normal';
       if(n===specials.goal)kind='goal';else if(n===specials.skull)kind='danger';else if(geese.has(n))kind='goose';else if(special)kind='trap';
       const isChoice=choices.has(n),tile=new THREE.Mesh(tileGeometry,tileMaterial(kind,isChoice));tile.position.set(p.x,TABLE_Y+(isChoice?.14:.08),p.z);tile.castShadow=true;tile.receiveShadow=true;
-      if(isChoice){tile.scale.set(1.10,1.16,1.10);if(payload.canInteract){tile.userData={kind:'goose-choice',steps:choiceByTarget.get(n),interactive:true,home:{scale:tile.scale.clone()}};interactive.push(tile)}}
+      if(isChoice){tile.scale.set(1.10,1.16,1.10);if(payload.canInteract){tile.userData={kind:'goose-choice',steps:choiceByTarget.get(n),interactive:true,home:{scale:tile.scale.clone()}};interactive.push(tile)}
+        const ring=new THREE.Mesh(gooseChoiceRingGeometry,gooseChoiceMaterial);ring.rotation.x=-Math.PI/2;ring.position.set(p.x,TABLE_Y+.155,p.z);objects.add(ring);
+      }
       else if(n===specials.goal)tile.scale.set(1.06,1.08,1.06);
       objects.add(tile);
       const label=cellLabel(n);label.position.set(p.x,TABLE_Y+(isChoice?.26:.18),p.z);label.rotation.x=-Math.PI/2;objects.add(label);
@@ -965,7 +983,7 @@ export function createTable3DRenderer({onFatal}={}){
     const values=Array.isArray(s?.dice)&&s.dice.length===2?s.dice:[1,1],diceKey=values.join('-')+'|'+(s?.turn??0)+'|'+(s?.goosePending?.rerolls??0)+'|'+(s?.players?.[s?.turn]?.gooseRolls??0),animateDice=diceKey!==lastDiceKey;
     if(animateDice)lastDiceKey=diceKey;
     values.forEach((value,i)=>{
-      const die=dieMesh(value);die.position.set(-.52+i*1.04,TABLE_Y+.72,.05);
+      const die=dieMesh(value);die.position.set(3.26+i*1.04,TABLE_Y+.72,3.00);
       if(payload.canInteract&&!s.goosePending){die.userData={...die.userData,kind:'goose-roll',interactive:true,home:{scale:die.scale.clone()}};interactive.push(die)}
       objects.add(die);
       if(animateDice&&motionAllowed()){const h=visualHash(diceKey+'|'+i);die.rotation.set(5+h*4,7+h*5,4+h*6);diceAnimations.push({mesh:die,start:performance.now(),duration:680+i*85,rx:die.rotation.x,ry:die.rotation.y,rz:die.rotation.z})}
