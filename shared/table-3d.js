@@ -226,7 +226,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function updateSortButton(){
     const button=host?.querySelector?.('[data-table-3d-sort]');if(!button)return;
-    const available=!!current?.interactions?.sort&&!current?.spectator&&!current?.gated;
+    const available=!!current?.viewData?.sortEnabled&&!!current?.interactions?.sort&&!current?.spectator&&!current?.gated;
     button.hidden=!available;if(!available)return;
     const next=current?.viewData?.sortByColor?'valeur':'couleur';
     button.title='Trier par '+next;button.setAttribute('aria-label','Trier par '+next);
