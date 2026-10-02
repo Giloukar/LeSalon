@@ -3,7 +3,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.169.0/+esm";
 const SUIT_SYMBOL={S:'♠',H:'♥',D:'♦',C:'♣',X:'★'};
 const SUIT_NAME={S:'pique',H:'cœur',D:'carreau',C:'trèfle',X:'joker'};
 const RANK_NAME={1:'A',11:'V',12:'D',13:'R'};
-const CARD_W=1.22,CARD_H=1.78,CARD_D=.045;
+const CARD_W=1.22,CARD_H=1.78,CARD_D=.045,CARD_STACK_SCALE=.88;
 const TABLE_Y=.28;
 const LIVE_CARD_GAMES=new Set(['huit','president','menteur','suites','plis','encheres','quatrevingtdixneuf','cactus']);
 const TABLETOP_CARD_GAMES=new Set([...LIVE_CARD_GAMES,'pouilleux','vingtetun']);
@@ -14,9 +14,10 @@ const visualHash=str=>{
 };
 const motionAllowed=()=>document.documentElement.dataset.motion!=='off'&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
 function device3DProfile(){
-  const dpr=Math.max(1,Number(globalThis.devicePixelRatio)||1),coarse=matchMedia('(pointer: coarse)').matches,memory=Number(globalThis.navigator?.deviceMemory||8),constrained=coarse||memory<=4;
-  const pixelCap=constrained?1.25:memory<=6?1.5:2,textureScale=constrained?.62:memory<=6?.8:1;
-  return{coarse,memory,constrained,pixelRatio:Math.min(dpr,pixelCap),textureScale,shadowSize:constrained?512:1024};
+  const dpr=Math.max(1,Number(globalThis.devicePixelRatio)||1),coarse=matchMedia('(pointer: coarse)').matches,memory=Number(globalThis.navigator?.deviceMemory||8),constrained=memory<=4;
+  const pixelCap=constrained?1.35:coarse?1.8:memory<=6?1.7:2.2,textureScale=constrained?.76:coarse?.94:memory<=6?.9:1.08;
+  const shadowSize=constrained?768:coarse?1024:memory<=6?1024:1536,anisotropy=constrained?3:coarse?6:8;
+  return{coarse,memory,constrained,pixelRatio:Math.min(dpr,pixelCap),textureScale,shadowSize,anisotropy};
 }
 const targetPixelRatio=()=>device3DProfile().pixelRatio;
 
@@ -24,7 +25,7 @@ function canvasTexture(draw,w=512,h=720){
   const profile=device3DProfile(),scale=profile.textureScale,canvas=document.createElement('canvas');
   canvas.width=Math.max(64,Math.round(w*scale));canvas.height=Math.max(64,Math.round(h*scale));
   const ctx=canvas.getContext('2d');if(scale!==1)ctx.scale(scale,scale);draw(ctx,w,h);
-  const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=profile.constrained?2:4;
+  const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=profile.anisotropy;
   if(profile.constrained){tex.generateMipmaps=false;tex.minFilter=THREE.LinearFilter;tex.magFilter=THREE.LinearFilter}
   return tex;
 }
@@ -287,15 +288,15 @@ export function createTable3DRenderer({onFatal}={}){
     renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
     renderer.setPixelRatio(targetPixelRatio());
     renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-    renderer.outputColorSpace=THREE.SRGBColorSpace;
+    renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.06;
     canvas=renderer.domElement;canvas.setAttribute('aria-label','Table de jeu 3D interactive');canvas.tabIndex=0;
 
     scene=new THREE.Scene();scene.background=new THREE.Color(0x0b110e);
-    scene.fog=new THREE.Fog(0x0b110e,16,31);
+    scene.fog=new THREE.Fog(0x0b110e,19,35);
     camera=new THREE.PerspectiveCamera(39,1,.1,60);setCameraPose(0,7.25,9.25,0,.25,.2);
 
     const hemi=new THREE.HemisphereLight(0xe9f3e7,0x162019,1.42);scene.add(hemi);
-    const key=new THREE.DirectionalLight(0xfff5df,2.05);key.position.set(-3,8,5);key.castShadow=true;key.shadow.mapSize.set(profile.shadowSize,profile.shadowSize);key.shadow.camera.left=-8;key.shadow.camera.right=8;key.shadow.camera.top=7;key.shadow.camera.bottom=-7;scene.add(key);
+    const key=new THREE.DirectionalLight(0xfff5df,2.05);key.position.set(-3,8,5);key.castShadow=true;key.shadow.mapSize.set(profile.shadowSize,profile.shadowSize);key.shadow.camera.left=-8;key.shadow.camera.right=8;key.shadow.camera.top=7;key.shadow.camera.bottom=-7;key.shadow.camera.near=1;key.shadow.camera.far=22;key.shadow.bias=-.00012;key.shadow.normalBias=.024;scene.add(key);
     const rim=new THREE.DirectionalLight(0xb8d8c5,1.0);rim.position.set(6,3,-5);scene.add(rim);
     const farFill=new THREE.DirectionalLight(0xe3f0df,1.25);farFill.position.set(0,6,-7);scene.add(farFill);
     const farGlow=new THREE.PointLight(0xbfd9c8,.62,18);farGlow.position.set(0,4,-4.2);scene.add(farGlow);
@@ -361,13 +362,13 @@ export function createTable3DRenderer({onFatal}={}){
     mesh.position.set(x,y,z);mesh.rotation.set(-Math.PI/2,0,rot);mesh.scale.setScalar(scale);objects.add(mesh);return mesh;
   }
   function handCardSlot(count,index){
-    const total=Math.max(1,count),rows=total<=7?1:total<=14?2:3,perRow=Math.ceil(total/rows),row=Math.floor(index/perRow),start=row*perRow,rowCount=Math.min(perRow,total-start),local=index-start;
-    const dense=rows>1,baseScale=rows===1?Math.max(.84,1-Math.max(0,total-5)*.035):rows===2?.72:.60,widthLimit=rows===1?8.7:rows===2?7.2:6.6;
+    const total=Math.max(1,count),rows=total<=9?1:total<=20?2:total<=30?3:total<=40?4:5,perRow=Math.ceil(total/rows),row=Math.floor(index/perRow),start=row*perRow,rowCount=Math.min(perRow,total-start),local=index-start;
+    const dense=rows>1,baseScale=rows===1?.86:rows===2?.82:rows===3?.76:rows===4?.70:.66,widthLimit=rows===1?9.4:10.35,minScale=rows===1?.82:rows===2?.76:rows===3?.70:rows===4?.66:.62;
     const fitScale=rowCount<=1?baseScale:Math.min(baseScale,(widthLimit-(rowCount-1)*.11)/(rowCount*CARD_W));
-    const scale=Math.max(rows===3?.54:.62,fitScale),spacing=rowCount<=1?0:CARD_W*scale+(dense?.13:.11),t=rowCount<=1?.5:local/(rowCount-1);
-    const x=(local-(rowCount-1)/2)*spacing,fan=dense?0:(t-.5)*-.08;
-    const z=rows===1?2.58+Math.abs(t-.5)*.06:rows===2?.93+row*1.25:.66+row*.96;
-    return{x,z,fan,scale,row,local,yOffset:row*.014+local*.0015};
+    const scale=Math.max(minScale,fitScale),spacing=rowCount<=1?0:CARD_W*scale+.11,t=rowCount<=1?.5:local/(rowCount-1);
+    const x=(local-(rowCount-1)/2)*spacing,fan=dense?0:(t-.5)*-.055,firstZ=rows===1?2.72:rows===2?1.72:rows===3?1.52:1.48,lastZ=rows===1?2.72:3.28,rowPitch=rows<=1?0:(lastZ-firstZ)/(rows-1);
+    const z=firstZ+row*rowPitch;
+    return{x,z,fan,scale,row,local,yOffset:row*.032+local*.0015};
   }
   function eightOpponentSeat(total,index){
     if(total<=1)return{x:0,z:-2.34};
@@ -1397,10 +1398,10 @@ export function createTable3DRenderer({onFatal}={}){
       const mesh=cardMesh(null,{back:true,interactiveCard:i===Math.min(5,Math.max(1,deckCount))-1});
       mesh.userData.kind=i===Math.min(5,Math.max(1,deckCount))-1?'deck':'card';
       if(mesh.userData.kind==='deck')mesh.userData.interactive=!!payload.canInteract;
-      placeCard(mesh,-1.25,.05,TABLE_Y+.07+i*.035,-.025+i*.012,1);
+      placeCard(mesh,-1.25,.05,TABLE_Y+.07+i*.035,-.025+i*.012,CARD_STACK_SCALE);
     }
     const top=s.discard?.at?.(-1);let discardMesh=null;
-    if(top){discardMesh=cardMesh(top);placeCard(discardMesh,1.25,.05,TABLE_Y+.12,(visualHash(top.id)-.5)*.18,1);}
+    if(top){discardMesh=cardMesh(top);placeCard(discardMesh,1.25,.05,TABLE_Y+.12,(visualHash(top.id)-.5)*.18,CARD_STACK_SCALE);}
     dropMarker.material.opacity=.2;
 
     const opponents=s.players.map((p,i)=>({p,i})).filter(x=>x.i!==viewer),opponentVisuals=new Map();
@@ -1424,12 +1425,12 @@ export function createTable3DRenderer({onFatal}={}){
       if(ownPlayed){
         const previousIndex=previous.ownIds.indexOf(top.id),slot=handCardSlot(previous.ownIds.length,Math.max(0,previousIndex)),posed=storedLocalPose(top.id),from=posed?.position?.clone?.()||new THREE.Vector3(slot.x,TABLE_Y+.28+slot.yOffset,slot.z),to=new THREE.Vector3(1.25,TABLE_Y+.23,.05),flight=cardMesh(top);
         if(discardMesh)discardMesh.visible=false;
-        queueCardFlight(flight,from,to,{duration:560,lift:.72,fromRot:slot.fan,toRot:(visualHash(top.id)-.5)*.18,bank:.14,roll:(visualHash(top.id+'roll')-.5)*.22,onDone:()=>{if(discardMesh)discardMesh.visible=true}});
+        queueCardFlight(flight,from,to,{duration:560,lift:.72,fromRot:slot.fan,toRot:(visualHash(top.id)-.5)*.18,bank:.14,roll:(visualHash(top.id+'roll')-.5)*.22,fromScale:new THREE.Vector3(slot.scale,slot.scale,slot.scale),toScale:new THREE.Vector3(CARD_STACK_SCALE,CARD_STACK_SCALE,CARD_STACK_SCALE),onDone:()=>{if(discardMesh)discardMesh.visible=true}});
       }else if(ownDrawnIds.length){
         ownDrawnIds.slice(0,4).forEach((id,q)=>{
           const visual=ownVisuals.get(id);if(!visual)return;visual.mesh.visible=false;
           const flight=cardMesh(visual.card),from=new THREE.Vector3(-1.25,TABLE_Y+.28,.05);
-          queueCardFlight(flight,from,visual.position,{duration:520+q*35,delay:q*80,lift:.68,fromRot:-.03,toRot:visual.rotation,bank:.12,roll:(q%2?-.10:.10),onDone:()=>{visual.mesh.visible=true}});
+          queueCardFlight(flight,from,visual.position,{duration:520+q*35,delay:q*80,lift:.68,fromRot:-.03,toRot:visual.rotation,bank:.12,roll:(q%2?-.10:.10),fromScale:new THREE.Vector3(CARD_STACK_SCALE,CARD_STACK_SCALE,CARD_STACK_SCALE),toScale:visual.mesh.scale,onDone:()=>{visual.mesh.visible=true}});
         });
       }else{
         const played=discardChanged?opponentIndices.find(i=>snapshot.handCounts[i]===previous.handCounts[i]-1):undefined;
