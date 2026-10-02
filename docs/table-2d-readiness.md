@@ -565,3 +565,10 @@ Le renderer ne décide pas de la validité ni de la pénalité : il affiche uniq
 Les pions de Métropole ne sautent plus instantanément entre deux cases après un lancer confirmé. Le renderer conserve uniquement le snapshot visuel précédent des positions, détecte le seul joueur dont la case a changé, puis reconstruit un trajet visuel à partir des dés déjà validés par le moteur.
 
 Un déplacement normal suit les cases successives du plateau, y compris le passage par Départ. Lorsqu’une case Événement envoie ensuite le joueur au Départ ou en détention, le trajet montre d’abord l’arrivée issue des dés puis un second saut vers la destination imposée. Cette reconstruction n’accorde aucun crédit, ne déclenche aucune case et n’appelle aucune action : `cityMove()` et `cityLand()` restent les seules sources de vérité. Si les mouvements sont désactivés, le pion apparaît directement à sa position confirmée.
+
+
+## Fins de manche directement en 3D
+
+Vingt-et-un, Enchères et Ferme la boîte n’obligent plus à revenir aux contrôles HTML pour lancer la manche suivante. Lorsque l’état entre en `roundEnd`, la vue 3D reste interactive uniquement pour le joueur autorisé à avancer : en ligne, il s’agit de l’hôte ; en local/solo, le joueur courant peut continuer directement.
+
+La scène affiche respectivement **Main suivante**, **Enchère suivante** ou **Passage suivant**. Ces trois contrôles utilisent un adaptateur commun `nextRound()` qui appelle uniquement `dispatch({type:'nextRound'})`. Redistribution des cartes, progression des compteurs, changement de joueur, scores et réinitialisation des phases restent donc intégralement gérés par les moteurs existants.
