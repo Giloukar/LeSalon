@@ -49,6 +49,43 @@ test('3D interaction payload pauses while Eight waits for a suit choice',async()
 
 test('Eight touch drag to discard opens the suit choice and always cleans its ghost',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','solo');const r=await t.page.evaluate(()=>{S.turn=0;S.phase='play';S.pendingDraw=0;S.attack=null;S.blockEight=false;S.suit='C';S.discard=[{id:'touch-top',suit:'C',rank:9}];S.players[0].hand=[{id:'touch-eight',suit:'H',rank:8},{id:'touch-four',suit:'C',rank:4}];showSuit=null;renderGame(false);const card=document.querySelector('[data-eight-card="1"][data-id="touch-eight"]'),drop=document.querySelector('[data-eight-drop="1"]');if(!card||!drop)throw Error('Eight drag fixtures missing');const a=card.getBoundingClientRect(),b=drop.getBoundingClientRect(),start={x:a.left+a.width/2,y:a.top+a.height/2},end={x:b.left+b.width/2,y:b.top+b.height/2},event=(type,x,y)=>new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:77,pointerType:'touch',isPrimary:true,button:0,buttons:type==='pointerup'?0:1,clientX:x,clientY:y});card.dispatchEvent(event('pointerdown',start.x,start.y));document.dispatchEvent(event('pointermove',end.x,end.y));const during={ghost:document.querySelectorAll('.eight-drag-ghost').length,source:document.querySelectorAll('.eight-drag-source').length,hot:document.querySelector('[data-eight-drop="1"]')?.classList.contains('eight-drop-hot')};document.dispatchEvent(event('pointerup',end.x,end.y));return{during,showSuit,ghost:document.querySelectorAll('.eight-drag-ghost').length,source:document.querySelectorAll('.eight-drag-source').length,hot:document.querySelector('[data-eight-drop="1"]')?.classList.contains('eight-drop-hot')||false};});assert.deepEqual(r.during,{ghost:1,source:1,hot:true});assert.equal(r.showSuit,'touch-eight');assert.equal(r.ghost,0);assert.equal(r.source,0);assert.equal(r.hot,false);}finally{await browser.close();}});
 
+test('2D/3D switching keeps a visual guard until the target renderer is ready',async()=>{
+ const view=await readFile(path.join(root,'shared/table-view.js'),'utf8'),css=await readFile(path.join(root,'shared/table-3d.css'),'utf8'),html=await readFile(path.join(root,'jeux.html'),'utf8');
+ assert.match(view,/function beginVisualTransition\(\)/);
+ assert.match(view,/dataset\.tableViewTransition='1'/);
+ assert.match(view,/if\(mode===BASE_MODE\)\{/);
+ assert.match(view,/active=BASE_MODE;setDataset\(BASE_MODE\)/);
+ assert.match(view,/if\(lastPayload\)r\?\.render\?\.\(lastPayload\)/);
+ assert.match(view,/active=mode;setDataset\(mode\)/);
+ assert.match(view,/endVisualTransition\(transition\)/);
+ assert.match(css,/data-table-view-transition="1"/);
+ assert.match(html,/function table3dTransitionGuard\(\)/);
+});
+
+test('3D hand sorting reuses the 2D sort preference for cards and Rummikub',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8'),html=await readFile(path.join(root,'jeux.html'),'utf8');
+ assert.match(html,/data=\{playableIds:\[\],sortByColor:!!sortByColor\}/);
+ assert.match(html,/data\.sortedHand=clone\(visualHand\)/);
+ assert.match(html,/sort\(\)\{[\s\S]*sortByColor=!sortByColor;renderGame\(true\);return true/);
+ assert.match(source,/data-table-3d-sort/);
+ assert.match(source,/function sortActiveHand\(\)/);
+ assert.match(source,/function visualOwnHand\(payload,state,viewer\)/);
+ assert.match(source,/Array\.isArray\(payload\.viewData\?\.sortedHand\)/);
+ assert.match(source,/updateSortButton\(\)/);
+});
+
+test('Goose 3D renders a continuous path, named special cells and active-player focus',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/function addGoosePath\(coords\)/);
+ assert.match(source,/goosePathGeometry/);
+ assert.match(source,/function gooseSpecialName\(cell,specials\)/);
+ assert.match(source,/PONT/);assert.match(source,/AUBERGE/);assert.match(source,/LABYRINTHE/);assert.match(source,/ARRIVÉE/);
+ assert.match(source,/gooseChoiceRingGeometry/);
+ assert.match(source,/if\(i===s\.turn\)/);
+ assert.match(source,/travel=t\*t\*\(3-2\*t\)/);
+ assert.doesNotMatch(source,/addGoosePath[^\n]*dispatch\(/);
+});
+
 test('Goose exposes engine-derived destinations to the 3D renderer',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'oie','solo');const r=await t.page.evaluate(async()=>{let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen={gameId:payload.gameId,coords:payload.viewData.boardCoords.length,geese:[...payload.viewData.gooseCells],choices:payload.viewData.gooseChoices.map(x=>({...x}))}}});S.goosePending={i:S.turn,dice:[2,5],rerolls:0};S.dice=[2,5];const expected=[2,5,7].map(steps=>({steps,target:legacyGooseTarget(player(S).pos,steps)}));renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});return{seen,expected,switches:document.querySelectorAll('.table-view-switch').length};});assert.equal(r.seen.gameId,'oie');assert.equal(r.seen.coords,63);assert.deepEqual(r.seen.choices,r.expected);assert.equal(r.switches,1);}finally{await browser.close();}});
 
 test('Three.js table renderer never draws gameplay randomness',async()=>{const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');assert.equal(source.includes('Math.random'),false);assert.match(source,/Array\.isArray\(s\?\.dice\).*s\.dice/);});
