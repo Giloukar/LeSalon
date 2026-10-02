@@ -78,7 +78,7 @@ export function createTable3DRenderer({onFatal}={}){
   let animationRaf=0,diceAnimations=[],pawnAnimations=[],cardAnimations=[],manipAnimations=[],tossAnimations=[],lastDiceKey='',lastMoveKey='';
   let wordSelection=[],wordDraftKey='';
   let codeDraft=[0,1,2],codeDraftKey='';
-  let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='',cityFocusIndex=null;
+  let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='',cityFocusIndex=null,cityOfferDraft=0,cityOfferDraftKey='';
   const paperGrain=canvasTexture(drawPaperGrain,128,128);paperGrain.colorSpace=THREE.NoColorSpace;paperGrain.wrapS=paperGrain.wrapT=THREE.RepeatWrapping;paperGrain.repeat.set(5,7);disposableTextures.push(paperGrain);
   const cardFinish={roughness:.43,metalness:0,bumpMap:paperGrain,bumpScale:.00030};
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
@@ -1954,10 +1954,12 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function syncMetropole(payload){
     clearObjects();dropMarker.visible=false;
-    const s=payload.state,data=payload.viewData?.city||{},board=data.board||[],owners=data.owners||[],houses=data.houses||[],mortgaged=data.mortgaged||[],colors=data.colors||[],playerColors=data.playerColors||[],manage=data.manage||[],dice=Array.isArray(data.dice)?data.dice:[1,1];
+    const s=payload.state,data=payload.viewData?.city||{},board=data.board||[],owners=data.owners||[],houses=data.houses||[],mortgaged=data.mortgaged||[],colors=data.colors||[],playerColors=data.playerColors||[],manage=data.manage||[],tradeable=data.tradeable||[],trade=data.trade||null,dice=Array.isArray(data.dice)?data.dice:[1,1];
     const previousCity=lastCitySnapshot,citySnapshot={positions:(data.players||[]).map(pl=>Number(pl.pos)||0),moves:Number(s?.moves||0),turn:Number(s?.turn||0),dice:[...dice]};
     const changedPlayers=previousCity&&previousCity.positions?.length===citySnapshot.positions.length?citySnapshot.positions.map((pos,i)=>pos!==previousCity.positions[i]?i:-1).filter(i=>i>=0):[],movedPlayer=changedPlayers.length===1?changedPlayers[0]:-1;
-    if(!payload.canInteract||!Number.isInteger(cityFocusIndex)||!manage[cityFocusIndex])cityFocusIndex=null;
+    if(!payload.canInteract||!Number.isInteger(cityFocusIndex)||!manage[cityFocusIndex]&&!tradeable[cityFocusIndex])cityFocusIndex=null;
+    const focusedTrade=Number.isInteger(cityFocusIndex)?tradeable[cityFocusIndex]:null,offerKey=focusedTrade?cityFocusIndex+'|'+focusedTrade.maxPrice+'|'+focusedTrade.suggested:'';
+    if(offerKey!==cityOfferDraftKey){cityOfferDraftKey=offerKey;cityOfferDraft=focusedTrade?Math.max(1,Math.min(focusedTrade.maxPrice,focusedTrade.suggested)):0}
     setCameraPose(0,9.35,9.9,0,.1,0);
     const boardGeo=new THREE.BoxGeometry(10.4,.18,7.45),boardBase=new THREE.Mesh(boardGeo,new THREE.MeshStandardMaterial({color:0x243a30,roughness:.94}));boardBase.position.y=TABLE_Y-.02;boardBase.receiveShadow=true;boardBase.userData.temporaryGeometry=boardGeo;boardBase.userData.temporaryMaterial=boardBase.material;objects.add(boardBase);
     board.forEach((cell,i)=>{
@@ -2007,7 +2009,15 @@ export function createTable3DRenderer({onFatal}={}){
         control.position.set(x,1.04,1.42);objects.add(control);
       });
       const focus=Number.isInteger(cityFocusIndex)?manage[cityFocusIndex]:null;
-      if(focus){
+      if(trade){
+        const cell=board[trade.index]||{},offer=makeLabel((trade.buyerName||'Acheteur')+' propose '+trade.price+' ¤ · '+(cell.name||('Case '+trade.index)),'#e8c88e');
+        offer.scale.set(4.45,.52,1);offer.position.set(0,1.02,-1.08);objects.add(offer);
+        const detail=makeLabel('À '+(trade.sellerName||'propriétaire')+' · réponse requise','#d8ded9');detail.scale.set(3.2,.40,1);detail.position.set(0,.98,-1.58);objects.add(detail);
+        if(data.canTradeRespond){
+          const accept=actionSprite('ACCEPTER · +'+trade.price,'city-action',{command:'tradeAccept'},'#dbea9e');accept.position.set(-1.65,1.02,-2.18);objects.add(accept);
+          const reject=actionSprite('REFUSER','city-action',{command:'tradeReject'},'#e5a09b');reject.position.set(1.65,1.02,-2.18);objects.add(reject);
+        }
+      }else if(focus){
         const cell=board[cityFocusIndex]||{},summary=makeLabel((cell.name||('Case '+cityFocusIndex))+' · '+Number(houses[cityFocusIndex]||0)+' ⌂',colors?.[cell.group]||'#e5e9e3');
         summary.scale.set(3.2,.48,1);summary.position.set(0,.96,-1.05);objects.add(summary);
         const propertyActions=[];
@@ -2020,12 +2030,18 @@ export function createTable3DRenderer({onFatal}={}){
           control.position.set(x,1.02,z);objects.add(control);
         });
         if(!propertyActions.length){const none=makeLabel('AUCUNE ACTION DISPONIBLE','#aeb9b0');none.scale.set(2.75,.44,1);none.position.set(0,.98,-1.72);objects.add(none)}
+      }else if(focusedTrade){
+        const cell=board[cityFocusIndex]||{},summary=makeLabel((cell.name||('Case '+cityFocusIndex))+' · à '+(focusedTrade.ownerName||'un joueur'),'#e8c88e');
+        summary.scale.set(3.65,.48,1);summary.position.set(0,.96,-1.02);objects.add(summary);
+        const price=makeLabel('OFFRE · '+cityOfferDraft+' ¤'+(focusedTrade.mortgaged?' · HYPOTHÉQUÉE':''),'#dbea9e');price.scale.set(3.15,.46,1);price.position.set(0,.99,-1.52);objects.add(price);
+        [-100,-10,10,100].forEach((delta,i)=>{const adjust=actionSprite((delta>0?'+':'')+delta,'city-offer-adjust',{delta},'#d8ded9');adjust.position.set((i-1.5)*1.35,1.02,-2.04);adjust.scale.set(1.12,.40,1);objects.add(adjust)});
+        const send=actionSprite('PROPOSER · '+cityOfferDraft+' ¤','city-offer-send',{index:cityFocusIndex},'#dbea9e');send.position.set(0,1.02,-2.67);send.scale.set(2.85,.48,1);objects.add(send);
       }
     }
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     if(title)title.textContent='VUE 3D · MÉTROPOLE';
-    if(status)status.textContent='Tour '+(data.lap||1)+' / 20 · '+(data.players?.[s.turn]?.name||'Joueur')+' · '+(data.phase==='debt'?'dette '+(data.debt?.amount||0)+' ¤':data.phase==='buy'?'achat proposé':data.phase==='roll'?'prêt à lancer':'gestion');
-    if(help)help.textContent=payload.canInteract?'Toutes les décisions sont jouables ici · cliquez une de vos rues pour gérer le bien':'Plateau synchronisé · les décisions restent verrouillées hors de votre tour';
+    if(status)status.textContent='Tour '+(data.lap||1)+' / 20 · '+(data.players?.[s.turn]?.name||'Joueur')+' · '+(data.phase==='tradeResponse'&&trade?'offre '+trade.price+' ¤':data.phase==='debt'?'dette '+(data.debt?.amount||0)+' ¤':data.phase==='buy'?'achat proposé':data.phase==='roll'?'prêt à lancer':'gestion');
+    if(help)help.textContent=trade?(data.canTradeRespond?'Acceptez ou refusez l’offre directement sur la table':(trade.sellerName||'Le propriétaire')+' étudie l’offre'):focusedTrade?'Réglez le montant puis proposez le rachat · '+(data.offersRemaining||0)+' offre(s) restante(s)':payload.canInteract?'Toutes les décisions sont jouables ici · cliquez une rue à vous pour la gérer ou une rue adverse éligible pour négocier':'Plateau synchronisé · les décisions restent verrouillées hors de votre tour';
     if(diceAnimations.length||pawnAnimations.length)startMotion();
   }
 
@@ -2404,7 +2420,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'deck',startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
     if(obj.userData.looseManip&&obj.userData.kind!=='card'){beginLooseCardDrag(obj,e,obj.userData.kind);return}
     if(['maid-pick','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','cactus-action','eight-suit','eight-action','round-next','ninety-action','blackjack-action','card-action','rummi-tile','rummi-dest','rummi-action'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,command:obj.userData.command,suit:obj.userData.suit,amount:obj.userData.amount,ace:obj.userData.ace,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
-    if(['goose-roll','goose-choice','yam-roll','yam-hold','yam-score','box-roll','box-toggle','box-close','city-roll','city-action','city-property','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue','intrus-spot','intrus-continue','code-cycle','code-submit','code-continue','golf-adjust','golf-shoot','golf-continue'].includes(obj.userData.kind)){
+    if(['goose-roll','goose-choice','yam-roll','yam-hold','yam-score','box-roll','box-toggle','box-close','city-roll','city-action','city-property','city-offer-adjust','city-offer-send','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue','intrus-spot','intrus-continue','code-cycle','code-submit','code-continue','golf-adjust','golf-shoot','golf-continue'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
       drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,control:obj.userData.control,command:obj.userData.command,category:obj.userData.category,delta:obj.userData.delta,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return;
     }
@@ -2536,6 +2552,8 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='echo-continue'){if(tap)current?.interactions?.echo?.('continue');return}
     if(d.kind==='city-roll'){if(tap)current?.interactions?.city?.('roll');return}
     if(d.kind==='city-action'){if(tap)current?.interactions?.city?.(d.command,d.index);return}
+    if(d.kind==='city-offer-adjust'){if(tap){const option=current?.viewData?.city?.tradeable?.[cityFocusIndex];if(option){cityOfferDraft=Math.max(1,Math.min(option.maxPrice,cityOfferDraft+Number(d.delta||0)));syncMetropole(current);draw()}}return}
+    if(d.kind==='city-offer-send'){if(tap&&Number.isInteger(d.index))current?.interactions?.city?.('tradeOffer',{index:d.index,price:cityOfferDraft});return}
     if(d.kind==='city-property'){if(tap){cityFocusIndex=d.index;syncMetropole(current);draw()}return}
     if(d.kind==='yam-roll'||d.kind==='yam-hold'||d.kind==='yam-score'){if(tap)current?.interactions?.yam?.(d.kind==='yam-hold'?'hold':d.kind==='yam-score'?'score':'roll',d.kind==='yam-score'?d.category:d.index);return}
     if(d.kind==='box-roll'||d.kind==='box-toggle'||d.kind==='box-close'){
@@ -2572,7 +2590,7 @@ export function createTable3DRenderer({onFatal}={}){
 
   function activate(){active=true;init()}
   function deactivate(){
-    cancelCameraDrag();cancelActiveDrag();active=false;hovered=null;wordSelection=[];wordDraftKey='';codeDraft=[0,1,2];codeDraftKey='';golfAim={angle:0,power:50};golfAimKey='';lastGolfKey='';cityFocusIndex=null;lastCitySnapshot=null;diceAnimations.length=0;pawnAnimations.length=0;manipAnimations.length=0;
+    cancelCameraDrag();cancelActiveDrag();active=false;hovered=null;wordSelection=[];wordDraftKey='';codeDraft=[0,1,2];codeDraftKey='';golfAim={angle:0,power:50};golfAimKey='';lastGolfKey='';cityFocusIndex=null;cityOfferDraft=0;cityOfferDraftKey='';lastCitySnapshot=null;diceAnimations.length=0;pawnAnimations.length=0;manipAnimations.length=0;
     if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
     tossAnimations.length=0;clearRemoteLooseCards();remoteLooseGame='';
     resizeObserver?.disconnect();resizeObserver=null;host?.remove();host=null;
