@@ -1,5 +1,9 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.169.0/+esm";
 
+import {createCardGeometry,drawCardFace,drawCardBack,drawPaperGrain,cardKey,jokerVariant} from './playing-card.js?v=1';
+
+import {createPieceKit} from './table-3d-pieces.js?v=1';
+
 const SUIT_SYMBOL={S:'♠',H:'♥',D:'♦',C:'♣',X:'★'};
 const SUIT_NAME={S:'pique',H:'cœur',D:'carreau',C:'trèfle',X:'joker'};
 const RANK_NAME={1:'A',11:'V',12:'D',13:'R'};
@@ -34,38 +38,18 @@ function roundRect(ctx,x,y,w,h,r){
   if(typeof ctx.roundRect==='function')ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h);
   ctx.closePath();
 }
-function cardFaceTexture(card){
-  return canvasTexture((g,w,h)=>{
-    const red=card?.suit==='H'||card?.suit==='D',symbol=card?.joker?'★':SUIT_SYMBOL[card?.suit]||'';
-    const rank=card?.joker?'JK':(RANK_NAME[card?.rank]||String(card?.rank??''));
-    g.clearRect(0,0,w,h);g.fillStyle='#fbf8ee';roundRect(g,5,5,w-10,h-10,30);g.fill();
-    g.strokeStyle='#d6cfbf';g.lineWidth=6;g.stroke();
-    g.fillStyle=red?'#a8323d':'#18201c';g.textAlign='center';
-    g.font='700 88px Georgia,serif';g.fillText(rank,72,108);
-    g.font='72px Georgia,serif';g.fillText(symbol,73,182);
-    g.font=card?.joker?'130px Georgia,serif':'170px Georgia,serif';g.fillText(symbol,w/2,h/2+55);
-    if(card?.joker){g.font='700 44px system-ui,sans-serif';g.fillText('JOKER',w/2,h/2+135)}
-    g.save();g.translate(w,h);g.rotate(Math.PI);g.font='700 88px Georgia,serif';g.fillText(rank,72,108);g.font='72px Georgia,serif';g.fillText(symbol,73,182);g.restore();
-  });
-}
-function cardBackTexture(){
-  return canvasTexture((g,w,h)=>{
-    g.fillStyle='#142920';roundRect(g,5,5,w-10,h-10,30);g.fill();
-    g.strokeStyle='#dbea9e';g.lineWidth=7;g.stroke();
-    g.strokeStyle='#8faf80';g.lineWidth=3;roundRect(g,28,28,w-56,h-56,23);g.stroke();
-    g.fillStyle='#dbea9e';g.textAlign='center';g.font='700 56px Georgia,serif';g.fillText('LE SALON',w/2,h/2-6);
-    g.font='38px Georgia,serif';g.fillText('♣  ♦  ♥  ♠',w/2,h/2+62);
-  });
-}
+function cardFaceTexture(card){return canvasTexture((g,w,h)=>drawCardFace(g,w,h,card),630,920)}
+function cardBackTexture(){return canvasTexture(drawCardBack,630,920)}
 
 export function createTable3DRenderer({onFatal}={}){
   let renderer=null,scene=null,camera=null,host=null,canvas=null,resizeObserver=null,assetUnsubscribe=null;
   let active=false,current=null,drag=null,hovered=null;
   const externalAssets=window.SalonTable3DAssets||null;
+  const physicalPieces=createPieceKit(THREE);
   const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2(),dragPlane=new THREE.Plane(new THREE.Vector3(0,1,0),-1.02);
   const interactive=[],faceTextures=new Map(),frontMaterials=new Map();
   const disposableTextures=[];
-  const cardGeometry=new THREE.BoxGeometry(CARD_W,CARD_H,CARD_D,1,1,1);
+  const cardGeometry=createCardGeometry(THREE);
   const tileGeometry=new THREE.BoxGeometry(.88,.12,.64);
   const pawnGeometry=new THREE.CylinderGeometry(.16,.24,.46,18);
   const dieGeometry=new THREE.BoxGeometry(.68,.68,.68);
@@ -87,8 +71,10 @@ export function createTable3DRenderer({onFatal}={}){
   let wordSelection=[],wordDraftKey='';
   let codeDraft=[0,1,2],codeDraftKey='';
   let golfAim={angle:0,power:50},golfAimKey='',lastGolfKey='',cityFocusIndex=null;
+  const paperGrain=canvasTexture(drawPaperGrain,128,128);paperGrain.colorSpace=THREE.NoColorSpace;paperGrain.wrapS=paperGrain.wrapT=THREE.RepeatWrapping;paperGrain.repeat.set(5,7);disposableTextures.push(paperGrain);
+  const cardFinish={roughness:.48,metalness:0,bumpMap:paperGrain,bumpScale:.00024};
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
-  const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,roughness:.64,metalness:0});
+  const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,...cardFinish});
   let objects=new THREE.Group(),cardFx=new THREE.Group(),socialCards=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,cameraControl={yaw:0,pitch:0,zoom:1},cameraDrag=null,cameraGame='',lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,lastBattleSnapshot=null,pendingMaidPickOrigin=null,pendingBattleOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map(),remoteLooseCards=new Map(),remoteLooseGame='';
   const localPoses=new Map();let activePoseScope='',poseSeen=new Set(),localPoseOrder=0,localThrowCounter=0,labelGeneration=0;
 
@@ -121,14 +107,14 @@ export function createTable3DRenderer({onFatal}={}){
   }
 
   function frontMaterial(card){
-    const key=card?.joker?'joker':(card?.suit||'X')+'-'+(card?.rank??0);
+    const key=cardKey(card);
     if(frontMaterials.has(key))return frontMaterials.get(key);
     const tex=cardFaceTexture(card);disposableTextures.push(tex);faceTextures.set(key,tex);
-    const mat=new THREE.MeshStandardMaterial({map:tex,roughness:.66,metalness:0});
+    const mat=new THREE.MeshStandardMaterial({map:tex,...cardFinish});
     frontMaterials.set(key,mat);return mat;
   }
   function externalAsset(kind,context,userData={}){
-    const obj=externalAssets?.create?.(kind,{THREE,...context});if(!obj?.isObject3D)return null;
+    const obj=externalAssets?.create?.(kind,{THREE,...context})||physicalPieces.create(kind,context);if(!obj?.isObject3D)return null;
     obj.userData={...obj.userData,...userData,externalAssetKind:kind};
     obj.traverse?.(child=>{
       if(child.isMesh){child.castShadow=true;child.receiveShadow=true}
@@ -153,7 +139,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function cardMesh(card,{back=false,id=null,interactiveCard=false,playable=false}={}){
     const userData={kind:'card',cardId:id,interactive:interactiveCard,playable};
-    const visual=card?Object.freeze({suit:card.suit,rank:card.rank,joker:!!card.joker,hidden:!!card.hidden}):null;
+    const visual=card?Object.freeze({suit:card.suit,rank:card.rank,joker:!!card.joker,jokerVariant:jokerVariant(card),hidden:!!card.hidden}):null;
     const external=externalAsset('card',{card:visual,back,id,playable,canonicalSize:{width:CARD_W,height:CARD_H,depth:CARD_D}},userData),face=back?backMaterial:frontMaterial(card);
     if(external){
       bindSemanticMaterials(external,{'salon-card-front':face,'salon-card-back':backMaterial,'salon-card-edge':edgeMaterial});
@@ -476,7 +462,7 @@ export function createTable3DRenderer({onFatal}={}){
     startMotion();
   }
   function visualCardSnapshot(card){
-    return card?{id:card.id,suit:card.suit,rank:card.rank,joker:!!card.joker,hidden:!!card.hidden}:null;
+    return card?{id:card.id,suit:card.suit,rank:card.rank,joker:!!card.joker,jokerVariant:jokerVariant(card),hidden:!!card.hidden}:null;
   }
   function cardFamilySnapshot(payload,center){
     const state=payload?.state,game=payload?.viewData?.cardGame||payload?.gameId,viewer=Number.isInteger(payload?.privateIndex)?payload.privateIndex:0,players=state?.players||[],own=payload?.spectator?[]:(players[viewer]?.hand||[]);
@@ -1085,7 +1071,7 @@ export function createTable3DRenderer({onFatal}={}){
 
       const deckCount=Math.max(0,Number(ninety.deckCount)||0),deckPos=new THREE.Vector3(-2.1,TABLE_Y+.22,.05);
       for(let i=0;i<Math.min(4,Math.max(1,deckCount));i++){
-        const mesh=cardMesh(null,{back:true});placeCard(mesh,deckPos.x,deckPos.z,TABLE_Y+.07+i*.028,-.025+i*.012,.78);
+        const mesh=cardMesh(null,{back:true});placeCard(mesh,deckPos.x,deckPos.z,TABLE_Y+.07+i*.0055,-.025+i*.012,.78);
       }
       let top=null;
       if(ninety.last){top=cardMesh(ninety.last,{back:!!ninety.last.hidden});placeCard(top,1.5,.05,TABLE_Y+.13,0,.9)}
@@ -1152,7 +1138,7 @@ export function createTable3DRenderer({onFatal}={}){
       const bj=data.blackjack||{},dealer=bj.dealer||[],own=bj.hand||[],shoePos=new THREE.Vector3(-3.75,TABLE_Y+.24,-.55),ownVisuals=new Map(),dealerVisuals=[];
       const deckCount=Math.max(0,Number(bj.deckCount)||0),shoeVisible=Math.min(5,Math.max(1,deckCount));
       for(let i=0;i<shoeVisible;i++){
-        const mesh=cardMesh(null,{back:true});placeCard(mesh,shoePos.x+i*.018,shoePos.z-i*.018,TABLE_Y+.07+i*.025,-.045+i*.012,.70);
+        const mesh=cardMesh(null,{back:true});placeCard(mesh,shoePos.x+i*.018,shoePos.z-i*.018,TABLE_Y+.07+i*.005,-.045+i*.012,.70);
       }
       const shoeLabel=makeLabel('SABOT · '+deckCount,'#d8ded9');shoeLabel.position.set(shoePos.x,1.0,shoePos.z-.72);shoeLabel.scale.set(2.0,.44,1);objects.add(shoeLabel);
 
@@ -1398,7 +1384,7 @@ export function createTable3DRenderer({onFatal}={}){
       const mesh=cardMesh(null,{back:true,interactiveCard:i===Math.min(5,Math.max(1,deckCount))-1});
       mesh.userData.kind=i===Math.min(5,Math.max(1,deckCount))-1?'deck':'card';
       if(mesh.userData.kind==='deck')mesh.userData.interactive=!!payload.canInteract;
-      placeCard(mesh,-1.25,.05,TABLE_Y+.07+i*.035,-.025+i*.012,CARD_STACK_SCALE);
+      placeCard(mesh,-1.25,.05,TABLE_Y+.07+i*.006,-.025+i*.012,CARD_STACK_SCALE);
     }
     const top=s.discard?.at?.(-1);let discardMesh=null;
     if(top){discardMesh=cardMesh(top);placeCard(discardMesh,1.25,.05,TABLE_Y+.12,(visualHash(top.id)-.5)*.18,CARD_STACK_SCALE);}
@@ -1586,7 +1572,7 @@ export function createTable3DRenderer({onFatal}={}){
     for(let i=0;i<Math.min(5,Math.max(1,deck));i++){
       const top=i===Math.min(5,Math.max(1,deck))-1,mesh=cardMesh(null,{back:true,interactiveCard:top&&payload.canInteract&&data.phase==='draw'});
       mesh.userData.kind=top&&payload.canInteract&&data.phase==='draw'?'cactus-draw':'cactus-card';mesh.userData.interactive=top&&payload.canInteract&&data.phase==='draw';
-      placeCard(mesh,-1.35,.1,TABLE_Y+.07+i*.035,-.02+i*.01,.82);
+      placeCard(mesh,-1.35,.1,TABLE_Y+.07+i*.006,-.02+i*.01,.82);
     }
     let discardMesh=null,drawnMesh=null;
     if(data.discard){discardMesh=cardMesh(data.discard,{interactiveCard:payload.canInteract&&data.phase==='draw'});discardMesh.userData.kind=payload.canInteract&&data.phase==='draw'?'cactus-take':'cactus-card';discardMesh.userData.interactive=payload.canInteract&&data.phase==='draw';placeCard(discardMesh,0,.1,TABLE_Y+.12,(visualHash(data.discard.id)-.5)*.12,.82)}
@@ -2453,7 +2439,7 @@ export function createTable3DRenderer({onFatal}={}){
   function destroy(){
     deactivate();clearObjects();
     canvas?.removeEventListener('pointerdown',onPointerDown);canvas?.removeEventListener('pointermove',onPointerMove);canvas?.removeEventListener('pointerup',onPointerUp);canvas?.removeEventListener('pointercancel',onPointerCancel);canvas?.removeEventListener('lostpointercapture',onLostPointerCapture);canvas?.removeEventListener('wheel',onWheel);canvas?.removeEventListener('keydown',onKeyDown);window.removeEventListener('blur',onWindowBlur);window.removeEventListener('salon:remote-card-gesture',onRemoteCardGesture);window.removeEventListener('salon:remote-tabletop-card',onRemoteTabletopCard);document.removeEventListener('visibilitychange',onVisibilityChange);assetUnsubscribe?.();assetUnsubscribe=null;
-    cardGeometry.dispose();tileGeometry.dispose();pawnGeometry.dispose();dieGeometry.dispose();rummiTileGeometry.dispose();grainGeometry.dispose();heldPadGeometry.dispose();codeGemGeometry.dispose();intrusDotGeometry.dispose();balloonGeometry.dispose();golfBallGeometry.dispose();cityTileGeometry.dispose();cityHouseGeometry.dispose();cityPegGeometry.dispose();edgeMaterial.dispose();backMaterial.dispose();for(const m of frontMaterials.values())m.dispose();for(const m of tileMaterials.values())m.dispose();for(const m of rummiTileMaterials.values())m.dispose();for(const m of pawnMaterials.values())m.dispose();for(const m of dieFaceMaterials.values())m.dispose();for(const m of cellLabelMaterials.values())m.dispose();for(const m of boxTileMaterials.values())m.dispose();for(const entry of labelMaterials.values()){entry.material.dispose();entry.texture.dispose()}labelMaterials.clear();neutralDieMaterial.dispose();rummiBackMaterial.dispose();for(const t of disposableTextures)t.dispose();for(const t of cellLabelTextures)t.dispose();
+    physicalPieces.dispose();cardGeometry.dispose();tileGeometry.dispose();pawnGeometry.dispose();dieGeometry.dispose();rummiTileGeometry.dispose();grainGeometry.dispose();heldPadGeometry.dispose();codeGemGeometry.dispose();intrusDotGeometry.dispose();balloonGeometry.dispose();golfBallGeometry.dispose();cityTileGeometry.dispose();cityHouseGeometry.dispose();cityPegGeometry.dispose();edgeMaterial.dispose();backMaterial.dispose();for(const m of frontMaterials.values())m.dispose();for(const m of tileMaterials.values())m.dispose();for(const m of rummiTileMaterials.values())m.dispose();for(const m of pawnMaterials.values())m.dispose();for(const m of dieFaceMaterials.values())m.dispose();for(const m of cellLabelMaterials.values())m.dispose();for(const m of boxTileMaterials.values())m.dispose();for(const entry of labelMaterials.values()){entry.material.dispose();entry.texture.dispose()}labelMaterials.clear();neutralDieMaterial.dispose();rummiBackMaterial.dispose();for(const t of disposableTextures)t.dispose();for(const t of cellLabelTextures)t.dispose();
     tableMesh?.geometry?.dispose();tableMesh?.material?.dispose();dropMarker?.geometry?.dispose();dropMarker?.material?.dispose();renderer?.dispose();
     localPoses.clear();poseSeen.clear();activePoseScope='';localPoseOrder=0;localThrowCounter=0;remoteLooseCards.clear();cameraPose=null;cameraControl={yaw:0,pitch:0,zoom:1};cameraDrag=null;cameraGame='';
     renderer=scene=camera=canvas=null;current=null;
