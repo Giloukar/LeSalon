@@ -3427,7 +3427,7 @@ if(window.SalonTableView){
     };
    });
    const cityTradeable=CITY_BOARD.map((c,i)=>{
-    if(!cityActive||!cityOfferAllowed(S,i))return null;
+    if(!cityActive||cityP.cash<1||!cityOfferAllowed(S,i))return null;
     const owner=S.owners[i],maxPrice=Math.min(99999,cityP.cash),suggested=Math.max(1,Math.min(maxPrice,c.price));
     return{index:i,owner,ownerName:S.players[owner]?.name||'',maxPrice,suggested,mortgaged:!!S.mortgaged[i],redeemCost:S.mortgaged[i]?Math.ceil(Math.floor(c.price/2)*1.1):0};
    });
