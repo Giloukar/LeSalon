@@ -90,16 +90,17 @@ test('3D round-end controls reuse nextRound for blackjack, auctions and shut-the
   for(const id of ['vingtetun','encheres','boite']){
    await setup(t.page,id,'solo');
    const r=await t.page.evaluate(async gameId=>{
-    S.phase='roundEnd';
+    if(gameId==='encheres'){
+     S.bids=S.players.map(p=>p.hand.shift());finishAuction(S);
+    }else S.phase='roundEnd';
     if(gameId==='vingtetun'){S.dealerRevealed=true;if(!S.dealer.length)S.dealer=[{id:'test-dealer',rank:10,suit:'S'}]}
-    if(gameId==='encheres'){S.bids=S.players.map((_,i)=>({id:'test-bid-'+i,rank:2+i,suit:['S','H','D','C'][i%4]}));S.lastAuction={round:S.bidRound,pot:S.pot,winner:0,cards:clone(S.bids)}}
     let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});
     renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});
     const before={phase:S.phase,round:S.round,bidRound:S.bidRound,boxTurns:S.boxTurns},canInteract=seen.canInteract,flag=gameId==='vingtetun'?seen.viewData.blackjack.canNextRound:gameId==='encheres'?seen.viewData.cardAction.canNextRound:seen.viewData.boxCanNextRound;
     const ok=seen.interactions.nextRound();
     return{canInteract,flag,ok,before,after:{phase:S.phase,round:S.round,bidRound:S.bidRound,boxTurns:S.boxTurns}};
    },id);
-   assert.equal(r.canInteract,true,id);assert.equal(r.flag,true,id);assert.equal(r.ok,true,id);assert.notEqual(r.after.phase,'roundEnd',id);
+   assert.deepEqual({canInteract:r.canInteract,flag:r.flag,ok:r.ok},{canInteract:true,flag:true,ok:true},id);assert.notEqual(r.after.phase,'roundEnd',id);
   }
  }finally{await browser.close();}
 });
