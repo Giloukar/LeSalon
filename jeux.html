@@ -3292,6 +3292,7 @@ if(window.SalonTableView){
  });
  renderGame=function(...args){
   const mine=S&&S.id==='huit'&&!gate&&!net.spectator?player(S).hand:[],data={playableIds:[],sortByColor:!!sortByColor};
+  const roundAdvance3D=!!(S&&S.phase==='roundEnd'&&['vingtetun','encheres','boite'].includes(S.id)&&!net.spectator&&(!isOnline()||net.me===0&&net.connected&&!net.pending&&!netPaused()));
   const sortableIds=new Set(['huit','rummikub','president','menteur','suites','plis','encheres','pouilleux','quatrevingtdixneuf','vingtetun']);
   data.sortEnabled=!!(S&&!gate&&!net.spectator&&sortableIds.has(S.id));
   if(S?.id==='huit'){
@@ -3316,7 +3317,7 @@ if(window.SalonTableView){
    data.yamCategories=YAM_CATEGORIES.map(c=>({id:c.id,name:c.name,rule:c.rule,max:c.max,filled:yp?.yamSheet?.[c.id]!=null,value:yp?.yamSheet?.[c.id]??null,preview:S.rolls?yamScore(S.dice,c.id):null}));
   }
   if(S?.id==='boite'){
-   data.boxDice=[...S.boxDice];data.boxNumbers=[...S.boxNumbers];data.boxStage=S.boxStage;data.boxSelected=[...selection].map(Number);data.boxCanOne=S.boxNumbers.every(n=>n<7);
+   data.boxDice=[...S.boxDice];data.boxNumbers=[...S.boxNumbers];data.boxStage=S.boxStage;data.boxSelected=[...selection].map(Number);data.boxCanOne=S.boxNumbers.every(n=>n<7);data.boxCanNextRound=roundAdvance3D;
   }
   if(S?.id==='cactus'){
    const viewer=privateIndex();
@@ -3495,7 +3496,7 @@ if(window.SalonTableView){
    }
    if(S.id==='encheres'){
     data.cardCenter={prize:S.prize,bids:[...S.bids],pot:S.pot,bidRound:S.bidRound,revealed:S.phase!=='play',lastAuction:S.lastAuction};
-    data.cardAction={game:'encheres',canBid:!!(canPlay()&&S.phase==='play'&&selection.size===1),count:selection.size};
+    data.cardAction={game:'encheres',canBid:!!(canPlay()&&S.phase==='play'&&selection.size===1),canNextRound:roundAdvance3D,count:selection.size};
    }
   }
   if(S&&TABLE_3D_SPECIAL_CARD_GAMES.includes(S.id)){
@@ -3510,7 +3511,7 @@ if(window.SalonTableView){
    }
    if(S.id==='vingtetun'){
     const dealer=S.dealer.map((c,i)=>i===0||S.dealerRevealed||S.phase==='over'?c:{hidden:true,id:'dealer-hidden-'+i});
-    data.blackjack={phase:S.phase,dealer,dealerRevealed:!!S.dealerRevealed,hand:!gate&&!net.spectator?[...player(S).hand]:[],playerValue:!gate&&!net.spectator?bjValue(player(S).hand):null,dealerValue:dealer.length?(S.dealerRevealed||S.phase==='over'?bjValue(S.dealer):bjValue([S.dealer[0]])):0,deckCount:S.deck.length,bet:player(S)?.bet||0,chips:player(S)?.chips||0,status:player(S)?.status||''};
+    data.blackjack={phase:S.phase,dealer,dealerRevealed:!!S.dealerRevealed,hand:!gate&&!net.spectator?[...player(S).hand]:[],playerValue:!gate&&!net.spectator?bjValue(player(S).hand):null,dealerValue:dealer.length?(S.dealerRevealed||S.phase==='over'?bjValue(S.dealer):bjValue([S.dealer[0]])):0,deckCount:S.deck.length,bet:player(S)?.bet||0,chips:player(S)?.chips||0,status:player(S)?.status||'',canNextRound:roundAdvance3D};
    }
    if(S.id==='bataille'){
     data.battle={number:S.battleNumber,winner:S.battleWinner,pot:S.battlePot,counts:S.players.map(p=>p.hand.length),reveals:(S.battleReveal||[]).map(r=>r.hidden?{owner:r.owner,hidden:true}:{owner:r.owner,hidden:false,card:r.card})};
@@ -3525,13 +3526,14 @@ if(window.SalonTableView){
    spectator:!!net.spectator,
    gated:!!gate,
    privateIndex:S?privateIndex():0,
-   canInteract:!!(S&&((S.id==='cactus'&&!net.spectator)||canPlay())),
+   canInteract:!!(S&&((S.id==='cactus'&&!net.spectator)||canPlay()||roundAdvance3D)),
    viewData:data,
    interactions:{
     sort(){
      if(!S||gate||net.spectator||!sortableIds.has(S.id))return false;
      sortByColor=!sortByColor;renderGame(true);return true;
     },
+    nextRound(){if(!roundAdvance3D)return false;dispatch({type:'nextRound'});return true},
     playCard(id){if(!S||S.id!=='huit'||!canPlay()||showSuit)return false;const c=player(S).hand.find(c=>c.id===id);if(!c)return false;eightPlayCardUI(c);return true},
     chooseSuit(suit){if(!S||S.id!=='huit'||!canPlay()||!showSuit||!SUITS.includes(suit))return false;dispatch({type:'card',id:showSuit,suit});return true},
     cancelSuit(){if(!S||S.id!=='huit'||!canPlay()||!showSuit)return false;showSuit=null;renderGame(false);return true},

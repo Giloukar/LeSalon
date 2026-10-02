@@ -74,6 +74,37 @@ test('privacy gate withholds state from an active 3D renderer',async()=>{const t
 
 test('3D interaction payload exposes only the Eight suit picker while a suit choice is pending',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','solo');const r=await t.page.evaluate(async()=>{let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen={canInteract:payload.canInteract,playable:[...payload.viewData.playableIds],choice:payload.viewData.eightSuitChoice,chooseSuit:typeof payload.interactions.chooseSuit==='function',cancelSuit:typeof payload.interactions.cancelSuit==='function'}}});await SalonTableView.setMode('3d',{persistPreference:false});showSuit='synthetic-choice';renderGame(false);return seen;});assert.equal(r.canInteract,true);assert.deepEqual(r.playable,[]);assert.deepEqual(r.choice,{cardId:'synthetic-choice'});assert.equal(r.chooseSuit,true);assert.equal(r.cancelSuit,true);}finally{await browser.close();}});
 
+test('3D round-end controls reuse nextRound for blackjack, auctions and shut-the-box',async()=>{
+ const html=await readFile(path.join(root,'jeux.html'),'utf8');
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(html,/const roundAdvance3D=!!\(S&&S\.phase==='roundEnd'&&\['vingtetun','encheres','boite'\]\.includes\(S\.id\)/);
+ assert.match(html,/nextRound\(\)\{if\(!roundAdvance3D\)return false;dispatch\(\{type:'nextRound'\}\);return true\}/);
+ assert.match(html,/data\.boxCanNextRound=roundAdvance3D/);
+ assert.match(html,/canNextRound:roundAdvance3D/);
+ assert.match(source,/actionSprite\('MAIN SUIVANTE','round-next'/);
+ assert.match(source,/actionSprite\('ENCHÈRE SUIVANTE','round-next'/);
+ assert.match(source,/actionSprite\('PASSAGE SUIVANT','round-next'/);
+ assert.match(source,/s\?\.phase!==\'roundEnd\'&&stage===\'choose\'&&payload\.canInteract/);
+ assert.match(source,/current\?\.interactions\?\.nextRound\?\.\(\)/);
+ const t=await table();browser=t.browser;try{
+  for(const id of ['vingtetun','encheres','boite']){
+   await setup(t.page,id,'solo');
+   const r=await t.page.evaluate(async gameId=>{
+    if(gameId==='encheres'){
+     S.bids=S.players.map(p=>p.hand.shift());finishAuction(S);
+    }else S.phase='roundEnd';
+    if(gameId==='vingtetun'){S.dealerRevealed=true;if(!S.dealer.length)S.dealer=[{id:'test-dealer',rank:10,suit:'S'}]}
+    let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});
+    renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});
+    const before={phase:S.phase,round:S.round,bidRound:S.bidRound,boxTurns:S.boxTurns},canInteract=seen.canInteract,flag=gameId==='vingtetun'?seen.viewData.blackjack.canNextRound:gameId==='encheres'?seen.viewData.cardAction.canNextRound:seen.viewData.boxCanNextRound;
+    const ok=seen.interactions.nextRound();
+    return{canInteract,flag,ok,before,after:{phase:S.phase,round:S.round,bidRound:S.bidRound,boxTurns:S.boxTurns}};
+   },id);
+   assert.deepEqual({canInteract:r.canInteract,flag:r.flag,ok:r.ok},{canInteract:true,flag:true,ok:true},id);assert.notEqual(r.after.phase,'roundEnd',id);
+  }
+ }finally{await browser.close();}
+});
+
 test('Eight 3D exposes Carte and Contre-carte through the authoritative action path',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  const html=await readFile(path.join(root,'jeux.html'),'utf8');
