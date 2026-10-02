@@ -1973,14 +1973,15 @@ export function createTable3DRenderer({onFatal}={}){
       }
     });
     (data.players||[]).forEach((pl,i)=>{
-      if(pl.out)return;const offset=cityPawnOffset(i),target=cityWorld(Number(pl.pos)||0).add(offset.clone()),pawn=pawnMesh(playerColors[i]||['#dbea9e','#aacdf7','#e4ad91','#c9afe7'][i%4]);
-      if(i===movedPlayer&&motionAllowed()){
-        const points=cityMovementRoute(previousCity.positions[i],Number(pl.pos)||0,dice,offset);
-        if(points.length>1){pawn.position.copy(points[0]);pawnAnimations.push({mesh:pawn,points,start:performance.now(),duration:Math.min(1700,Math.max(520,points.length*120)),lift:.12})}
-        else pawn.position.copy(target);
-      }else pawn.position.copy(target);
+      if(pl.out)return;const offset=cityPawnOffset(i),target=cityWorld(Number(pl.pos)||0).add(offset.clone()),pawn=pawnMesh(playerColors[i]||['#dbea9e','#aacdf7','#e4ad91','#c9afe7'][i%4]),points=i===movedPlayer&&motionAllowed()?cityMovementRoute(previousCity.positions[i],Number(pl.pos)||0,dice,offset):[];
+      const duration=Math.min(1700,Math.max(520,Math.max(2,points.length)*120));
+      if(points.length>1){pawn.position.copy(points[0]);pawnAnimations.push({mesh:pawn,points,start:performance.now(),duration,lift:.12})}
+      else pawn.position.copy(target);
       objects.add(pawn);
-      const tag=makeLabel((pl.name||'Joueur')+' · '+pl.cash+' ¤'+(pl.jailed?' · détenu':''),i===s.turn?'#dbea9e':'#d8ded9');tag.scale.set(1.65,.31,1);tag.position.set(target.x,TABLE_Y+.92,target.z);objects.add(tag);
+      const tag=makeLabel((pl.name||'Joueur')+' · '+pl.cash+' ¤'+(pl.jailed?' · détenu':''),i===s.turn?'#dbea9e':'#d8ded9');tag.scale.set(1.65,.31,1);
+      if(points.length>1){const tagPoints=points.map(p=>new THREE.Vector3(p.x,TABLE_Y+.92,p.z));tag.position.copy(tagPoints[0]);pawnAnimations.push({mesh:tag,points:tagPoints,start:performance.now(),duration,lift:.04})}
+      else tag.position.set(target.x,TABLE_Y+.92,target.z);
+      objects.add(tag);
     });
     lastCitySnapshot=citySnapshot;
     const key='city|'+(s?.moves??0)+'|'+dice.join('-'),animate=s?.moves>0&&key!==lastDiceKey;if(animate)lastDiceKey=key;
