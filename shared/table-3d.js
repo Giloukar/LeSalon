@@ -1530,7 +1530,7 @@ export function createTable3DRenderer({onFatal}={}){
     lastEightSnapshot=snapshot;
 
     if(choosingSuit&&payload.canInteract){
-      CARD_SUIT_ORDER.forEach((suit,i)=>{
+      CARD_SUIT_ORDER.filter(suit=>suit!=='X').forEach((suit,i)=>{
         const symbol=SUIT_SYMBOL[suit]||suit,name=(SUIT_NAME[suit]||suit).toUpperCase(),pick=actionSprite(symbol+' '+name,'eight-suit',{suit},['H','D'].includes(suit)?'#efaaa0':'#dbea9e');
         pick.position.set((i-1.5)*2.05,1.04,1.15);pick.scale.set(1.85,.54,1);objects.add(pick);
       });
