@@ -539,8 +539,8 @@ Cette disposition permet notamment à une longue suite de partager une ligne ave
 Les cellules calculées sont la source unique pour le rendu, les boutons d'ajout à un groupe et les zones de dépôt pendant un drag. Une tuile ne peut donc pas sembler appartenir à une zone visuelle différente de celle reconnue au relâchement. Cette adaptation reste entièrement dans la présentation 3D et ne modifie ni les groupes du moteur, ni leurs indices, ni la validation d'un coup.
 
 
-## Cactus — défausse physique de la carte piochée
+## Cactus — échange et défausse physiques de la carte tirée
 
-Quand le joueur pioche depuis le paquet et entre dans la phase d’échange, la carte tirée devient maintenant un objet manipulable dans la scène 3D. Elle peut être saisie et glissée vers la défausse centrale ; le relâchement dans cette zone appelle uniquement l’action Cactus autoritative `discard` déjà utilisée par l’interface existante.
+Pendant la phase `swap`, la carte tirée devient un objet manipulable dans la scène 3D. Elle peut être saisie puis glissée directement sur l’une des cartes de la main : le renderer ne fait qu’identifier le slot visé et appelle l’action Cactus autoritative `swap(index)` déjà utilisée par l’interface existante.
 
-La carte n’est manipulable de cette façon que pour le joueur actif, pendant `swap`, et seulement lorsque la source est réellement la pioche. Une carte prise depuis la défausse ne peut donc pas être rejetée par ce raccourci. Un relâchement hors de la zone valide n’envoie aucune action et remet simplement la carte à sa position visuelle. Les effets éventuels de la carte jetée — notamment le pouvoir du 8 — restent entièrement calculés par le moteur Cactus.
+Lorsque la carte vient réellement de la pioche, elle peut aussi être glissée vers la défausse centrale pour appeler l’action `discard`. Une carte prise depuis la défausse ne peut pas être rejetée par ce raccourci, conformément aux règles existantes. Un relâchement hors de toute zone valide n’envoie aucune action et remet simplement la carte à sa position visuelle. Les échanges, la carte rejetée et les effets éventuels — notamment le pouvoir du 8 — restent entièrement calculés par le moteur Cactus.
