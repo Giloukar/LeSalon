@@ -3426,6 +3426,12 @@ if(window.SalonTableView){
      canSell:!!(S.houses[i]>0&&S.houses[i]>=max)
     };
    });
+   const cityTradeable=CITY_BOARD.map((c,i)=>{
+    if(!cityActive||!cityOfferAllowed(S,i))return null;
+    const owner=S.owners[i],maxPrice=Math.min(99999,cityP.cash),suggested=Math.max(1,Math.min(maxPrice,c.price));
+    return{index:i,owner,ownerName:S.players[owner]?.name||'',maxPrice,suggested,mortgaged:!!S.mortgaged[i],redeemCost:S.mortgaged[i]?Math.ceil(Math.floor(c.price/2)*1.1):0};
+   });
+   const cityTrade=S.trade?{from:S.trade.from,to:S.trade.to,index:S.trade.index,price:S.trade.price,remaining:Math.max(0,Number(S.trade.remaining)||0),buyerName:S.players[S.trade.from]?.name||'',sellerName:S.players[S.trade.to]?.name||''}:null;
    data.city={
     board:CITY_BOARD.map((c,i)=>({name:c.name,type:c.type,group:c.group??-1,price:c.price??0,rent:c.type==='property'&&S.owners[i]>=0?cityRent(S,i):0})),
     colors:CITY_COLORS.slice(),
@@ -3439,6 +3445,10 @@ if(window.SalonTableView){
     offer:S.offer??null,
     debt:S.debt?{amount:S.debt.amount,reason:S.debt.reason}:null,
     manage:cityManage,
+    tradeable:cityTradeable,
+    trade:cityTrade,
+    offersRemaining:Math.max(0,3-(S.offersThisTurn||0)),
+    canTradeRespond:!!(cityActive&&S.phase==='tradeResponse'&&S.trade&&S.trade.to===S.turn),
     canRoll:!!(cityActive&&S.phase==='roll'),
     canBail:!!(cityActive&&S.phase==='roll'&&cityP.jailed&&cityP.cash>=50),
     canBuy:!!(cityActive&&S.phase==='buy'&&Number.isInteger(S.offer)&&S.owners[S.offer]<0&&cityP.cash>=(CITY_BOARD[S.offer]?.price||Infinity)),
@@ -3680,6 +3690,9 @@ if(window.SalonTableView){
     },
     city(type,value){
      if(!S||S.id!=='metropole'||!canPlay())return false;
+     if(type==='tradeOffer'&&value&&Number.isInteger(value.index)&&Number.isSafeInteger(value.price)&&value.price>=1&&value.price<=99999&&value.price<=player(S).cash&&cityOfferAllowed(S,value.index)){dispatch({type:'tradeOffer',index:value.index,price:value.price});return true}
+     if(type==='tradeAccept'&&S.phase==='tradeResponse'&&S.trade?.to===S.turn){dispatch({type:'tradeAccept'});return true}
+     if(type==='tradeReject'&&S.phase==='tradeResponse'&&S.trade?.to===S.turn){dispatch({type:'tradeReject'});return true}
      if(type==='roll'&&S.phase==='roll'){dispatch({type:'roll'});return true}
      if(type==='bail'&&S.phase==='roll'&&player(S).jailed&&player(S).cash>=50){dispatch({type:'bail'});return true}
      if(type==='buy'&&S.phase==='buy'){dispatch({type:'buy'});return true}
