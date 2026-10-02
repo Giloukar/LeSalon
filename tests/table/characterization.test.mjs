@@ -409,6 +409,21 @@ test('Eight 3D staging keeps opponent motion presentation-only',async()=>{
 });
 
 
+test('3D card and Rummikub hands expose the same local sort toggle as 2D',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ const html=await readFile(path.join(root,'jeux.html'),'utf8');
+ assert.match(source,/SORTABLE_HAND_GAMES=new Set/);
+ assert.match(source,/function sortedVisualHand\(cards,game,byColor=false\)/);
+ assert.match(source,/data-table-3d-sort hidden/);
+ assert.match(source,/function sortActiveHand\(\)/);
+ assert.match(source,/clearActiveHandPoses\(\)/);
+ assert.match(source,/updateSortButton\(\)/);
+ assert.match(source,/sortedVisualHand\(data\.hand\|\|\[\],'rummikub',payload\.viewData\?\.sortByColor\)/);
+ assert.match(source,/sortedVisualHand\(s\.players\[viewer\]\?\.hand\|\|\[\],'huit',payload\.viewData\?\.sortByColor\)/);
+ assert.match(html,/data=\{playableIds:\[\],sortByColor:!!sortByColor\}/);
+ assert.match(html,/sortByColor=!sortByColor;renderGame\(true\);return true/);
+});
+
 test('dense 3D card hands preserve a protected center zone and stable physical card size',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/total<=9\?1:total<=20\?2:total<=30\?3:total<=40\?4:5/);
