@@ -620,7 +620,7 @@ test('owned cards and rack tiles can keep local free poses without changing game
  assert.match(source,/if\(a\.mesh\.userData\?\.persistLocalPose\)/);
  assert.match(source,/function storedLocalPose\(id,type='card'\)/);
  assert.match(source,/activePoseScope=poseScope\(payload\);poseSeen=new Set\(\)/);
- assert.match(source,/syncCurrent\(payload\);pruneLocalPoses\(\);pruneLabelCache\(\);updateLocalPoseResetButton\(\);updateCameraResetButton\(\);draw\(\)/);
+ assert.match(source,/syncCurrent\(payload\);pruneLocalPoses\(\);pruneLabelCache\(\);updateLocalPoseResetButton\(\);updateSortButton\(\);updateCameraResetButton\(\);draw\(\)/);
  assert.doesNotMatch(source,/saveLocalPose[^\n]*dispatch\(/);
  assert.doesNotMatch(source,/settlePersistentPlacement[^\n]*onlineAct\(/);
  assert.doesNotMatch(source,/localPoses[^\n]*publishOnline\(/);
