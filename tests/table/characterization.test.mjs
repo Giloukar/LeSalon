@@ -488,6 +488,7 @@ test('Eight 3D keeps suit choice on the table instead of falling back to HTML co
  assert.match(source,/const suitChoice=payload\.viewData\?\.eightSuitChoice\|\|null,choosingSuit=!!suitChoice\?\.cardId/);
  assert.match(source,/const canDrawTop=!choosingSuit/);
  assert.match(source,/actionSprite\(symbol\+' '\+name,'eight-suit',\{suit\}/);
+ assert.match(source,/CARD_SUIT_ORDER\.filter\(suit=>suit!==\'X\'\)\.forEach/);
  assert.match(source,/current\?\.interactions\?\.chooseSuit\?\.\(d\.suit\)/);
  assert.match(source,/current\?\.interactions\?\.cancelSuit\?\.\(\)/);
 });
