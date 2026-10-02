@@ -84,6 +84,12 @@ test('Jeu de l’Oie 3D exposes adventure choices, special cells and feather rer
  assert.match(source,/specialDefs=\{bridge:\['⌒','PONT'/);
  assert.match(source,/marker=makeLabel\(special\.symbol\+' '\+special\.label/);
  assert.match(source,/tile\.scale\.set\(1\.10,1\.16,1\.10\)/);
+ assert.match(source,/function addGoosePath\(coords\)/);
+ assert.match(source,/goosePathGeometry=new THREE\.BoxGeometry\(1,\.032,\.12\)/);
+ assert.match(source,/gooseChoiceRingGeometry=new THREE\.RingGeometry\(\.38,\.49,36\)/);
+ assert.match(source,/gooseDiceTrayGeometry=new THREE\.PlaneGeometry\(2\.65,1\.12\)/);
+ assert.match(source,/diceTray\.position\.set\(3\.78,TABLE_Y\+\.025,3\.00\)/);
+ assert.match(source,/die\.position\.set\(3\.26\+i\*1\.04,TABLE_Y\+\.72,3\.00\)/);
  assert.match(source,/actionSprite\(entry\.label,'goose-choice',\{steps:entry\.steps\}/);
  assert.match(source,/actionSprite\('RELANCER · 🪶 '\+turnPlayer\.feathers,'goose-reroll'/);
  assert.match(source,/LANCER LES DÉS/);
