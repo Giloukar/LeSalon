@@ -252,8 +252,11 @@ test('Three.js hardening adapts mobile quality, motion and reusable geometry',as
  assert.match(source,/camera\.fov=aspect<\.62\?42:aspect<\.82\?40:aspect<\.95\?39:aspect>1\.8\?37:39/);
  assert.equal((source.match(/setCameraPose\(/g)||[]).length>=18,true);
  assert.match(source,/function device3DProfile\(\)/);
- assert.match(source,/pixelCap=constrained\?1\.25:memory<=6\?1\.5:2/);
- assert.match(source,/textureScale=constrained\?\.62:memory<=6\?\.8:1/);
+ assert.match(source,/pixelCap=constrained\?1\.35:coarse\?1\.8:memory<=6\?1\.7:2\.2/);
+ assert.match(source,/textureScale=constrained\?\.76:coarse\?\.94:memory<=6\?\.9:1\.08/);
+ assert.match(source,/shadowSize=constrained\?768:coarse\?1024:memory<=6\?1024:1536/);
+ assert.match(source,/anisotropy=constrained\?3:coarse\?6:8/);
+ assert.match(source,/ACESFilmicToneMapping/);
  assert.match(source,/generateMipmaps=false/);
  assert.match(source,/profile\.shadowSize/);
  assert.equal((source.match(/new THREE\.BoxGeometry\(\.62,\.9,\.085\)/g)||[]).length,1);
@@ -261,8 +264,9 @@ test('Three.js hardening adapts mobile quality, motion and reusable geometry',as
  assert.match(source,/lostpointercapture/);
  assert.match(source,/function capturePointer\(id\)\{try\{/);
  assert.match(source,/cardDropRadius/);
- assert.match(source,/const dense=rows>1,baseScale=rows===1\?Math\.max\(\.84,1-Math\.max\(0,total-5\)\*\.035\):rows===2\?\.72:\.60/);
- assert.match(source,/spacing=rowCount<=1\?0:CARD_W\*scale\+\(dense\?\.13:\.11\)/);
+ assert.match(source,/rows=total<=9\?1:total<=20\?2:total<=30\?3:total<=40\?4:5/);
+ assert.match(source,/baseScale=rows===1\?\.86:rows===2\?\.82:rows===3\?\.76:rows===4\?\.70:\.66/);
+ assert.match(source,/spacing=rowCount<=1\?0:CARD_W\*scale\+\.11/);
  assert.match(source,/const farFill=new THREE\.DirectionalLight/);
  assert.match(source,/const farGlow=new THREE\.PointLight/);
  assert.match(source,/function eightOpponentSeat\(total,index\)/);
@@ -401,12 +405,15 @@ test('Eight 3D staging keeps opponent motion presentation-only',async()=>{
 });
 
 
-test('dense 3D card hands switch to compact grid rows before reaching the action HUD',async()=>{
+test('dense 3D card hands preserve a protected center zone and stable physical card size',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
- assert.match(source,/total<=7\?1:total<=14\?2:3/);
+ assert.match(source,/total<=9\?1:total<=20\?2:total<=30\?3:total<=40\?4:5/);
  assert.match(source,/fan=dense\?0:/);
- assert.match(source,/rows===2\?\.93\+row\*1\.25/);
- assert.match(source,/rows===3\?\.54:\.62/);
+ assert.match(source,/firstZ=rows===1\?2\.72:rows===2\?1\.72:rows===3\?1\.52:1\.48/);
+ assert.match(source,/lastZ=rows===1\?2\.72:3\.28/);
+ assert.match(source,/minScale=rows===1\?\.82:rows===2\?\.76:rows===3\?\.70:rows===4\?\.66:\.62/);
+ assert.match(source,/CARD_STACK_SCALE=\.88/);
+ assert.equal((source.match(/CARD_STACK_SCALE/g)||[]).length>=5,true);
 });
 
 test('Rummikub dense 3D layout and shared card motion remain presentation-only',async()=>{
