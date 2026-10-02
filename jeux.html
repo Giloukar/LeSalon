@@ -3297,6 +3297,13 @@ if(window.SalonTableView){
   if(S?.id==='huit'){
    if(canPlay()&&!showSuit)data.playableIds=mine.filter(c=>eightLegal(S,c)).map(c=>c.id);
    data.eightSuitChoice=showSuit?{cardId:String(showSuit)}:null;
+   const i=S.turn,p=player(S),counter=Number.isInteger(S.counterTarget)&&S.counterTarget!==i&&S.players[S.counterTarget]?.hand.length===1&&!S.announced?.[S.counterTarget];
+   data.eightActions={
+    canAnnounce:!!(canPlay()&&!showSuit&&p.hand.length===2&&!S.announced?.[i]),
+    announced:!!S.announced?.[i],
+    canCounter:!!(canPlay()&&!showSuit&&counter),
+    counterTarget:counter?S.counterTarget:null
+   };
   }
   if(S?.id==='oie'){
    const d=S.goosePending?.dice||[],steps=d.length===2?[d[0],d[1],d[0]+d[1]]:[];
@@ -3528,6 +3535,7 @@ if(window.SalonTableView){
     playCard(id){if(!S||S.id!=='huit'||!canPlay()||showSuit)return false;const c=player(S).hand.find(c=>c.id===id);if(!c)return false;eightPlayCardUI(c);return true},
     chooseSuit(suit){if(!S||S.id!=='huit'||!canPlay()||!showSuit||!SUITS.includes(suit))return false;dispatch({type:'card',id:showSuit,suit});return true},
     cancelSuit(){if(!S||S.id!=='huit'||!canPlay()||!showSuit)return false;showSuit=null;renderGame(false);return true},
+    eightAction(type){if(!S||S.id!=='huit'||!canPlay()||showSuit||!['announce','counter'].includes(type))return false;dispatch({type});return true},
     draw(){if(!S||S.id!=='huit'||!canPlay()||showSuit)return false;dispatch({type:'draw'});return true},
     goose(type,steps){if(!S||S.id!=='oie'||!canPlay())return false;const action=type==='choose'?{type:'gooseChoose',steps}:type==='reroll'?{type:'gooseReroll'}:{type:'roll'};dispatch(action);return true},
     yam(type,value){

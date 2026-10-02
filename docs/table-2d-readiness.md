@@ -551,3 +551,10 @@ Lorsque la carte vient réellement de la pioche, elle peut aussi être glissée 
 Le choix déclenché par un 8 ou un Joker reste maintenant dans la table 3D. Dès que le moteur demande une couleur, les cartes et la pioche sont temporairement verrouillées et quatre commandes ♠, ♥, ♦ et ♣ apparaissent sur la table, avec une commande d’annulation. Le clic appelle exactement l’action de carte existante avec la couleur choisie ; aucune règle n’est dupliquée dans Three.js.
 
 La carte qui a ouvert le choix reste légèrement mise en évidence pendant cette étape. Une fois la couleur choisie, le moteur reprend le tour normal et les interactions physiques de la main et de la pioche sont réactivées.
+
+
+## 8 Américain — Carte et Contre-carte en 3D
+
+Les annonces encore actives dans le moteur moderne du 8 Américain sont maintenant accessibles directement sur la table 3D. Quand la main autorise l’annonce, un bouton « Carte ! » apparaît dans la scène. Lorsqu’un adversaire descend à une carte sans avoir annoncé, « Contre-carte ! » apparaît également avant le coup suivant.
+
+Le renderer ne décide pas de la validité ni de la pénalité : il affiche uniquement les disponibilités exposées par la couche de vue et renvoie `announce` ou `counter` vers le même `dispatch()` que l’interface 2D. Le moteur reste donc l’unique source de vérité pour l’annonce, l’oubli et la pioche de pénalité.
