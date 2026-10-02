@@ -229,7 +229,7 @@ test('replaceable 3D asset registry stays presentation-only and supports hot swa
 test('dense Rummikub layout keeps every board and rack tile inside adaptive visible rows',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/function rummiDesiredGroupWidth\(group\)/);
- assert.match(source,/Math\.min\(4\.58,Math\.max\(1\.64,length\*natural\+\.12\)\)/);
+ assert.match(source,/Math\.min\(4\.58,Math\.max\(1\.64,length\*natural\*\.62\+\.16\)\)/);
  assert.match(source,/packed=rummiPackRows\(active,width,gap\)/);
  assert.match(source,/minZ=-2\.90,maxZ=\.85/);
  assert.match(source,/z=minZ\+\(rowIndex\+\.5\)\*cellD/);
