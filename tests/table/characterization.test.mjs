@@ -74,6 +74,29 @@ test('privacy gate withholds state from an active 3D renderer',async()=>{const t
 
 test('3D interaction payload exposes only the Eight suit picker while a suit choice is pending',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','solo');const r=await t.page.evaluate(async()=>{let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen={canInteract:payload.canInteract,playable:[...payload.viewData.playableIds],choice:payload.viewData.eightSuitChoice,chooseSuit:typeof payload.interactions.chooseSuit==='function',cancelSuit:typeof payload.interactions.cancelSuit==='function'}}});await SalonTableView.setMode('3d',{persistPreference:false});showSuit='synthetic-choice';renderGame(false);return seen;});assert.equal(r.canInteract,true);assert.deepEqual(r.playable,[]);assert.deepEqual(r.choice,{cardId:'synthetic-choice'});assert.equal(r.chooseSuit,true);assert.equal(r.cancelSuit,true);}finally{await browser.close();}});
 
+test('Eight 3D exposes Carte and Contre-carte through the authoritative action path',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ const html=await readFile(path.join(root,'jeux.html'),'utf8');
+ assert.match(html,/data\.eightActions=\{/);
+ assert.match(html,/eightAction\(type\).*\['announce','counter'\]\.includes\(type\).*dispatch\(\{type\}\)/s);
+ assert.match(source,/actionSprite\(entry\.label,'eight-action',\{command:entry\.command\}/);
+ assert.match(source,/current\?\.interactions\?\.eightAction\?\.\(d\.command\)/);
+ assert.doesNotMatch(source,/eight-action[^\n]*onlineAct\(/);
+ const t=await table();browser=t.browser;try{
+  await setup(t.page,'huit','solo');
+  const r=await t.page.evaluate(async()=>{
+   S.turn=0;showSuit=null;S.counterTarget=null;S.announced[0]=false;
+   while(S.players[0].hand.length>2)S.players[0].hand.pop();
+   while(S.players[0].hand.length<2)S.players[0].hand.push(S.deck.pop());
+   let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});
+   renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});
+   const before={hand:S.players[0].hand.length,announced:S.announced[0]},available={...seen.viewData.eightActions},ok=seen.interactions.eightAction('announce');
+   return{before,available,ok,after:{hand:S.players[0].hand.length,announced:S.announced[0]}};
+  });
+  assert.equal(r.available.canAnnounce,true);assert.equal(r.ok,true);assert.equal(r.before.hand,2);assert.equal(r.before.announced,false);assert.equal(r.after.hand,2);assert.equal(r.after.announced,true);
+ }finally{await browser.close();}
+});
+
 test('Eight touch drag to discard opens the suit choice and always cleans its ghost',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','solo');const r=await t.page.evaluate(()=>{S.turn=0;S.phase='play';S.pendingDraw=0;S.attack=null;S.blockEight=false;S.suit='C';S.discard=[{id:'touch-top',suit:'C',rank:9}];S.players[0].hand=[{id:'touch-eight',suit:'H',rank:8},{id:'touch-four',suit:'C',rank:4}];showSuit=null;renderGame(false);const card=document.querySelector('[data-eight-card="1"][data-id="touch-eight"]'),drop=document.querySelector('[data-eight-drop="1"]');if(!card||!drop)throw Error('Eight drag fixtures missing');const a=card.getBoundingClientRect(),b=drop.getBoundingClientRect(),start={x:a.left+a.width/2,y:a.top+a.height/2},end={x:b.left+b.width/2,y:b.top+b.height/2},event=(type,x,y)=>new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:77,pointerType:'touch',isPrimary:true,button:0,buttons:type==='pointerup'?0:1,clientX:x,clientY:y});card.dispatchEvent(event('pointerdown',start.x,start.y));document.dispatchEvent(event('pointermove',end.x,end.y));const during={ghost:document.querySelectorAll('.eight-drag-ghost').length,source:document.querySelectorAll('.eight-drag-source').length,hot:document.querySelector('[data-eight-drop="1"]')?.classList.contains('eight-drop-hot')};document.dispatchEvent(event('pointerup',end.x,end.y));return{during,showSuit,ghost:document.querySelectorAll('.eight-drag-ghost').length,source:document.querySelectorAll('.eight-drag-source').length,hot:document.querySelector('[data-eight-drop="1"]')?.classList.contains('eight-drop-hot')||false};});assert.deepEqual(r.during,{ghost:1,source:1,hot:true});assert.equal(r.showSuit,'touch-eight');assert.equal(r.ghost,0);assert.equal(r.source,0);assert.equal(r.hot,false);}finally{await browser.close();}});
 
 test('Goose exposes engine-derived destinations to the 3D renderer',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'oie','solo');const r=await t.page.evaluate(async()=>{let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen={gameId:payload.gameId,coords:payload.viewData.boardCoords.length,geese:[...payload.viewData.gooseCells],choices:payload.viewData.gooseChoices.map(x=>({...x}))}}});S.goosePending={i:S.turn,dice:[2,5],rerolls:0};S.dice=[2,5];const expected=[2,5,7].map(steps=>({steps,target:legacyGooseTarget(player(S).pos,steps)}));renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});return{seen,expected,switches:document.querySelectorAll('.table-view-switch').length};});assert.equal(r.seen.gameId,'oie');assert.equal(r.seen.coords,63);assert.deepEqual(r.seen.choices,r.expected);assert.equal(r.switches,1);}finally{await browser.close();}});
