@@ -65,6 +65,24 @@ test('Three.js table renderer never draws gameplay randomness',async()=>{const s
 
 test('Yam exposes engine-owned dice and held state to the 3D renderer',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'yam','solo');const r=await t.page.evaluate(async()=>{let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen={dice:[...payload.viewData.yamDice],held:[...payload.viewData.yamHeld],rolls:payload.viewData.yamRolls,turn:payload.viewData.yamTurn,interactions:payload.interactions}}});S.dice=[6,2,6,4,1];S.held=[true,false,true,false,false];S.rolls=2;renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const initial={dice:[...seen.dice],held:[...seen.held],rolls:seen.rolls,turn:seen.turn},before=clone(S),action=seen.interactions.yam;action('hold',1);return{seen:initial,before,after:clone(S)};});assert.deepEqual(r.seen.dice,[6,2,6,4,1]);assert.deepEqual(r.seen.held,[true,false,true,false,false]);assert.equal(r.seen.rolls,2);assert.equal(r.after.held[1],true);assert.equal(r.after.moves,r.before.moves+1);assert.deepEqual(r.after.dice,r.before.dice);assert.equal(r.after.rolls,r.before.rolls);assert.equal(r.after.turn,r.before.turn);assert.equal(r.after.players[0].score,r.before.players[0].score);}finally{await browser.close();}});
 
+test('Jeu de l’Oie 3D exposes adventure choices, special cells and feather rerolls',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ const html=await readFile(path.join(root,'jeux.html'),'utf8');
+ assert.match(source,/specialDefs=\{bridge:\['⌒','PONT'/);
+ assert.match(source,/marker=makeLabel\(special\.symbol\+' '\+special\.label/);
+ assert.match(source,/tile\.scale\.set\(1\.10,1\.16,1\.10\)/);
+ assert.match(source,/kind:'goose-choice',steps:entry\.steps/);
+ assert.match(source,/kind:'goose-reroll'/);
+ assert.match(source,/LANCER LES DÉS/);
+ assert.match(source,/RELANCER · 🪶/);
+ assert.match(source,/Grain doré · \+1 plume/);
+ assert.match(source,/pad\.scale\.set\(\.48,\.22,\.48\)/);
+ assert.match(html,/type==='reroll'\?\{type:'gooseReroll'\}/);
+ assert.doesNotMatch(source,/goose-reroll[^\n]*Math\.random/);
+});
+
+test('3D feather reroll delegates to the authoritative Goose engine',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'oie','online');const r=await t.page.evaluate(async()=>{net.gameId='oie';net.state.turn=0;S=projectGame(net.state,0);let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const before=net.state.players[0].feathers,rolled=seen.interactions.goose('roll'),dice=[...net.state.dice],afterRoll=net.state.players[0].feathers,rerolled=seen.interactions.goose('reroll');return{before,rolled,dice,afterRoll,rerolled,after:net.state.players[0].feathers,pending:clone(net.state.goosePending)};});assert.equal(r.rolled,true);assert.equal(r.afterRoll,r.before);assert.equal(r.rerolled,true);assert.equal(r.after,r.before-1);assert.equal(r.pending.rerolls,1);assert.equal(r.pending.dice.length,2);assert.equal(r.dice.length,2);}finally{await browser.close();}});
+
 test('Yam and Métropole expose direct physical dice controls without bypassing engine actions',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/const kind=rolls===0\?'yam-roll':'yam-hold'/);
