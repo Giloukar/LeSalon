@@ -579,3 +579,10 @@ La scène affiche respectivement **Main suivante**, **Enchère suivante** ou **P
 Les rachats entre joueurs n’obligent plus à ouvrir le formulaire HTML. Lorsqu’une rue adverse est éligible selon `cityOfferAllowed()`, elle peut être sélectionnée sur le plateau 3D. Le prix proposé est alors un brouillon purement local à la vue : il peut être ajusté par pas de 10 ou 100 crédits, dans la limite des liquidités et de 99 999 crédits, sans modifier l’état de partie ni envoyer de paquet réseau.
 
 Le bouton **Proposer** transmet ensuite exactement `tradeOffer { index, price }` au moteur existant. Le propriétaire voit l’offre sur sa table 3D et peut **Accepter** ou **Refuser** ; ces commandes repassent par `tradeAccept` et `tradeReject`. Les contrôles d’éligibilité, le maximum de trois offres, le transfert d’argent et de propriété, les hypothèques, le délai autoritaire de 45 secondes et l’expiration restent intégralement gérés par le moteur et l’hôte.
+
+
+## Ferme la boîte — volets physiques en 3D
+
+Les volets ne changent plus instantanément d’état après la validation d’une combinaison. Le renderer conserve seulement la liste visuelle des nombres ouverts du rendu précédent. Lorsqu’un nouvel état confirmé retire un ou plusieurs nombres, chaque volet concerné bascule et descend physiquement vers sa position fermée, avec un léger décalage entre plusieurs fermetures simultanées.
+
+Une simple sélection locale ne ferme rien et ne déclenche pas cette animation, puisque `boxNumbers` n’a pas encore changé. Three.js ne calcule ni les combinaisons possibles ni la somme valide : `playBox()` reste seul responsable d’accepter `close`. Au passage suivant, les volets réouverts apparaissent directement selon le nouvel état, sans rejouer artificiellement une fermeture.
