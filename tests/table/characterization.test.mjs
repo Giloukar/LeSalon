@@ -216,6 +216,44 @@ test('Métropole 3D roll delegates to the authoritative host action path',async(
 
 test('Métropole 3D exposes the full authoritative turn and property action surface',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'metropole','online');const r=await t.page.evaluate(async()=>{let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});net.gameId='metropole';net.state.turn=0;net.state.phase='buy';net.state.offer=1;net.state.owners[1]=-1;net.state.houses[1]=0;net.state.mortgaged[1]=false;net.state.players[0].cash=1200;S=projectGame(net.state,0);renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const before={cash:net.state.players[0].cash,revision:net.revision,price:seen.viewData.city.board[1].price,canBuy:seen.viewData.city.canBuy,manageCount:seen.viewData.city.manage.length};const bought=seen.interactions.city('buy');const afterBuy={cash:net.state.players[0].cash,owner:net.state.owners[1],phase:net.state.phase,revision:net.revision};const manage=seen.viewData.city.manage[1];const mortgaged=seen.interactions.city('mortgage',1);return{before,bought,afterBuy,manage,mortgaged,afterMortgage:{cash:net.state.players[0].cash,mortgaged:net.state.mortgaged[1],revision:net.revision}};});assert.equal(r.before.canBuy,true);assert.equal(r.before.manageCount,24);assert.equal(r.bought,true);assert.equal(r.afterBuy.owner,0);assert.equal(r.afterBuy.cash,r.before.cash-r.before.price);assert.equal(r.afterBuy.phase,'end');assert.equal(r.afterBuy.revision,r.before.revision+1);assert.equal(r.manage.canMortgage,true);assert.equal(r.mortgaged,true);assert.equal(r.afterMortgage.mortgaged,true);assert.equal(r.afterMortgage.cash,r.afterBuy.cash+r.manage.mortgageGain);assert.equal(r.afterMortgage.revision,r.afterBuy.revision+1);}finally{await browser.close();}});
 
+test('Métropole 3D can send and answer property trade offers through the authoritative engine',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ const html=await readFile(path.join(root,'jeux.html'),'utf8');
+ assert.match(html,/tradeable:cityTradeable/);
+ assert.match(html,/canTradeRespond:/);
+ assert.match(html,/type==='tradeOffer'.*cityOfferAllowed\(S,value\.index\).*dispatch\(\{type:'tradeOffer'/s);
+ assert.match(html,/type==='tradeAccept'.*dispatch\(\{type:'tradeAccept'\}\)/s);
+ assert.match(html,/type==='tradeReject'.*dispatch\(\{type:'tradeReject'\}\)/s);
+ assert.match(source,/cityOfferDraft=0,cityOfferDraftKey=''/);
+ assert.match(source,/city-offer-adjust/);
+ assert.match(source,/city-offer-send/);
+ assert.match(source,/ACCEPTER · \+/);
+ assert.match(source,/REFUSER/);
+ const t=await table();browser=t.browser;try{
+  const offered=await t.page.evaluate(async()=>{
+   await SalonTableView.setMode('2d',{persistPreference:false});
+   net.gameId='metropole';net.state.turn=0;net.state.phase='end';net.state.trade=null;net.state.offersThisTurn=0;
+   const index=CITY_BOARD.findIndex(c=>c.type==='property'),group=cityGroup(net.state,CITY_BOARD[index].group);
+   net.state.owners[index]=1;group.forEach(i=>net.state.houses[i]=0);net.state.players[0].cash=1200;net.state.players[1].cash=1200;S=projectGame(net.state,0);
+   let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});
+   const option=clone(seen.viewData.city.tradeable[index]),before={revision:net.revision,cash0:net.state.players[0].cash,cash1:net.state.players[1].cash},ok=seen.interactions.city('tradeOffer',{index,price:123});
+   return{index,option,ok,before,after:{revision:net.revision,phase:net.state.phase,turn:net.state.turn,owner:net.state.owners[index],trade:clone(net.state.trade),cash0:net.state.players[0].cash,cash1:net.state.players[1].cash}};
+  });
+  assert.ok(offered.option);assert.equal(offered.option.owner,1);assert.equal(offered.ok,true);assert.equal(offered.after.phase,'tradeResponse');assert.equal(offered.after.turn,1);assert.equal(offered.after.owner,1);assert.equal(offered.after.trade.price,123);assert.equal(offered.after.trade.index,offered.index);assert.equal(offered.after.cash0,offered.before.cash0);assert.equal(offered.after.cash1,offered.before.cash1);assert.equal(offered.after.revision,offered.before.revision+1);
+
+  const accepted=await t.page.evaluate(async()=>{
+   await SalonTableView.setMode('2d',{persistPreference:false});
+   const index=CITY_BOARD.findIndex(c=>c.type==='property'),group=cityGroup(net.state,CITY_BOARD[index].group);
+   net.state.phase='tradeResponse';net.state.turn=0;net.state.owners[index]=0;group.forEach(i=>net.state.houses[i]=0);net.state.players[0].cash=1200;net.state.players[1].cash=900;
+   net.state.trade={from:1,to:0,index,price:125,returnPhase:'end',remaining:45000,lastAt:Date.now(),running:false};S=projectGame(net.state,0);
+   let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});
+   const before={seller:net.state.players[0].cash,buyer:net.state.players[1].cash,revision:net.revision,canRespond:seen.viewData.city.canTradeRespond},ok=seen.interactions.city('tradeAccept');
+   return{ok,before,after:{seller:net.state.players[0].cash,buyer:net.state.players[1].cash,owner:net.state.owners[index],phase:net.state.phase,turn:net.state.turn,trade:net.state.trade,revision:net.revision}};
+  });
+  assert.equal(accepted.before.canRespond,true);assert.equal(accepted.ok,true);assert.equal(accepted.after.owner,1);assert.equal(accepted.after.seller,accepted.before.seller+125);assert.equal(accepted.after.buyer,accepted.before.buyer-125);assert.equal(accepted.after.phase,'end');assert.equal(accepted.after.turn,1);assert.equal(accepted.after.trade,null);assert.equal(accepted.after.revision,accepted.before.revision+1);
+ }finally{await browser.close();}
+});
+
 test('Métropole 3D animates confirmed pawn movement without simulating city rules',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/lastCitySnapshot=null/);
