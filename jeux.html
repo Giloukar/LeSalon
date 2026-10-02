@@ -3302,7 +3302,7 @@ if(window.SalonTableView){
   if(S?.id==='yam'){
    const yp=S.players[S.turn]||player(S);
    data.yamDice=[...S.dice];data.yamHeld=[...S.held];data.yamRolls=S.rolls;data.yamTurn=S.yamTurn;data.yamScore=yp?.score||0;data.yamPlayerName=yp?.name||'Joueur';
-   data.yamCategories=YAM_CATEGORIES.map(c=>({id:c.id,name:c.name,rule:c.rule,max:c.max,filled:yp?.yamSheet?.[c.id]!==null,value:yp?.yamSheet?.[c.id]??null,preview:S.rolls?yamScore(S.dice,c.id):null}));
+   data.yamCategories=YAM_CATEGORIES.map(c=>({id:c.id,name:c.name,rule:c.rule,max:c.max,filled:yp?.yamSheet?.[c.id]!=null,value:yp?.yamSheet?.[c.id]??null,preview:S.rolls?yamScore(S.dice,c.id):null}));
   }
   if(S?.id==='boite'){
    data.boxDice=[...S.boxDice];data.boxNumbers=[...S.boxNumbers];data.boxStage=S.boxStage;data.boxSelected=[...selection].map(Number);data.boxCanOne=S.boxNumbers.every(n=>n<7);
