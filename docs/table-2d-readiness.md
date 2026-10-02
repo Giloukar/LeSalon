@@ -537,3 +537,10 @@ La table commune Rummikub n'utilise plus une grille de colonnes uniformes. Chaqu
 Cette disposition permet notamment à une longue suite de partager une ligne avec un petit groupe lorsqu'il reste assez d'espace, et permet à quatre groupes courts de tenir sur une même ligne. Quand le nombre de lignes augmente, l'échelle des tuiles tient aussi compte de la profondeur disponible afin d'éviter les recouvrements verticaux.
 
 Les cellules calculées sont la source unique pour le rendu, les boutons d'ajout à un groupe et les zones de dépôt pendant un drag. Une tuile ne peut donc pas sembler appartenir à une zone visuelle différente de celle reconnue au relâchement. Cette adaptation reste entièrement dans la présentation 3D et ne modifie ni les groupes du moteur, ni leurs indices, ni la validation d'un coup.
+
+
+## Cactus — échange et défausse physiques de la carte tirée
+
+Pendant la phase `swap`, la carte tirée devient un objet manipulable dans la scène 3D. Elle peut être saisie puis glissée directement sur l’une des cartes de la main : le renderer ne fait qu’identifier le slot visé et appelle l’action Cactus autoritative `swap(index)` déjà utilisée par l’interface existante.
+
+Lorsque la carte vient réellement de la pioche, elle peut aussi être glissée vers la défausse centrale pour appeler l’action `discard`. Une carte prise depuis la défausse ne peut pas être rejetée par ce raccourci, conformément aux règles existantes. Un relâchement hors de toute zone valide n’envoie aucune action et remet simplement la carte à sa position visuelle. Les échanges, la carte rejetée et les effets éventuels — notamment le pouvoir du 8 — restent entièrement calculés par le moteur Cactus.
