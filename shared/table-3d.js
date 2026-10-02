@@ -1648,7 +1648,11 @@ export function createTable3DRenderer({onFatal}={}){
     }
     let discardMesh=null,drawnMesh=null;
     if(data.discard){discardMesh=cardMesh(data.discard,{interactiveCard:payload.canInteract&&data.phase==='draw'});discardMesh.userData.kind=payload.canInteract&&data.phase==='draw'?'cactus-take':'cactus-card';discardMesh.userData.interactive=payload.canInteract&&data.phase==='draw';placeCard(discardMesh,0,.1,TABLE_Y+.12,(visualHash(data.discard.id)-.5)*.12,.82)}
-    if(data.drawn){drawnMesh=cardMesh(data.drawn);drawnMesh.userData.kind='cactus-drawn';placeCard(drawnMesh,1.35,.1,TABLE_Y+.14,0,.88)}
+    if(data.drawn){
+      const canDiscardDrawn=!!(payload.canInteract&&data.turn===viewer&&data.phase==='swap'&&data.source==='draw');
+      drawnMesh=cardMesh(data.drawn,{interactiveCard:canDiscardDrawn});drawnMesh.userData.kind=canDiscardDrawn?'cactus-drawn':'cactus-card';placeCard(drawnMesh,1.35,.1,TABLE_Y+.14,0,.88);
+      if(canDiscardDrawn)makeLooseManipulable(drawnMesh,{kind:'cactus-drawn',tapEnabled:false,cardId:data.drawn.id});
+    }
 
     const snapshot=cactusSnapshot(payload,data);
     if(previous&&previous.key===snapshot.key&&motionAllowed()){
@@ -1693,7 +1697,7 @@ export function createTable3DRenderer({onFatal}={}){
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     if(title)title.textContent='VUE 3D · CACTUS';
     if(status)status.textContent=data.caller!==null?'Dernier tour · Cactus annoncé':data.phase==='peek'?'Mémorisez vos deux cartes':data.phase==='draw'?'Pioche ou défausse':data.phase==='swap'?'Échangez une carte':data.phase==='power'?'Pouvoir du 8':data.phase==='reveal'?'Mémorisez la carte':'Table synchronisée';
-    if(help)help.textContent=data.phase==='peek'||data.phase==='reveal'?'Utilisez « C’est mémorisé » sous la table':data.phase==='draw'?'Cliquez la pioche ou la défausse · vos cartes permettent aussi le jet rapide':data.phase==='swap'?'Cliquez une de vos cartes pour l’échanger':data.phase==='power'?'Cliquez une de vos cartes pour la regarder':'Les cartes restent cachées comme dans la vue 2D';
+    if(help)help.textContent=data.phase==='peek'||data.phase==='reveal'?'Utilisez « C’est mémorisé » sur la table':data.phase==='draw'?'Cliquez la pioche ou la défausse · vos cartes permettent aussi le jet rapide':data.phase==='swap'?(data.source==='draw'?'Échangez avec une de vos cartes ou glissez la carte piochée vers la défausse':'Cliquez une de vos cartes pour l’échanger'):data.phase==='power'?'Cliquez une de vos cartes pour la regarder':'Les cartes restent cachées comme dans la vue 2D';
   }
   function syncEcho(payload){
     clearObjects();dropMarker.visible=false;
@@ -2292,8 +2296,11 @@ export function createTable3DRenderer({onFatal}={}){
     }else if(d.kind==='trick-collect'&&current?.gameId==='plis'){
       d.trickToHand=d.mesh.position.z>=1.42&&Math.abs(d.mesh.position.x)<=4.45;
       showDropMarkerAt(Math.max(-2.8,Math.min(2.8,d.mesh.position.x)),2.20,d.trickToHand);
+    }else if(d.kind==='cactus-drawn'&&current?.gameId==='cactus'){
+      d.cactusToDiscard=directCardDropNear(d,'cactus');
+      const target=cardGestureTarget('cactus',TABLE_Y+.025);showDropMarkerAt(target.x,target.z,d.cactusToDiscard);
     }
-    const authoritative=!!(d.overDrop||d.rummiDrop||d.drawToRack||d.maidToHand||d.battleToCenter||d.trickToHand);
+    const authoritative=!!(d.overDrop||d.rummiDrop||d.drawToRack||d.maidToHand||d.battleToCenter||d.trickToHand||d.cactusToDiscard);
     d.localSnap=!authoritative&&!d.stackMode&&!(d.companions?.length)&&d.mesh.userData?.persistLocalPose?localPoseSnapTarget(d.mesh,d.mesh.position):null;
     if(d.localSnap)showDropMarkerAt(d.localSnap.x,d.localSnap.z,true);else if(!authoritative)showDropMarkerAt(0,0,false);
     draw();e.preventDefault();return true;
@@ -2384,6 +2391,9 @@ export function createTable3DRenderer({onFatal}={}){
       }
       if(d.kind==='cactus-quick'&&d.gestureStarted){
         if(directCardDropNear(d,'cactus')){emitLocalCardGesture('commit',1,0);current?.interactions?.cactus?.('quick',d.index);return}
+      }
+      if(d.kind==='cactus-drawn'&&(d.cactusToDiscard||directCardDropNear(d,'cactus'))){
+        if(current?.interactions?.cactus?.('discard'))return;
       }
       if(d.kind==='card-select'&&d.gestureStarted&&directCardDropNear(d)){
         rememberGroupedCardDropOrigins(d);
