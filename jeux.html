@@ -3228,7 +3228,7 @@ receiveSocial=function(data,actor,connection){
 
 /* Contrôleur de rendu : la 2D reste la couche de base et le fallback permanent. */
 const TABLE_VIEW_2D_RENDER=renderGame,TABLE_VIEW_SHOW_HOME=showHome;
-let table3dPresentation='full';
+let table3dPresentation='full',table3dNativeFullscreenObserved=false;
 function table3dRefreshLayout(){
  requestAnimationFrame(()=>{try{window.dispatchEvent(new Event('resize'))}catch{}requestAnimationFrame(()=>{try{window.dispatchEvent(new Event('resize'))}catch{}})});
 }
@@ -3241,8 +3241,9 @@ function table3dNativeFullscreenSafe(){
 }
 function table3dRequestNativeFullscreen(){
  if(!table3dNativeFullscreenSafe())return Promise.resolve(false);
- const root=document.documentElement;if(document.fullscreenElement||typeof root.requestFullscreen!=='function')return Promise.resolve(!!document.fullscreenElement);
- try{return Promise.resolve(root.requestFullscreen()).then(()=>true).catch(()=>false)}catch{return Promise.resolve(false)}
+ const root=document.documentElement;if(document.fullscreenElement){table3dNativeFullscreenObserved=true;return Promise.resolve(true)}
+ if(typeof root.requestFullscreen!=='function')return Promise.resolve(false);
+ try{return Promise.resolve(root.requestFullscreen()).then(()=>{if(document.fullscreenElement)table3dNativeFullscreenObserved=true;return true}).catch(()=>false)}catch{return Promise.resolve(false)}
 }
 function table3dExitNativeFullscreen(){
  if(!document.fullscreenElement||typeof document.exitFullscreen!=='function')return Promise.resolve(false);
@@ -3715,9 +3716,10 @@ if(window.SalonTableView){
   });
  });
  document.addEventListener('fullscreenchange',()=>{
-  if(window.SalonTableView?.getMode?.()!=='3d')return;
-  if(document.fullscreenElement)return;
-  if(table3dPresentation==='full'&&table3dNativeFullscreenSafe())table3dSetPresentation('embedded');
+  if(document.fullscreenElement){table3dNativeFullscreenObserved=true;return}
+  const hadNativeFullscreen=table3dNativeFullscreenObserved;table3dNativeFullscreenObserved=false;
+  if(!hadNativeFullscreen||window.SalonTableView?.getMode?.()!=='3d')return;
+  if(table3dPresentation==='full')table3dSetPresentation('embedded');
  });
  document.addEventListener('click',async e=>{
   const b=e.target.closest?.('[data-table-view-mode]');if(!b)return;
