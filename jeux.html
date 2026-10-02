@@ -3228,7 +3228,7 @@ receiveSocial=function(data,actor,connection){
 
 /* Contrôleur de rendu : la 2D reste la couche de base et le fallback permanent. */
 const TABLE_VIEW_2D_RENDER=renderGame,TABLE_VIEW_SHOW_HOME=showHome;
-let table3dPresentation='full';
+let table3dPresentation='full',table3dNativeFullscreenObserved=false;
 function table3dRefreshLayout(){
  requestAnimationFrame(()=>{try{window.dispatchEvent(new Event('resize'))}catch{}requestAnimationFrame(()=>{try{window.dispatchEvent(new Event('resize'))}catch{}})});
 }
@@ -3241,8 +3241,9 @@ function table3dNativeFullscreenSafe(){
 }
 function table3dRequestNativeFullscreen(){
  if(!table3dNativeFullscreenSafe())return Promise.resolve(false);
- const root=document.documentElement;if(document.fullscreenElement||typeof root.requestFullscreen!=='function')return Promise.resolve(!!document.fullscreenElement);
- try{return Promise.resolve(root.requestFullscreen()).then(()=>true).catch(()=>false)}catch{return Promise.resolve(false)}
+ const root=document.documentElement;if(document.fullscreenElement){table3dNativeFullscreenObserved=true;return Promise.resolve(true)}
+ if(typeof root.requestFullscreen!=='function')return Promise.resolve(false);
+ try{return Promise.resolve(root.requestFullscreen()).then(()=>{if(document.fullscreenElement)table3dNativeFullscreenObserved=true;return true}).catch(()=>false)}catch{return Promise.resolve(false)}
 }
 function table3dExitNativeFullscreen(){
  if(!document.fullscreenElement||typeof document.exitFullscreen!=='function')return Promise.resolve(false);
@@ -3300,7 +3301,9 @@ if(window.SalonTableView){
    data.specialCells={bridge:6,inn:19,well:31,maze:42,prison:52,skull:58,goal:63};data.playerColors=COLORS.slice();
   }
   if(S?.id==='yam'){
-   data.yamDice=[...S.dice];data.yamHeld=[...S.held];data.yamRolls=S.rolls;data.yamTurn=S.yamTurn;
+   const yp=S.players[S.turn]||player(S);
+   data.yamDice=[...S.dice];data.yamHeld=[...S.held];data.yamRolls=S.rolls;data.yamTurn=S.yamTurn;data.yamScore=yp?.score||0;data.yamPlayerName=yp?.name||'Joueur';
+   data.yamCategories=YAM_CATEGORIES.map(c=>({id:c.id,name:c.name,rule:c.rule,max:c.max,filled:yp?.yamSheet?.[c.id]!=null,value:yp?.yamSheet?.[c.id]??null,preview:S.rolls?yamScore(S.dice,c.id):null}));
   }
   if(S?.id==='boite'){
    data.boxDice=[...S.boxDice];data.boxNumbers=[...S.boxNumbers];data.boxStage=S.boxStage;data.boxSelected=[...selection].map(Number);data.boxCanOne=S.boxNumbers.every(n=>n<7);
@@ -3522,7 +3525,13 @@ if(window.SalonTableView){
     playCard(id){if(!S||S.id!=='huit'||!canPlay())return false;const c=player(S).hand.find(c=>c.id===id);if(!c)return false;eightPlayCardUI(c);return true},
     draw(){if(!S||S.id!=='huit'||!canPlay())return false;dispatch({type:'draw'});return true},
     goose(type,steps){if(!S||S.id!=='oie'||!canPlay())return false;const action=type==='choose'?{type:'gooseChoose',steps}:type==='reroll'?{type:'gooseReroll'}:{type:'roll'};dispatch(action);return true},
-    yam(type,index){if(!S||S.id!=='yam'||!canPlay())return false;dispatch(type==='hold'?{type:'hold',index}:{type:'roll'});return true},
+    yam(type,value){
+     if(!S||S.id!=='yam'||!canPlay())return false;
+     if(type==='hold'&&Number.isInteger(value)){dispatch({type:'hold',index:value});return true}
+     if(type==='score'&&typeof value==='string'&&YAM_CATEGORIES.some(c=>c.id===value)){dispatch({type:'score',category:value});return true}
+     if(type==='roll'){dispatch({type:'roll'});return true}
+     return false;
+    },
     rummi(type,value){
      if(!S||S.id!=='rummikub'||!canPlay())return false;
      if(type==='select'){
@@ -3707,9 +3716,10 @@ if(window.SalonTableView){
   });
  });
  document.addEventListener('fullscreenchange',()=>{
-  if(window.SalonTableView?.getMode?.()!=='3d')return;
-  if(document.fullscreenElement)return;
-  if(table3dPresentation==='full'&&table3dNativeFullscreenSafe())table3dSetPresentation('embedded');
+  if(document.fullscreenElement){table3dNativeFullscreenObserved=true;return}
+  const hadNativeFullscreen=table3dNativeFullscreenObserved;table3dNativeFullscreenObserved=false;
+  if(!hadNativeFullscreen||window.SalonTableView?.getMode?.()!=='3d')return;
+  if(table3dPresentation==='full')table3dSetPresentation('embedded');
  });
  document.addEventListener('click',async e=>{
   const b=e.target.closest?.('[data-table-view-mode]');if(!b)return;
