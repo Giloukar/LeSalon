@@ -83,7 +83,7 @@ export function createTable3DRenderer({onFatal}={}){
   const cardFinish={roughness:.43,metalness:0,bumpMap:paperGrain,bumpScale:.00030};
   const backTexture=cardBackTexture();disposableTextures.push(backTexture);
   const backMaterial=new THREE.MeshStandardMaterial({map:backTexture,...cardFinish});
-  let objects=new THREE.Group(),cardFx=new THREE.Group(),socialCards=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,cameraControl={yaw:0,pitch:0,zoom:1},cameraDrag=null,cameraGame='',lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,lastBattleSnapshot=null,pendingMaidPickOrigin=null,pendingBattleOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map(),remoteLooseCards=new Map(),remoteLooseGame='';
+  let objects=new THREE.Group(),cardFx=new THREE.Group(),socialCards=new THREE.Group(),dropMarker=null,tableMesh=null,cameraPose=null,cameraControl={yaw:0,pitch:0,zoom:1},cameraDrag=null,cameraGame='',lastEightSnapshot=null,lastCactusSnapshot=null,lastNinetySnapshot=null,lastRummiSnapshot=null,lastMaidSnapshot=null,lastBlackjackSnapshot=null,lastBattleSnapshot=null,lastCitySnapshot=null,pendingMaidPickOrigin=null,pendingBattleOrigin=null,lastCardFamilySnapshots=new Map(),remoteCardGestures=new Map(),remoteLooseCards=new Map(),remoteLooseGame='';
   const localPoses=new Map();let activePoseScope='',poseSeen=new Set(),localPoseOrder=0,localThrowCounter=0,labelGeneration=0;
 
   function cameraViewChanged(){
@@ -1934,13 +1934,23 @@ export function createTable3DRenderer({onFatal}={}){
     if(side===2)return new THREE.Vector3(4.35-step*1.45,TABLE_Y+.13,-3.05);
     return new THREE.Vector3(-4.35,TABLE_Y+.13,-3.05+step*1.02);
   }
+  function cityPawnOffset(index){return new THREE.Vector3((index%2)? .17:-.17,.35,index>1?.17:-.17)}
+  function cityMovementRoute(from,to,dice,offset){
+    if(!Number.isInteger(from)||!Number.isInteger(to)||from<0||from>=24||to<0||to>=24)return[];
+    const total=Array.isArray(dice)&&dice.length===2?Number(dice[0])+Number(dice[1]):0,rolled=total>=2&&total<=12?(from+total)%24:to,cells=[from];
+    if(rolled!==from){let cursor=from;for(let guard=0;guard<24&&cursor!==rolled;guard++){cursor=(cursor+1)%24;cells.push(cursor)}}
+    if(to!==rolled)cells.push(to);
+    return cells.map(n=>cityWorld(n).add(offset.clone()));
+  }
   function cityCellMaterial(cell,owner,mortgaged,colors){
     const color=cell?.type==='property'?(colors?.[cell.group]||'#8c9a86'):cell?.type==='chance'?'#9d7fb1':cell?.type==='tax'?'#b16f67':cell?.type==='gojail'?'#8e5b5b':cell?.type==='jail'?'#8b806c':'#718277';
     return new THREE.MeshStandardMaterial({color:new THREE.Color(color),roughness:.86,metalness:.02,emissive:mortgaged?0x351d1d:owner>=0?0x172018:0x000000,emissiveIntensity:mortgaged?.42:owner>=0?.18:0});
   }
   function syncMetropole(payload){
     clearObjects();dropMarker.visible=false;
-    const s=payload.state,data=payload.viewData?.city||{},board=data.board||[],owners=data.owners||[],houses=data.houses||[],mortgaged=data.mortgaged||[],colors=data.colors||[],playerColors=data.playerColors||[],manage=data.manage||[];
+    const s=payload.state,data=payload.viewData?.city||{},board=data.board||[],owners=data.owners||[],houses=data.houses||[],mortgaged=data.mortgaged||[],colors=data.colors||[],playerColors=data.playerColors||[],manage=data.manage||[],dice=Array.isArray(data.dice)?data.dice:[1,1];
+    const previousCity=lastCitySnapshot,citySnapshot={positions:(data.players||[]).map(pl=>Number(pl.pos)||0),moves:Number(s?.moves||0),turn:Number(s?.turn||0),dice:[...dice]};
+    const changedPlayers=previousCity&&previousCity.positions?.length===citySnapshot.positions.length?citySnapshot.positions.map((pos,i)=>pos!==previousCity.positions[i]?i:-1).filter(i=>i>=0):[],movedPlayer=changedPlayers.length===1?changedPlayers[0]:-1;
     if(!payload.canInteract||!Number.isInteger(cityFocusIndex)||!manage[cityFocusIndex])cityFocusIndex=null;
     setCameraPose(0,9.35,9.9,0,.1,0);
     const boardGeo=new THREE.BoxGeometry(10.4,.18,7.45),boardBase=new THREE.Mesh(boardGeo,new THREE.MeshStandardMaterial({color:0x243a30,roughness:.94}));boardBase.position.y=TABLE_Y-.02;boardBase.receiveShadow=true;boardBase.userData.temporaryGeometry=boardGeo;boardBase.userData.temporaryMaterial=boardBase.material;objects.add(boardBase);
@@ -1963,10 +1973,18 @@ export function createTable3DRenderer({onFatal}={}){
       }
     });
     (data.players||[]).forEach((pl,i)=>{
-      if(pl.out)return;const p=cityWorld(Number(pl.pos)||0),pawn=pawnMesh(playerColors[i]||['#dbea9e','#aacdf7','#e4ad91','#c9afe7'][i%4]);pawn.position.set(p.x+((i%2)? .17:-.17),TABLE_Y+.48,p.z+(i>1?.17:-.17));objects.add(pawn);
-      const tag=makeLabel((pl.name||'Joueur')+' · '+pl.cash+' ¤'+(pl.jailed?' · détenu':''),i===s.turn?'#dbea9e':'#d8ded9');tag.scale.set(1.65,.31,1);tag.position.set(pawn.position.x,TABLE_Y+.92,pawn.position.z);objects.add(tag);
+      if(pl.out)return;const offset=cityPawnOffset(i),target=cityWorld(Number(pl.pos)||0).add(offset.clone()),pawn=pawnMesh(playerColors[i]||['#dbea9e','#aacdf7','#e4ad91','#c9afe7'][i%4]),points=i===movedPlayer&&motionAllowed()?cityMovementRoute(previousCity.positions[i],Number(pl.pos)||0,dice,offset):[];
+      const duration=Math.min(1700,Math.max(520,Math.max(2,points.length)*120));
+      if(points.length>1){pawn.position.copy(points[0]);pawnAnimations.push({mesh:pawn,points,start:performance.now(),duration,lift:.12})}
+      else pawn.position.copy(target);
+      objects.add(pawn);
+      const tag=makeLabel((pl.name||'Joueur')+' · '+pl.cash+' ¤'+(pl.jailed?' · détenu':''),i===s.turn?'#dbea9e':'#d8ded9');tag.scale.set(1.65,.31,1);
+      if(points.length>1){const tagPoints=points.map(p=>new THREE.Vector3(p.x,TABLE_Y+.92,p.z));tag.position.copy(tagPoints[0]);pawnAnimations.push({mesh:tag,points:tagPoints,start:performance.now(),duration,lift:.04})}
+      else tag.position.set(target.x,TABLE_Y+.92,target.z);
+      objects.add(tag);
     });
-    const dice=Array.isArray(data.dice)?data.dice:[1,1],key='city|'+(s?.moves??0)+'|'+dice.join('-'),animate=s?.moves>0&&key!==lastDiceKey;if(animate)lastDiceKey=key;
+    lastCitySnapshot=citySnapshot;
+    const key='city|'+(s?.moves??0)+'|'+dice.join('-'),animate=s?.moves>0&&key!==lastDiceKey;if(animate)lastDiceKey=key;
     dice.forEach((value,i)=>{const die=dieMesh(value);die.position.set(-.52+i*1.04,TABLE_Y+.78,.05);if(payload.canInteract&&data.canRoll){die.userData={...die.userData,kind:'city-roll',interactive:true,home:{scale:die.scale.clone()}};interactive.push(die)}objects.add(die);if(animate&&motionAllowed()){const h=visualHash(key+'|'+i);die.rotation.set(5+h*4,7+h*5,4+h*6);diceAnimations.push({mesh:die,start:performance.now(),duration:620+i*70,rx:die.rotation.x,ry:die.rotation.y,rz:die.rotation.z})}});
     if(payload.canInteract){
       const phaseActions=[];
@@ -2002,10 +2020,11 @@ export function createTable3DRenderer({onFatal}={}){
     if(title)title.textContent='VUE 3D · MÉTROPOLE';
     if(status)status.textContent='Tour '+(data.lap||1)+' / 20 · '+(data.players?.[s.turn]?.name||'Joueur')+' · '+(data.phase==='debt'?'dette '+(data.debt?.amount||0)+' ¤':data.phase==='buy'?'achat proposé':data.phase==='roll'?'prêt à lancer':'gestion');
     if(help)help.textContent=payload.canInteract?'Toutes les décisions sont jouables ici · cliquez une de vos rues pour gérer le bien':'Plateau synchronisé · les décisions restent verrouillées hors de votre tour';
-    if(diceAnimations.length)startMotion();
+    if(diceAnimations.length||pawnAnimations.length)startMotion();
   }
 
   function syncCurrent(payload){
+    if(payload?.gameId!=='metropole')lastCitySnapshot=null;
     if(payload?.gameId==='golf')syncGolf(payload);
     else if(payload?.gameId==='code')syncCode(payload);
     else if(payload?.gameId==='intrus')syncIntrus(payload);
@@ -2546,7 +2565,7 @@ export function createTable3DRenderer({onFatal}={}){
 
   function activate(){active=true;init()}
   function deactivate(){
-    cancelCameraDrag();cancelActiveDrag();active=false;hovered=null;wordSelection=[];wordDraftKey='';codeDraft=[0,1,2];codeDraftKey='';golfAim={angle:0,power:50};golfAimKey='';lastGolfKey='';cityFocusIndex=null;diceAnimations.length=0;pawnAnimations.length=0;manipAnimations.length=0;
+    cancelCameraDrag();cancelActiveDrag();active=false;hovered=null;wordSelection=[];wordDraftKey='';codeDraft=[0,1,2];codeDraftKey='';golfAim={angle:0,power:50};golfAimKey='';lastGolfKey='';cityFocusIndex=null;lastCitySnapshot=null;diceAnimations.length=0;pawnAnimations.length=0;manipAnimations.length=0;
     if(animationRaf){cancelAnimationFrame(animationRaf);animationRaf=0}
     tossAnimations.length=0;clearRemoteLooseCards();remoteLooseGame='';
     resizeObserver?.disconnect();resizeObserver=null;host?.remove();host=null;

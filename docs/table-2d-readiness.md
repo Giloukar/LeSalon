@@ -558,3 +558,10 @@ La carte qui a ouvert le choix reste légèrement mise en évidence pendant cett
 Les annonces encore actives dans le moteur moderne du 8 Américain sont maintenant accessibles directement sur la table 3D. Quand la main autorise l’annonce, un bouton « Carte ! » apparaît dans la scène. Lorsqu’un adversaire descend à une carte sans avoir annoncé, « Contre-carte ! » apparaît également avant le coup suivant.
 
 Le renderer ne décide pas de la validité ni de la pénalité : il affiche uniquement les disponibilités exposées par la couche de vue et renvoie `announce` ou `counter` vers le même `dispatch()` que l’interface 2D. Le moteur reste donc l’unique source de vérité pour l’annonce, l’oubli et la pioche de pénalité.
+
+
+## Métropole — déplacement physique des pions en 3D
+
+Les pions de Métropole ne sautent plus instantanément entre deux cases après un lancer confirmé. Le renderer conserve uniquement le snapshot visuel précédent des positions, détecte le seul joueur dont la case a changé, puis reconstruit un trajet visuel à partir des dés déjà validés par le moteur.
+
+Un déplacement normal suit les cases successives du plateau, y compris le passage par Départ. Lorsqu’une case Événement envoie ensuite le joueur au Départ ou en détention, le trajet montre d’abord l’arrivée issue des dés puis un second saut vers la destination imposée. Cette reconstruction n’accorde aucun crédit, ne déclenche aucune case et n’appelle aucune action : `cityMove()` et `cityLand()` restent les seules sources de vérité. Si les mouvements sont désactivés, le pion apparaît directement à sa position confirmée.
