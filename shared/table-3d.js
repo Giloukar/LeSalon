@@ -1063,7 +1063,7 @@ export function createTable3DRenderer({onFatal}={}){
     for(let n=1;n<=9;n++){
       const isOpen=open.has(n),isSelected=selected.has(n),x=(n-5)*1.05;
       const tile=new THREE.Mesh(tileGeometry,boxTileMaterial(!isOpen,isSelected));tile.scale.set(1,.22,1.18);tile.position.set(x,TABLE_Y+(isOpen?.42:.31),-1.15);tile.rotation.x=isOpen?-.34:0;tile.castShadow=true;tile.receiveShadow=true;
-      if(isOpen&&stage==='choose'&&payload.canInteract){tile.userData={kind:'box-toggle',number:n,interactive:true};interactive.push(tile)}
+      if(isOpen&&s?.phase!=='roundEnd'&&stage==='choose'&&payload.canInteract){tile.userData={kind:'box-toggle',number:n,interactive:true};interactive.push(tile)}
       objects.add(tile);const label=cellLabel(n);label.scale.set(.58,.4,1);label.position.set(x,TABLE_Y+(isOpen?.62:.39),-1.12);objects.add(label);
     }
     const key='box|'+(s?.moves??0)+'|'+dice.join('-'),animate=dice.length>0&&key!==lastDiceKey;if(animate)lastDiceKey=key;
@@ -1071,7 +1071,9 @@ export function createTable3DRenderer({onFatal}={}){
       const die=dieMesh(value);die.position.set((i-(dice.length-1)/2)*1.1,TABLE_Y+.82,.45);objects.add(die);
       if(animate&&motionAllowed()){const h=visualHash(key+'|'+i);die.rotation.set(5+h*4,7+h*5,4+h*6);diceAnimations.push({mesh:die,start:performance.now(),duration:600+i*70,rx:die.rotation.x,ry:die.rotation.y,rz:die.rotation.z})}
     });
-    if(stage==='roll'&&payload.canInteract){
+    if(s?.phase==='roundEnd'&&payload.viewData?.boxCanNextRound&&payload.canInteract){
+      const next=actionSprite('PASSAGE SUIVANT','round-next',{},'#dbea9e');next.position.set(0,1.05,2.3);objects.add(next);
+    }else if(stage==='roll'&&payload.canInteract){
       const two=actionSprite('LANCER 2 DÉS','box-roll',{count:2});two.position.set(-1.45,1.05,2.3);objects.add(two);
       if(payload.viewData?.boxCanOne){const one=actionSprite('LANCER 1 DÉ','box-roll',{count:1},'#b7d5ee');one.position.set(1.45,1.05,2.3);objects.add(one)}
     }else if(stage==='choose'&&payload.canInteract){
@@ -1079,8 +1081,8 @@ export function createTable3DRenderer({onFatal}={}){
     }
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     if(title)title.textContent='VUE 3D · FERME LA BOÎTE';
-    if(status)status.textContent=stage==='choose'?'Total '+dice.reduce((a,b)=>a+b,0)+' · '+open.size+' volets ouverts':'Passage '+(s?.boxRound||1)+' / 3';
-    if(help)help.textContent=stage==='choose'?'Touchez les volets dont la somme égale les dés puis confirmez':'Lancez deux dés · un seul devient disponible quand 7, 8 et 9 sont fermés';
+    if(status)status.textContent=s?.phase==='roundEnd'?'Passage terminé · score enregistré':stage==='choose'?'Total '+dice.reduce((a,b)=>a+b,0)+' · '+open.size+' volets ouverts':'Passage '+(s?.boxRound||1)+' / 3';
+    if(help)help.textContent=s?.phase==='roundEnd'?(payload.viewData?.boxCanNextRound?'Passez au passage suivant directement depuis la table':'L’hôte lancera le passage suivant'):stage==='choose'?'Touchez les volets dont la somme égale les dés puis confirmez':'Lancez deux dés · un seul devient disponible quand 7, 8 et 9 sont fermés';
     if(diceAnimations.length)startMotion();
   }
 
@@ -1284,10 +1286,12 @@ export function createTable3DRenderer({onFatal}={}){
         const hit=actionSprite('TIRER','blackjack-action',{command:'hit'},'#dbea9e');hit.position.set(-2.1,1.02,1.45);objects.add(hit);
         const stand=actionSprite('RESTER','blackjack-action',{command:'stand'},'#b7d5ee');stand.position.set(0,1.02,1.45);objects.add(stand);
         if(own.length===2&&Number(bj.chips||0)>=Number(bj.bet||0)){const dbl=actionSprite('DOUBLER','blackjack-action',{command:'double'},'#e6d7b4');dbl.position.set(2.1,1.02,1.45);objects.add(dbl)}
+      }else if(bj.phase==='roundEnd'&&bj.canNextRound&&payload.canInteract){
+        const next=actionSprite('MAIN SUIVANTE','round-next',{},'#dbea9e');next.position.set(0,1.02,1.45);objects.add(next);
       }
       if(title)title.textContent='VUE 3D · VINGT-ET-UN';
-      if(status)status.textContent=bj.phase==='bet'?(bj.chips||0)+' jetons disponibles':own.length?(bj.playerValue||0)+' points · mise '+(bj.bet||0):'La banque distribue';
-      if(help)help.textContent=bj.phase==='bet'?'Choisissez votre mise · les cartes seront distribuées depuis le sabot':bj.phase==='play'?'Tirer, rester ou doubler · chaque nouvelle carte vient physiquement du sabot':'La banque tire depuis le sabot · sa carte cachée reste masquée jusqu’à la révélation';
+      if(status)status.textContent=bj.phase==='bet'?(bj.chips||0)+' jetons disponibles':bj.phase==='roundEnd'?'Main terminée · '+(bj.chips||0)+' jetons':own.length?(bj.playerValue||0)+' points · mise '+(bj.bet||0):'La banque distribue';
+      if(help)help.textContent=bj.phase==='bet'?'Choisissez votre mise · les cartes seront distribuées depuis le sabot':bj.phase==='play'?'Tirer, rester ou doubler · chaque nouvelle carte vient physiquement du sabot':bj.phase==='roundEnd'?(bj.canNextRound?'Passez à la main suivante directement depuis la table':'L’hôte lancera la main suivante'):'La banque tire depuis le sabot · sa carte cachée reste masquée jusqu’à la révélation';
       return;
     }
 
@@ -1429,6 +1433,8 @@ export function createTable3DRenderer({onFatal}={}){
       }else if(game==='plis'){
         if(action.canCollect){const collect=actionSprite('RAMASSER LE PLI','card-action',{command:'collect'},'#e6d7b4');collect.position.set(0,1.04,1.10);objects.add(collect)}
         else if(action.canPlay){const play=actionSprite('JOUER LA CARTE','card-action',{command:'play'},'#dbea9e');play.position.set(0,1.04,1.10);objects.add(play)}
+      }else if(game==='encheres'&&action.canNextRound){
+        const next=actionSprite('ENCHÈRE SUIVANTE','round-next',{},'#dbea9e');next.position.set(0,1.04,1.28);objects.add(next);
       }else if(game==='encheres'&&action.canBid){
         const bid=actionSprite('CONFIRMER LA CARTE','card-action',{command:'bid'},'#dbea9e');bid.position.set(0,1.04,1.28);objects.add(bid);
       }
@@ -1441,7 +1447,7 @@ export function createTable3DRenderer({onFatal}={}){
       else if(game==='menteur')status.textContent=center.claim?'Annonce : '+center.claim.count+' × '+(RANK_NAME[center.claim.rank]||center.claim.rank):'Valeur demandée : '+(RANK_NAME[center.required]||center.required);
       else if(game==='suites')status.textContent=center.opening?'Le 7 de cœur doit ouvrir':'Prolongez les quatre familles';
       else if(game==='plis')status.textContent='Atout '+(SUIT_SYMBOL[center.trump]||center.trump)+' · pli '+Math.min(6,(center.completedTricks||0)+1)+'/6';
-      else if(game==='encheres')status.textContent='Tour '+(center.bidRound||1)+' · '+(center.pot||0)+' points à remporter';
+      else if(game==='encheres')status.textContent=action.canNextRound?'Enchère terminée · '+(center.pot||0)+' points distribués':'Tour '+(center.bidRound||1)+' · '+(center.pot||0)+' points à remporter';
     }
     if(help)help.textContent=game==='plis'&&action.canCollect?'Saisissez une carte du pli : tout le paquet suit · ramenez-le vers vous pour le collecter':payload.canInteract?'Touchez pour sélectionner · glissez librement une carte · validez directement sur la table':'La table 3D suit la partie et les mouvements confirmés';
   }
@@ -2397,7 +2403,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(!current?.canInteract&&!obj.userData.looseManip)return;
     if(obj.userData.kind==='deck'){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'deck',startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
     if(obj.userData.looseManip&&obj.userData.kind!=='card'){beginLooseCardDrag(obj,e,obj.userData.kind);return}
-    if(['maid-pick','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','cactus-action','eight-suit','eight-action','ninety-action','blackjack-action','card-action','rummi-tile','rummi-dest','rummi-action'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,command:obj.userData.command,suit:obj.userData.suit,amount:obj.userData.amount,ace:obj.userData.ace,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
+    if(['maid-pick','battle-action','cactus-quick','cactus-swap','cactus-target','cactus-draw','cactus-take','cactus-action','eight-suit','eight-action','round-next','ninety-action','blackjack-action','card-action','rummi-tile','rummi-dest','rummi-action'].includes(obj.userData.kind)){drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,index:obj.userData.index,owner:obj.userData.owner,cardId:obj.userData.cardId,tileId:obj.userData.tileId,dest:obj.userData.dest,command:obj.userData.command,suit:obj.userData.suit,amount:obj.userData.amount,ace:obj.userData.ace,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return}
     if(['goose-roll','goose-choice','yam-roll','yam-hold','yam-score','box-roll','box-toggle','box-close','city-roll','city-action','city-property','echo-pad','echo-memorized','echo-continue','balloon-pump','balloon-bank','balloon-continue','word-letter','word-answer','word-clear','word-submit','word-giveup','word-continue','intrus-spot','intrus-continue','code-cycle','code-submit','code-continue','golf-adjust','golf-shoot','golf-continue'].includes(obj.userData.kind)){
       if(obj.userData.kind==='box-close'&&obj.userData.enabled===false)return;
       drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:obj.userData.kind,steps:obj.userData.steps,index:obj.userData.index,count:obj.userData.count,number:obj.userData.number,control:obj.userData.control,command:obj.userData.command,category:obj.userData.category,delta:obj.userData.delta,startX:e.clientX,startY:e.clientY};capturePointer(e.pointerId);return;
@@ -2498,6 +2504,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='cactus-action'){if(tap)current?.interactions?.cactus?.(d.command);return}
     if(d.kind==='eight-suit'){if(tap){if(d.command==='cancel')current?.interactions?.cancelSuit?.();else current?.interactions?.chooseSuit?.(d.suit)}return}
     if(d.kind==='eight-action'){if(tap)current?.interactions?.eightAction?.(d.command);return}
+    if(d.kind==='round-next'){if(tap)current?.interactions?.nextRound?.();return}
     if(d.kind==='ninety-action'){if(tap)current?.interactions?.specialCard?.(d.command,{id:d.cardId,ace:d.ace});return}
     if(d.kind==='blackjack-action'){if(tap)current?.interactions?.specialCard?.(d.command,d.amount);return}
     if(d.kind==='card-action'){if(tap)current?.interactions?.cardAction?.(d.command);return}
