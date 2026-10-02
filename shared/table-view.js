@@ -41,9 +41,9 @@ function safeDeactivate(mode){
 function fallback(reason,error){
   const previous=active;
   requestId++;
-  if(previous!==BASE_MODE)safeDeactivate(previous);
   active=BASE_MODE;
   setDataset(BASE_MODE);
+  if(previous!==BASE_MODE)safeDeactivate(previous);
   emit({mode:BASE_MODE,previous,preferred,reason:reason||'fallback',error:error?String(error?.message||error):''});
   if(lastPayload&&previous!==BASE_MODE){
     try{renderer(BASE_MODE)?.render?.(lastPayload)}catch(_){}
@@ -82,22 +82,38 @@ async function setMode(mode,{persistPreference=true,reason='user'}={}){
   if(id!==requestId)return{ok:false,mode:active,reason:'superseded'};
 
   const previous=active;
+  if(mode===BASE_MODE){
+    active=BASE_MODE;
+    setDataset(BASE_MODE);
+    if(previous!==BASE_MODE)safeDeactivate(previous);
+    try{r?.activate?.({mode,previous,lastPayload})}
+    catch(error){
+      console.warn('2D renderer activation failed',error);
+      return{ok:false,mode:active,reason:'activate-failed',error};
+    }
+    emit({mode,previous,preferred,reason});
+    return{ok:true,mode};
+  }
+
   if(previous!==BASE_MODE)safeDeactivate(previous);
-  try{r?.activate?.({mode,previous,lastPayload})}
-  catch(error){
-    fallback('activate-failed',error);
-    return{ok:false,mode:active,reason:'activate-failed',error};
+  try{
+    r?.activate?.({mode,previous,lastPayload});
+    if(lastPayload)r?.render?.(lastPayload);
+  }catch(error){
+    safeDeactivate(mode);
+    active=BASE_MODE;
+    setDataset(BASE_MODE);
+    try{renderer(BASE_MODE)?.render?.(lastPayload)}catch(_){}
+    emit({mode:BASE_MODE,previous,preferred,reason:'render-failed',error:String(error?.message||error)});
+    return{ok:false,mode:active,reason:'render-failed',error};
+  }
+  if(id!==requestId){
+    safeDeactivate(mode);
+    return{ok:false,mode:active,reason:'superseded'};
   }
 
   active=mode;
   setDataset(mode);
-  if(lastPayload&&mode!==BASE_MODE){
-    try{r?.render?.(lastPayload)}
-    catch(error){
-      fallback('render-failed',error);
-      return{ok:false,mode:active,reason:'render-failed',error};
-    }
-  }
   emit({mode,previous,preferred,reason});
   return{ok:true,mode};
 }
