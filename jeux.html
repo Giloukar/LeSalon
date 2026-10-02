@@ -3294,7 +3294,8 @@ if(window.SalonTableView){
  renderGame=function(...args){
   const mine=S&&S.id==='huit'&&!gate&&!net.spectator?player(S).hand:[],data={playableIds:[],sortByColor:!!sortByColor};
   const sortableIds=new Set(['huit','rummikub','president','menteur','suites','plis','encheres','pouilleux','quatrevingtdixneuf','bataille']);
-  if(S&&!gate&&!net.spectator&&sortableIds.has(S.id)){
+  data.sortEnabled=!!(S&&!gate&&!net.spectator&&sortableIds.has(S.id));
+  if(data.sortEnabled){
    const visualHand=[...player(S).hand];
    if(S.id==='rummikub')visualHand.sort((a,b)=>(!!a.joker)-(!!b.joker)||(sortByColor?(a.color??5)-(b.color??5)||(a.num||0)-(b.num||0):(a.num||99)-(b.num||99)||(a.color||0)-(b.color||0)));
    else visualHand.sort((a,b)=>sortByColor?SUITS.indexOf(a.suit)-SUITS.indexOf(b.suit)||a.rank-b.rank:presRank(a.rank)-presRank(b.rank)||SUITS.indexOf(a.suit)-SUITS.indexOf(b.suit));
