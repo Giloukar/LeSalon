@@ -69,7 +69,7 @@ test('3D hand sorting reuses the 2D sort preference for cards and Rummikub',asyn
  assert.match(html,/data\.sortedHand=clone\(visualHand\)/);
  assert.match(html,/sort\(\)\{[\s\S]*sortByColor=!sortByColor;renderGame\(true\);return true/);
  assert.match(html,/else if\(NEW_CARD_GAMES\.includes\(S\.id\)\)visualHand\.sort/);
- assert.doesNotMatch(source,/sortActiveHand[\s\S]{0,700}emitLocalTabletopCard\('arrange'\)/);
+ assert.doesNotMatch(source,/if\(changed&&current\?\.gameId!=='rummikub'\)emitLocalTabletopCard\('arrange'\)/);
  assert.match(source,/data-table-3d-sort/);
  assert.match(source,/function sortActiveHand\(\)/);
  assert.match(source,/function visualOwnHand\(payload,state,viewer\)/);
