@@ -924,27 +924,40 @@ export function createTable3DRenderer({onFatal}={}){
   function syncGoose(payload){
     clearObjects();dropMarker.visible=false;
     const s=payload.state,coords=payload.viewData?.boardCoords||[],geese=new Set(payload.viewData?.gooseCells||[]),choices=new Set(payload.viewData?.choiceTargets||[]),choiceByTarget=new Map((payload.viewData?.gooseChoices||[]).map(x=>[x.target,x.steps])),grains=new Set(s?.gooseGrains||[]);
-    const specials=payload.viewData?.specialCells||{};
-    setCameraPose(0,8.7,8.25,0,.15,0);
+    const specials=payload.viewData?.specialCells||{},specialDefs={bridge:['⌒','PONT','#d7cf9d'],inn:['☕','AUBERGE','#e6c18f'],well:['◉','PUITS','#b7d5ee'],maze:['⤴','LABYRINTHE','#d4bae8'],prison:['▥','PRISON','#c5cbd2'],skull:['↶','RETOUR','#efa79d'],goal:['♛','ARRIVÉE','#dbea9e']},specialByCell=new Map();
+    for(const [key,n] of Object.entries(specials))if(Number.isInteger(n)&&specialDefs[key])specialByCell.set(n,{key,symbol:specialDefs[key][0],label:specialDefs[key][1],accent:specialDefs[key][2]});
+    setCameraPose(0,8.9,8.45,0,.12,0);
 
     for(let n=1;n<=Math.min(63,coords.length);n++){
-      const p=worldForCell(n,coords);let kind='normal';
-      if(n===specials.goal)kind='goal';else if(n===specials.skull)kind='danger';else if(geese.has(n))kind='goose';else if(Object.values(specials).includes(n))kind='trap';
-      const tile=new THREE.Mesh(tileGeometry,tileMaterial(kind,choices.has(n)));tile.position.set(p.x,TABLE_Y+.08,p.z);tile.castShadow=true;tile.receiveShadow=true;
-      if(choices.has(n)&&payload.canInteract){tile.userData={kind:'goose-choice',steps:choiceByTarget.get(n),interactive:true};interactive.push(tile)}
+      const p=worldForCell(n,coords),special=specialByCell.get(n);let kind='normal';
+      if(n===specials.goal)kind='goal';else if(n===specials.skull)kind='danger';else if(geese.has(n))kind='goose';else if(special)kind='trap';
+      const isChoice=choices.has(n),tile=new THREE.Mesh(tileGeometry,tileMaterial(kind,isChoice));tile.position.set(p.x,TABLE_Y+(isChoice?.14:.08),p.z);tile.castShadow=true;tile.receiveShadow=true;
+      if(isChoice){tile.scale.set(1.10,1.16,1.10);if(payload.canInteract){tile.userData={kind:'goose-choice',steps:choiceByTarget.get(n),interactive:true,home:{scale:tile.scale.clone()}};interactive.push(tile)}}
+      else if(n===specials.goal)tile.scale.set(1.06,1.08,1.06);
       objects.add(tile);
-      const label=cellLabel(n);label.position.set(p.x,TABLE_Y+.18,p.z);label.rotation.x=-Math.PI/2;objects.add(label);
-      if(grains.has(n)){const grain=new THREE.Mesh(grainGeometry,new THREE.MeshStandardMaterial({color:0xf2cf67,emissive:0x8b6b18,emissiveIntensity:.45}));grain.position.set(p.x+.27,TABLE_Y+.34,p.z-.16);grain.userData.temporaryMaterial=grain.material;objects.add(grain)}
+      const label=cellLabel(n);label.position.set(p.x,TABLE_Y+(isChoice?.26:.18),p.z);label.rotation.x=-Math.PI/2;objects.add(label);
+      if(special){
+        const marker=makeLabel(special.symbol+' '+special.label,special.accent);marker.position.set(p.x,TABLE_Y+.62,p.z-.27);marker.scale.set(.92,.20,1);objects.add(marker);
+      }else if(geese.has(n)){
+        const goose=makeLabel('♧ OIE','#dbea9e');goose.position.set(p.x,TABLE_Y+.53,p.z-.25);goose.scale.set(.64,.17,1);objects.add(goose);
+      }
+      if(grains.has(n)){
+        const material=new THREE.MeshStandardMaterial({color:0xf2cf67,emissive:0x8b6b18,emissiveIntensity:.48,roughness:.44});
+        for(let g=0;g<3;g++){const grain=new THREE.Mesh(grainGeometry,material);grain.position.set(p.x+.20+g*.085,TABLE_Y+.34+g*.025,p.z-.16+(g%2)*.07);grain.scale.set(.78,1.18,.70);if(g===0)grain.userData.temporaryMaterial=material;objects.add(grain)}
+      }
     }
 
-    const colors=payload.viewData?.playerColors||[];
+    const colors=payload.viewData?.playerColors||[],turnPlayer=s?.players?.[s?.turn]||null;
     const moveKey=(s?.moves||0)+'|'+(s?.movedPlayer??-1)+'|'+(s?.path||[]).join('-'),animateMove=moveKey!==lastMoveKey&&Array.isArray(s?.path)&&s.path.length>1;
     if(animateMove)lastMoveKey=moveKey;
     (s?.players||[]).forEach((pl,i)=>{
       const pawn=pawnMesh(colors[i]||['#dbea9e','#aacdf7','#e4ad91','#c9afe7'][i%4]);
       const target=worldForCell(pl.pos,coords),offset=new THREE.Vector3(((i%3)-1)*.13,.12,Math.floor(i/3)*.12);target.add(offset);
+      if(i===s.turn){
+        const pad=new THREE.Mesh(heldPadGeometry,tileMaterial('goose',true));pad.position.set(target.x,TABLE_Y+.34,target.z);pad.scale.set(.48,.22,.48);objects.add(pad);pawn.scale.multiplyScalar(1.10);
+      }
       if(animateMove&&i===s.movedPlayer){
-        const points=s.path.map(n=>worldForCell(n,coords).add(offset.clone()));pawn.position.copy(points[0]);pawnAnimations.push({mesh:pawn,points,start:performance.now(),duration:Math.min(1700,Math.max(480,points.length*105))});
+        const points=s.path.map(n=>worldForCell(n,coords).add(offset.clone()));pawn.position.copy(points[0]);pawnAnimations.push({mesh:pawn,points,start:performance.now(),duration:Math.min(1900,Math.max(520,points.length*110)),lift:.16});
       }else pawn.position.copy(target);
       objects.add(pawn);
     });
@@ -955,13 +968,24 @@ export function createTable3DRenderer({onFatal}={}){
       const die=dieMesh(value);die.position.set(-.52+i*1.04,TABLE_Y+.72,.05);
       if(payload.canInteract&&!s.goosePending){die.userData={...die.userData,kind:'goose-roll',interactive:true,home:{scale:die.scale.clone()}};interactive.push(die)}
       objects.add(die);
-      if(animateDice&&motionAllowed()){const h=visualHash(diceKey+'|'+i);die.rotation.set(5+h*4,7+h*5,4+h*6);diceAnimations.push({mesh:die,start:performance.now(),duration:620+i*80,rx:die.rotation.x,ry:die.rotation.y,rz:die.rotation.z})}
+      if(animateDice&&motionAllowed()){const h=visualHash(diceKey+'|'+i);die.rotation.set(5+h*4,7+h*5,4+h*6);diceAnimations.push({mesh:die,start:performance.now(),duration:680+i*85,rx:die.rotation.x,ry:die.rotation.y,rz:die.rotation.z})}
     });
 
+    if(payload.canInteract){
+      if(s?.goosePending){
+        const d=s.goosePending.dice||values,options=[{label:'DÉ 1 · '+d[0],steps:d[0]},{label:'DÉ 2 · '+d[1],steps:d[1]},{label:'SOMME · '+(d[0]+d[1]),steps:d[0]+d[1]}],unique=options.filter((entry,index,list)=>list.findIndex(x=>x.steps===entry.steps)===index);
+        unique.forEach((entry,i)=>{const choice=actionSprite(entry.label,'goose-choice',{steps:entry.steps},'#dbea9e');choice.position.set((i-(unique.length-1)/2)*2.45,1.02,2.15);choice.scale.set(2.05,.46,1);objects.add(choice)});
+        if((turnPlayer?.feathers||0)>0){const reroll=actionSprite('RELANCER · 🪶 '+turnPlayer.feathers,'goose-reroll',{},'#e8c890');reroll.position.set(0,1.02,2.80);reroll.scale.set(2.30,.46,1);objects.add(reroll)}
+      }else{
+        const roll=actionSprite('LANCER LES DÉS','goose-roll',{},'#dbea9e');roll.position.set(0,1.02,2.28);objects.add(roll);
+      }
+    }
+
+    const event=s?.gooseLastEvent||{},eventText=event.arrive?'Arrivée !':event.grain?'Grain doré · +1 plume':event.duel?'Duel '+event.duel.a+' – '+event.duel.d:event.geese?'Oie × '+event.geese:event.trap?String(event.trap).toUpperCase():event.reroll?'Relance avec une plume':'';
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
     if(title)title.textContent='VUE 3D · JEU DE L’OIE';
-    if(status)status.textContent=s?.goosePending?'Choisissez '+s.goosePending.dice.join(' ou ')+' · somme '+(s.goosePending.dice[0]+s.goosePending.dice[1]):(s?.players?.[s.turn]?.name||'Joueur')+' joue';
-    if(help)help.textContent=s?.goosePending?'Cliquez une destination éclairée · les boutons 2D restent disponibles dessous':'Cliquez les dés pour lancer · le résultat vient toujours du moteur de jeu';
+    if(status)status.textContent=s?.goosePending?'Choisissez '+s.goosePending.dice[0]+', '+s.goosePending.dice[1]+' ou '+(s.goosePending.dice[0]+s.goosePending.dice[1])+' · 🪶 '+(turnPlayer?.feathers||0):(turnPlayer?.name||'Joueur')+' · case '+(turnPlayer?.pos||0)+' · 🪶 '+(turnPlayer?.feathers||0)+' · ✦ '+(turnPlayer?.grains||0)+(eventText?' · '+eventText:'');
+    if(help)help.textContent=s?.goosePending?'Touchez un choix, une case éclairée ou relancez avec une plume':'Touchez les dés ou LANCER LES DÉS · les cases spéciales sont indiquées sur le plateau';
     if(diceAnimations.length||pawnAnimations.length)startMotion();
   }
 
@@ -2391,7 +2415,7 @@ export function createTable3DRenderer({onFatal}={}){
     if(d.kind==='rummi-dest'){if(tap)current?.interactions?.rummi?.('move',d.dest);return}
     if(d.kind==='rummi-action'){if(tap)current?.interactions?.rummi?.(d.command);return}
     if(d.kind==='deck'){if(tap)current?.interactions?.draw?.();return}
-    if(d.kind==='goose-roll'||d.kind==='goose-choice'){if(tap)current?.interactions?.goose?.(d.kind==='goose-roll'?'roll':'choose',d.steps);return}
+    if(['goose-roll','goose-choice','goose-reroll'].includes(d.kind)){if(tap)current?.interactions?.goose?.(d.kind==='goose-roll'?'roll':d.kind==='goose-reroll'?'reroll':'choose',d.steps);return}
     if(d.kind==='golf-adjust'){if(tap){if(d.control==='angle')golfAim.angle=Math.max(-180,Math.min(180,golfAim.angle+Number(d.delta||0)));else if(d.control==='power')golfAim.power=Math.max(5,Math.min(100,golfAim.power+Number(d.delta||0)));syncGolf(current);draw()}return}
     if(d.kind==='golf-shoot'){if(tap)current?.interactions?.golf?.('shoot',{angle:Math.round(golfAim.angle),power:Math.round(golfAim.power)});return}
     if(d.kind==='golf-continue'){if(tap)current?.interactions?.golf?.('continue');return}
