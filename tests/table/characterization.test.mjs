@@ -71,8 +71,8 @@ test('Jeu de l’Oie 3D exposes adventure choices, special cells and feather rer
  assert.match(source,/specialDefs=\{bridge:\['⌒','PONT'/);
  assert.match(source,/marker=makeLabel\(special\.symbol\+' '\+special\.label/);
  assert.match(source,/tile\.scale\.set\(1\.10,1\.16,1\.10\)/);
- assert.match(source,/kind:'goose-choice',steps:entry\.steps/);
- assert.match(source,/kind:'goose-reroll'/);
+ assert.match(source,/actionSprite\(entry\.label,'goose-choice',\{steps:entry\.steps\}/);
+ assert.match(source,/actionSprite\('RELANCER · 🪶 '\+turnPlayer\.feathers,'goose-reroll'/);
  assert.match(source,/LANCER LES DÉS/);
  assert.match(source,/RELANCER · 🪶/);
  assert.match(source,/Grain doré · \+1 plume/);
@@ -92,7 +92,7 @@ test('Yam and Métropole expose direct physical dice controls without bypassing 
  assert.match(source,/kind:'goose-roll',interactive:true,home:\{scale:die\.scale\.clone\(\)\}/);
  assert.match(source,/current\?\.interactions\?\.yam\?\.\(d\.kind==='yam-hold'\?'hold':'roll'/);
  assert.match(source,/current\?\.interactions\?\.city\?\.\('roll'\)/);
- assert.match(source,/current\?\.interactions\?\.goose\?\.\(d\.kind==='goose-roll'\?'roll':'choose'/);
+ assert.match(source,/current\?\.interactions\?\.goose\?\.\(d\.kind==='goose-roll'\?'roll':d\.kind==='goose-reroll'\?'reroll':'choose'/);
  assert.match(source,/const interactiveHover=!!hovered\?\.userData\?\.interactive/);
  assert.doesNotMatch(source,/kind==='yam-roll'[^\n]*Math\.random/);
  assert.doesNotMatch(source,/kind==='city-roll'[^\n]*Math\.random/);
