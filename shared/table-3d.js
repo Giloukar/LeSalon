@@ -640,7 +640,7 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function rummiDesiredGroupWidth(group){
     const length=Math.max(1,Number(group?.length)||1),natural=.66;
-    return Math.min(4.58,Math.max(1.64,length*natural+.12));
+    return Math.min(4.58,Math.max(1.64,length*natural*.62+.16));
   }
   function rummiPackRows(active,width=9.35,gap=.18){
     const rows=[];let row={orders:[],desired:0};
