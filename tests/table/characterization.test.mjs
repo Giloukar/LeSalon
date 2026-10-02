@@ -229,13 +229,14 @@ test('replaceable 3D asset registry stays presentation-only and supports hot swa
 test('dense Rummikub layout keeps every board and rack tile inside adaptive visible rows',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  assert.match(source,/function rummiDesiredGroupWidth\(group\)/);
+ assert.match(source,/Math\.min\(4\.58,Math\.max\(1\.64,length\*natural\*\.62\+\.16\)\)/);
  assert.match(source,/packed=rummiPackRows\(active,width,gap\)/);
  assert.match(source,/minZ=-2\.90,maxZ=\.85/);
  assert.match(source,/z=minZ\+\(rowIndex\+\.5\)\*cellD/);
  assert.match(source,/tileCount=active\.reduce/);
  assert.match(source,/function rummiLayoutCell\(layout,order\)/);
- assert.match(source,/depthScale=\(Math\.max\(\.22,cell\.depth-\.06\)\)\/\.9/);
- assert.match(source,/scale=Math\.max\(\.24,Math\.min\(\.96,widthScale,depthScale\)\)/);
+ assert.match(source,/depthScale=Math\.max\(\.48,\(Math\.max\(\.22,cell\.depth-\.06\)\)\/\.9\)/);
+ assert.match(source,/scale=Math\.max\(\.48,Math\.min\(\.96,widthScale,depthScale\)\)/);
  assert.match(source,/function rummiRackLayout\(count\)/);
  assert.match(source,/rows=total<=12\?1:total<=24\?2:total<=36\?3:total<=52\?4:5/);
  assert.match(source,/depth=3\.15,minZ=1\.60,maxZ=minZ\+depth/);
