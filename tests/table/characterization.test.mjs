@@ -454,11 +454,14 @@ test('Cactus physical quick throw commits only through the existing engine inter
  assert.doesNotMatch(source,/cactus-quick[^\n]*onlineAct\(/);
 });
 
-test('Cactus drawn card can be dragged to the discard through the existing engine action',async()=>{
+test('Cactus drawn card can be dragged to swap or discard through existing engine actions',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
- assert.match(source,/canDiscardDrawn=!!\(payload\.canInteract&&data\.turn===viewer&&data\.phase==='swap'&&data\.source==='draw'\)/);
+ assert.match(source,/canManipulateDrawn=!!\(payload\.canInteract&&data\.turn===viewer&&data\.phase==='swap'\)/);
+ assert.match(source,/function cactusOwnHandDropTarget\(position\)/);
  assert.match(source,/makeLooseManipulable\(drawnMesh,\{kind:'cactus-drawn',tapEnabled:false/);
- assert.match(source,/d\.cactusToDiscard=directCardDropNear\(d,'cactus'\)/);
+ assert.match(source,/d\.cactusSwap=cactusOwnHandDropTarget\(d\.mesh\.position\)/);
+ assert.match(source,/current\?\.interactions\?\.cactus\?\.\('swap',d\.cactusSwap\.index\)/);
+ assert.match(source,/current\?\.viewData\?\.cactus\?\.source==='draw'/);
  assert.match(source,/current\?\.interactions\?\.cactus\?\.\('discard'\)/);
  assert.doesNotMatch(source,/cactus-drawn[^\n]*dispatch\(/);
  assert.doesNotMatch(source,/cactus-drawn[^\n]*onlineAct\(/);
