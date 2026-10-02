@@ -11,6 +11,8 @@ const CARD_W=1.22,CARD_H=1.78,CARD_D=.045,CARD_STACK_SCALE=.88;
 const TABLE_Y=.28;
 const LIVE_CARD_GAMES=new Set(['huit','president','menteur','suites','plis','encheres','quatrevingtdixneuf','cactus']);
 const TABLETOP_CARD_GAMES=new Set([...LIVE_CARD_GAMES,'pouilleux','vingtetun']);
+const SORTABLE_HAND_GAMES=new Set(['huit','rummikub','president','menteur','suites','plis','encheres','pouilleux','quatrevingtdixneuf','bataille']);
+const VISUAL_SUIT_ORDER=['S','H','D','C'];
 const visualHash=str=>{
   let h=2166136261;
   for(const ch of String(str)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}
@@ -220,17 +222,32 @@ export function createTable3DRenderer({onFatal}={}){
     const button=host?.querySelector?.('[data-table-3d-reset-poses]');if(button)button.hidden=!hasActiveLocalPoses();
     const hand=host?.querySelector?.('[data-table-3d-arrange-hand]');if(hand)hand.hidden=!hasActiveLocalCardPoses();
   }
+  function updateSortButton(){
+    const button=host?.querySelector?.('[data-table-3d-sort]');if(!button)return;
+    const show=!!current&&!current.spectator&&SORTABLE_HAND_GAMES.has(current.gameId)&&typeof current.interactions?.sort==='function';
+    button.hidden=!show;if(!show)return;
+    const byColor=!!current.viewData?.sortByColor,next=byColor?'valeur':'couleur';
+    button.title='Trier par '+next;button.setAttribute('aria-label','Trier la main par '+next);button.textContent=byColor?'A↕':'♠↕';
+  }
   function emitLocalTabletopCard(action,data={}){
     if(!current?.online||current?.spectator||!TABLETOP_CARD_GAMES.has(current?.gameId))return false;
     window.dispatchEvent(new CustomEvent('salon:local-tabletop-card',{detail:{action,gameId:current.gameId,...data}}));return true;
   }
-  function arrangeActiveHand(){
+  function clearActiveHandPoses(){
     if(!activePoseScope)return false;const prefix=activePoseScope+'|card|';let changed=false;
     for(const key of [...localPoses.keys()])if(key.startsWith(prefix)){localPoses.delete(key);changed=true}
     if(tossAnimations.length)tossAnimations=tossAnimations.filter(a=>!a.mesh?.userData?.cardId);
-    emitLocalTabletopCard('arrange');
+    return changed;
+  }
+  function arrangeActiveHand(){
+    const changed=clearActiveHandPoses();emitLocalTabletopCard('arrange');
     if(changed&&current){poseSeen=new Set();syncCurrent(current);pruneLocalPoses()}
     updateLocalPoseResetButton();draw();return changed;
+  }
+  function sortActiveHand(){
+    if(!current?.interactions?.sort)return false;
+    clearActiveHandPoses();
+    return current.interactions.sort();
   }
   function resetActiveLocalPoses(){
     if(!activePoseScope)return false;const prefix=activePoseScope+'|',cardPrefix=activePoseScope+'|card|';let changed=false,hadCards=false;
@@ -316,8 +333,9 @@ export function createTable3DRenderer({onFatal}={}){
     const column=document.querySelector('.table-column');if(!column)return null;
     if(!host?.isConnected){
       host=document.createElement('section');host.className='table-3d-host';host.setAttribute('aria-label','Vue 3D de la table');
-      host.innerHTML='<div class="table-3d-window-controls" aria-label="Affichage 3D"><button type="button" class="table-3d-window-button table-3d-hand-reset" data-table-3d-arrange-hand hidden aria-label="Ranger ma main" title="Ranger ma main">▤</button><button type="button" class="table-3d-window-button table-3d-reset" data-table-3d-reset-poses hidden aria-label="Ranger mes objets selon la disposition du jeu" title="Ranger mes objets · local uniquement">↺</button><button type="button" class="table-3d-window-button table-3d-camera-reset" data-table-3d-reset-camera hidden aria-label="Recentrer la caméra 3D" title="Recentrer la caméra">◎</button><button type="button" class="table-3d-window-button table-3d-minimize" data-table-3d-window="embedded" aria-label="Réduire la vue 3D dans la page" title="Réduire la vue 3D">↙</button><button type="button" class="table-3d-window-button table-3d-expand" data-table-3d-window="full" aria-label="Agrandir la vue 3D" title="Plein écran">⛶</button><button type="button" class="table-3d-window-button table-3d-close" data-table-view-mode="2d" aria-label="Revenir à la vue 2D" title="Revenir à la vue 2D">×</button></div><div class="table-3d-hud"><span class="table-3d-accent" data-table-3d-title>VUE 3D</span><span data-table-3d-status>Table synchronisée</span></div><div class="table-3d-help" data-table-3d-help>Glissez le tapis pour tourner la vue · molette sur le tapis pour zoomer</div>';
+      host.innerHTML='<div class="table-3d-window-controls" aria-label="Affichage 3D"><button type="button" class="table-3d-window-button table-3d-sort" data-table-3d-sort hidden aria-label="Trier ma main" title="Trier ma main">♠↕</button><button type="button" class="table-3d-window-button table-3d-hand-reset" data-table-3d-arrange-hand hidden aria-label="Ranger ma main" title="Ranger ma main">▤</button><button type="button" class="table-3d-window-button table-3d-reset" data-table-3d-reset-poses hidden aria-label="Ranger mes objets selon la disposition du jeu" title="Ranger mes objets · local uniquement">↺</button><button type="button" class="table-3d-window-button table-3d-camera-reset" data-table-3d-reset-camera hidden aria-label="Recentrer la caméra 3D" title="Recentrer la caméra">◎</button><button type="button" class="table-3d-window-button table-3d-minimize" data-table-3d-window="embedded" aria-label="Réduire la vue 3D dans la page" title="Réduire la vue 3D">↙</button><button type="button" class="table-3d-window-button table-3d-expand" data-table-3d-window="full" aria-label="Agrandir la vue 3D" title="Plein écran">⛶</button><button type="button" class="table-3d-window-button table-3d-close" data-table-view-mode="2d" aria-label="Revenir à la vue 2D" title="Revenir à la vue 2D">×</button></div><div class="table-3d-hud"><span class="table-3d-accent" data-table-3d-title>VUE 3D</span><span data-table-3d-status>Table synchronisée</span></div><div class="table-3d-help" data-table-3d-help>Glissez le tapis pour tourner la vue · molette sur le tapis pour zoomer</div>';
       host.querySelectorAll('[data-table-3d-window]').forEach(button=>button.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();window.dispatchEvent(new CustomEvent('salon:table-3d-window',{detail:{mode:button.getAttribute('data-table-3d-window')}}))}));
+      host.querySelector('[data-table-3d-sort]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();sortActiveHand()});
       host.querySelector('[data-table-3d-arrange-hand]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();arrangeActiveHand()});
       host.querySelector('[data-table-3d-reset-poses]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();resetActiveLocalPoses()});
       host.querySelector('[data-table-3d-reset-camera]')?.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();resetCameraView()});
@@ -346,6 +364,15 @@ export function createTable3DRenderer({onFatal}={}){
   }
   function placeCard(mesh,x,z,y=TABLE_Y+.07,rot=0,scale=1){
     mesh.position.set(x,y,z);mesh.rotation.set(-Math.PI/2,0,rot);mesh.scale.setScalar(scale);objects.add(mesh);return mesh;
+  }
+  function visualCardRank(game,rank){
+    const n=Number(rank)||0;
+    return ['suites','plis'].includes(game)?n:(n===1?11:n===2?12:n-3);
+  }
+  function sortedVisualHand(cards,game,byColor=false){
+    const list=[...(cards||[])];
+    if(game==='rummikub')return list.sort((a,b)=>(!!a.joker)-(!!b.joker)||(byColor?(a.color??5)-(b.color??5)||(a.num||0)-(b.num||0):(a.num||99)-(b.num||99)||(a.color||0)-(b.color||0)));
+    return list.sort((a,b)=>byColor?VISUAL_SUIT_ORDER.indexOf(a.suit)-VISUAL_SUIT_ORDER.indexOf(b.suit)||(Number(a.rank)||0)-(Number(b.rank)||0):visualCardRank(game,a.rank)-visualCardRank(game,b.rank)||VISUAL_SUIT_ORDER.indexOf(a.suit)-VISUAL_SUIT_ORDER.indexOf(b.suit));
   }
   function handCardSlot(count,index){
     const total=Math.max(1,count),rows=total<=9?1:total<=20?2:total<=30?3:total<=40?4:5,perRow=Math.ceil(total/rows),row=Math.floor(index/perRow),start=row*perRow,rowCount=Math.min(perRow,total-start),local=index-start;
@@ -1009,7 +1036,7 @@ export function createTable3DRenderer({onFatal}={}){
     const title=host?.querySelector('[data-table-3d-title]'),status=host?.querySelector('[data-table-3d-status]'),help=host?.querySelector('[data-table-3d-help]');
 
     if(game==='pouilleux'){
-      const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,ownVisuals=new Map();
+      const own=payload.spectator?[]:sortedVisualHand(s.players[viewer]?.hand||[],game,payload.viewData?.sortByColor),n=own.length,ownVisuals=new Map();
       own.forEach((card,i)=>{
         const slot=handCardSlot(n,i),mesh=cardMesh(card,{back:!!card.hidden});
         placeCard(mesh,slot.x,slot.z,TABLE_Y+.11+slot.yOffset,slot.fan,slot.scale);makeLooseManipulable(mesh,{kind:'loose-card',cardId:card.id,persistPose:true});
@@ -1060,7 +1087,7 @@ export function createTable3DRenderer({onFatal}={}){
     }
 
     if(game==='quatrevingtdixneuf'){
-      const ninety=data.ninety||{},selected=new Set(ninety.selectedIds||[]),selectable=new Set(ninety.selectableIds||[]),legal=new Set(ninety.legalIds||[]),own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,ownVisuals=new Map();
+      const ninety=data.ninety||{},selected=new Set(ninety.selectedIds||[]),selectable=new Set(ninety.selectableIds||[]),legal=new Set(ninety.legalIds||[]),own=payload.spectator?[]:sortedVisualHand(s.players[viewer]?.hand||[],game,payload.viewData?.sortByColor),n=own.length,ownVisuals=new Map();
       const ninetyDrop=cardGestureTarget('quatrevingtdixneuf',TABLE_Y+.025);dropMarker.visible=!!(payload.canInteract&&selectable.size);dropMarker.position.set(ninetyDrop.x,TABLE_Y+.025,ninetyDrop.z);dropMarker.material.opacity=.2;
       own.forEach((card,i)=>{
         const slot=handCardSlot(n,i),chosen=selected.has(card.id),isLegal=legal.has(card.id),mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:selectable.has(card.id),playable:selectable.has(card.id)});
@@ -1280,7 +1307,7 @@ export function createTable3DRenderer({onFatal}={}){
     setCameraPose(0,7.4,9.1,0,.22,.15);
     const selected=new Set(data.selectedIds||[]),selectable=new Set(data.selectableIds||[]),playable=new Set(data.cardPlayableIds||[]);
     const dropTarget=cardGestureTarget(game,TABLE_Y+.025);dropMarker.visible=!!(payload.canInteract&&selectable.size);dropMarker.position.set(dropTarget.x,TABLE_Y+.025,dropTarget.z);dropMarker.material.opacity=.2;
-    const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),n=own.length,ownVisuals=new Map();
+    const own=payload.spectator?[]:sortedVisualHand(s.players[viewer]?.hand||[],game,payload.viewData?.sortByColor),n=own.length,ownVisuals=new Map();
     own.forEach((card,i)=>{
       const slot=handCardSlot(n,i),chosen=selected.has(card.id),canSelect=selectable.has(card.id),legal=playable.has(card.id);
       const mesh=cardMesh(card,{back:!!card.hidden,id:card.id,interactiveCard:canSelect,playable:canSelect});
@@ -1368,7 +1395,7 @@ export function createTable3DRenderer({onFatal}={}){
     setCameraPose(0,7.25,9.25,0,.25,.2);
     const s=payload.state,viewer=Number.isInteger(payload.privateIndex)?payload.privateIndex:0;
     if(!s?.players?.length){lastEightSnapshot=null;return}
-    const own=payload.spectator?[]:(s.players[viewer]?.hand||[]),playable=new Set(payload.viewData?.playableIds||[]),previous=lastEightSnapshot;
+    const own=payload.spectator?[]:sortedVisualHand(s.players[viewer]?.hand||[],'huit',payload.viewData?.sortByColor),playable=new Set(payload.viewData?.playableIds||[]),previous=lastEightSnapshot;
 
     const n=own.length,ownVisuals=new Map();
     own.forEach((card,i)=>{
@@ -1452,7 +1479,7 @@ export function createTable3DRenderer({onFatal}={}){
   function syncRummikub(payload){
     clearObjects();dropMarker.visible=false;
     const data=payload.viewData?.rummi;if(!data){lastRummiSnapshot=null;return}
-    const selected=new Set(data.selectedIds||[]),oldIds=new Set(data.refTableIds||[]),groups=data.table||[],layout=rummiBoardLayout(groups),hand=data.hand||[],rackLayout=rummiRackLayout(hand.length),currentVisuals=new Map();
+    const selected=new Set(data.selectedIds||[]),oldIds=new Set(data.refTableIds||[]),groups=data.table||[],layout=rummiBoardLayout(groups),hand=sortedVisualHand(data.hand||[],'rummikub',payload.viewData?.sortByColor),rackLayout=rummiRackLayout(hand.length),currentVisuals=new Map();
     const density=Math.max(layout.rows,rackLayout.rows,Math.ceil((layout.tileCount+hand.length)/24)),cameraExtra=Math.max(0,density-2);
     setCameraPose(0,8.65+cameraExtra*.42,10.45+cameraExtra*.38,0,.2,-.28);
 
@@ -1926,7 +1953,7 @@ export function createTable3DRenderer({onFatal}={}){
     }
     ensureHost();document.documentElement.dataset.table3dGame=payload.gameId||'';document.documentElement.dataset.table3dPhase=payload.state?.phase||'';
     activePoseScope=poseScope(payload);poseSeen=new Set();
-    syncCurrent(payload);pruneLocalPoses();pruneLabelCache();updateLocalPoseResetButton();updateCameraResetButton();draw();
+    syncCurrent(payload);pruneLocalPoses();pruneLabelCache();updateLocalPoseResetButton();updateSortButton();updateCameraResetButton();draw();
   }
   function draw(){if(active&&renderer&&scene&&camera)renderer.render(scene,camera)}
   function updatePointer(e){
