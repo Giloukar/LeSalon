@@ -41,9 +41,11 @@ function safeDeactivate(mode){
 function fallback(reason,error){
   const previous=active;
   requestId++;
-  if(previous!==BASE_MODE)safeDeactivate(previous);
+  // Reveal the permanent 2D layer before tearing the overlay down. This avoids
+  // a paint where neither renderer is visible after WebGL/fullscreen failures.
   active=BASE_MODE;
   setDataset(BASE_MODE);
+  if(previous!==BASE_MODE)safeDeactivate(previous);
   emit({mode:BASE_MODE,previous,preferred,reason:reason||'fallback',error:error?String(error?.message||error):''});
   if(lastPayload&&previous!==BASE_MODE){
     try{renderer(BASE_MODE)?.render?.(lastPayload)}catch(_){}
@@ -82,22 +84,41 @@ async function setMode(mode,{persistPreference=true,reason='user'}={}){
   if(id!==requestId)return{ok:false,mode:active,reason:'superseded'};
 
   const previous=active;
-  if(previous!==BASE_MODE)safeDeactivate(previous);
-  try{r?.activate?.({mode,previous,lastPayload})}
-  catch(error){
-    fallback('activate-failed',error);
-    return{ok:false,mode:active,reason:'activate-failed',error};
+  if(mode===BASE_MODE){
+    // The 2D tree is always current. Make it visible first, then remove the
+    // overlay, so a fullscreen/context teardown can never expose a blank frame.
+    active=BASE_MODE;
+    setDataset(BASE_MODE);
+    try{r?.activate?.({mode,previous,lastPayload})}
+    catch(error){
+      return{ok:false,mode:active,reason:'activate-failed',error};
+    }
+    if(previous!==BASE_MODE)safeDeactivate(previous);
+    emit({mode,previous,preferred,reason});
+    return{ok:true,mode};
+  }
+
+  if(!lastPayload)return{ok:false,mode:active,reason:'no-payload'};
+  if(previous!==BASE_MODE){
+    active=BASE_MODE;
+    setDataset(BASE_MODE);
+    safeDeactivate(previous);
+  }
+  try{
+    // Build and draw the 3D surface while the synchronized 2D layer is still
+    // visible underneath. Only swap the visibility flag after a successful draw.
+    r?.activate?.({mode,previous,lastPayload});
+    r?.render?.(lastPayload);
+  }catch(error){
+    safeDeactivate(mode);
+    active=BASE_MODE;
+    setDataset(BASE_MODE);
+    emit({mode:BASE_MODE,previous,preferred,reason:'render-failed',error:String(error?.message||error)});
+    return{ok:false,mode:active,reason:'render-failed',error};
   }
 
   active=mode;
   setDataset(mode);
-  if(lastPayload&&mode!==BASE_MODE){
-    try{r?.render?.(lastPayload)}
-    catch(error){
-      fallback('render-failed',error);
-      return{ok:false,mode:active,reason:'render-failed',error};
-    }
-  }
   emit({mode,previous,preferred,reason});
   return{ok:true,mode};
 }
