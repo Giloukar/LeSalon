@@ -2,7 +2,7 @@
 'use strict';
 const view=window.SalonTableView,SRC=document.currentScript?.src||location.href;
 if(!view)return;
-let modulePromise=null,renderer=null;
+let modulePromise=null,renderer=null,freshActivation=true;
 function webglAvailable(){
   try{
     const c=document.createElement('canvas');
@@ -11,6 +11,14 @@ function webglAvailable(){
 }
 function supportedHere(){
   return document.documentElement.dataset.table3dSupported==='yes';
+}
+function renderFreshBaseline(payload){
+  const root=document.documentElement,hadMotion=root.hasAttribute('data-motion'),previousMotion=root.getAttribute('data-motion');
+  root.dataset.motion='off';
+  try{renderer?.render?.(payload)}finally{
+    if(hadMotion)root.setAttribute('data-motion',previousMotion??'');else root.removeAttribute('data-motion');
+  }
+  renderer?.render?.(payload);
 }
 view.register('3d',{
   available(){return webglAvailable()&&supportedHere()},
@@ -26,13 +34,14 @@ view.register('3d',{
     });
     return renderer;
   },
-  activate(){renderer?.activate?.()},
+  activate(){freshActivation=true;renderer?.activate?.()},
   render(payload){
     if(payload?.gated){view.fallback('gated-state');return}
     if(!['huit','oie','yam','boite','cactus','rummikub','president','menteur','suites','plis','encheres','pouilleux','quatrevingtdixneuf','vingtetun','bataille','metropole','echo','ballon','anagrammes','intrus','code','golf'].includes(payload?.gameId)){view.fallback('unsupported-game');return}
+    if(freshActivation){freshActivation=false;renderFreshBaseline(payload);return}
     renderer?.render?.(payload);
   },
   deactivate(){renderer?.deactivate?.()},
-  destroy(){renderer?.destroy?.();renderer=null}
+  destroy(){renderer?.destroy?.();renderer=null;freshActivation=true}
 });
 })();
