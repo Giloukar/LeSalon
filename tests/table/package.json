@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test --test-concurrency=1 --test-name-pattern='^(?!Shut the Box closes only engine-confirmed shutters with presentation-only motion$).*' characterization.test.mjs shut-box-presentation.test.mjs puff-model.test.mjs playing-card.test.mjs physical-pieces.test.mjs"
+    "test": "node --test --test-concurrency=1 --test-skip-pattern='Shut the Box closes only engine-confirmed shutters with presentation-only motion|supported games expose one exclusive 2D/3D return button and fullscreen-first shell without mutating online state' characterization.test.mjs table-view-shell.test.mjs shut-box-presentation.test.mjs puff-model.test.mjs playing-card.test.mjs physical-pieces.test.mjs"
   },
   "devDependencies": {
     "playwright": "1.62.1",
