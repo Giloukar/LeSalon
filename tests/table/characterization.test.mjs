@@ -216,6 +216,21 @@ test('Métropole 3D roll delegates to the authoritative host action path',async(
 
 test('Métropole 3D exposes the full authoritative turn and property action surface',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'metropole','online');const r=await t.page.evaluate(async()=>{let seen=null;SalonTableView.register('3d',{available:()=>true,render(payload){seen=payload}});net.gameId='metropole';net.state.turn=0;net.state.phase='buy';net.state.offer=1;net.state.owners[1]=-1;net.state.houses[1]=0;net.state.mortgaged[1]=false;net.state.players[0].cash=1200;S=projectGame(net.state,0);renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});const before={cash:net.state.players[0].cash,revision:net.revision,price:seen.viewData.city.board[1].price,canBuy:seen.viewData.city.canBuy,manageCount:seen.viewData.city.manage.length};const bought=seen.interactions.city('buy');const afterBuy={cash:net.state.players[0].cash,owner:net.state.owners[1],phase:net.state.phase,revision:net.revision};const manage=seen.viewData.city.manage[1];const mortgaged=seen.interactions.city('mortgage',1);return{before,bought,afterBuy,manage,mortgaged,afterMortgage:{cash:net.state.players[0].cash,mortgaged:net.state.mortgaged[1],revision:net.revision}};});assert.equal(r.before.canBuy,true);assert.equal(r.before.manageCount,24);assert.equal(r.bought,true);assert.equal(r.afterBuy.owner,0);assert.equal(r.afterBuy.cash,r.before.cash-r.before.price);assert.equal(r.afterBuy.phase,'end');assert.equal(r.afterBuy.revision,r.before.revision+1);assert.equal(r.manage.canMortgage,true);assert.equal(r.mortgaged,true);assert.equal(r.afterMortgage.mortgaged,true);assert.equal(r.afterMortgage.cash,r.afterBuy.cash+r.manage.mortgageGain);assert.equal(r.afterMortgage.revision,r.afterBuy.revision+1);}finally{await browser.close();}});
 
+test('Shut the Box closes only engine-confirmed shutters with presentation-only motion',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ assert.match(source,/lastBoxSnapshot=null/);
+ assert.match(source,/previousOpen=new Set\(previousBox\?\.open\|\|\[\]\)/);
+ assert.match(source,/newlyClosed=!!previousBox&&previousBox\.round===Number\(s\?\.boxRound\|\|0\)&&previousOpen\.has\(n\)&&!isOpen/);
+ assert.match(source,/manipAnimations\.push\(\{mesh:tile,from:tileFrom/);
+ assert.match(source,/manipAnimations\.push\(\{mesh:label,from:labelFrom/);
+ assert.match(source,/lastBoxSnapshot=\{open:\[\.\.\.open\]/);
+ assert.match(source,/if\(diceAnimations\.length\|\|manipAnimations\.length\)startMotion\(\)/);
+ const block=source.slice(source.indexOf('function syncBox'),source.indexOf('function syncSpecialCards'));
+ assert.doesNotMatch(block,/dispatch\(/);
+ assert.doesNotMatch(block,/boxCombinations\(/);
+ assert.doesNotMatch(block,/reduce\([^\n]*===/);
+});
+
 test('Métropole 3D can send and answer property trade offers through the authoritative engine',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
  const html=await readFile(path.join(root,'jeux.html'),'utf8');
