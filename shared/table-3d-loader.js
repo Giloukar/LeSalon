@@ -37,7 +37,7 @@ view.register('3d',{
   activate(){freshActivation=true;renderer?.activate?.()},
   render(payload){
     if(payload?.gated){view.fallback('gated-state');return}
-    if(!['huit','oie','yam','boite','cactus','rummikub','president','menteur','suites','plis','encheres','pouilleux','quatrevingtdixneuf','vingtetun','bataille','metropole','echo','ballon','anagrammes','intrus','code','golf'].includes(payload?.gameId)){view.fallback('unsupported-game');return}
+    if(!supportedHere()){view.fallback('unsupported-game');return}
     if(freshActivation){freshActivation=false;renderFreshBaseline(payload);return}
     renderer?.render?.(payload);
   },
