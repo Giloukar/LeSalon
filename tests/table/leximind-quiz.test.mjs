@@ -83,7 +83,7 @@ test('leaving Quiz cancels its automatic advance and pending answer requests',as
   await page.click('#answers .ans:first-child');
   await page.click('[data-p="free"]');
   await page.waitForTimeout(950);
-  assert.equal(await page.evaluate(()=>__lexiTest.quizCalls),1);
+  assert.equal(await page.evaluate(()=>__lexiTest.quizCalls),2,'only the Réponse libre screen should make another question-pack request');
   assert.equal(await page.locator('#quiz').isVisible(),false);
   assert.equal(await page.locator('#free').isVisible(),true);
   await page.evaluate(()=>{
