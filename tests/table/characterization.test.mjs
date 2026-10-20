@@ -228,7 +228,9 @@ test('Shut the Box closes only engine-confirmed shutters with presentation-only 
  const block=source.slice(source.indexOf('function syncBox'),source.indexOf('function syncSpecialCards'));
  assert.doesNotMatch(block,/dispatch\(/);
  assert.doesNotMatch(block,/boxCombinations\(/);
- assert.doesNotMatch(block,/reduce\([^\n]*===/);
+ // Comparing the visible selection with the dice only enables a button; playBox remains authoritative.
+ assert.match(block,/confirm\.userData\.enabled=sum===total&&sum>0/);
+ assert.doesNotMatch(block,/s\.boxNumbers\s*=/);
 });
 
 test('Métropole 3D can send and answer property trade offers through the authoritative engine',async()=>{
