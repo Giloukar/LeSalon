@@ -1015,3 +1015,20 @@ test('free 3D tabletop manipulation stays presentation-only until an explicit va
  assert.doesNotMatch(source,/moveLooseCardDrag[^\n]*onlineAct\(/);
  assert.match(source,/card-action/);
 });
+
+
+test('3D rejects stale Eight and Cactus card drops without broadcasting a false commit',async()=>{
+ const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
+ const cactusStart=source.indexOf("if(d.kind==='cactus-quick'&&d.gestureStarted)");
+ const cactusEnd=source.indexOf("if(d.kind==='cactus-drawn')",cactusStart);
+ const cactus=source.slice(cactusStart,cactusEnd);
+ assert.ok(cactusStart>=0&&cactusEnd>cactusStart);
+ assert.ok(cactus.includes("if(current?.interactions?.cactus?.('quick',d.index)){emitLocalCardGesture('commit',1,0);return}"));
+ assert.ok(cactus.includes("emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d,{snap:true});return;"));
+ const eightStart=source.indexOf('const near=d.canPlay&&d.moved');
+ const eightEnd=source.indexOf('function cancelActiveDrag',eightStart);
+ const eight=source.slice(eightStart,eightEnd);
+ assert.ok(eightStart>=0&&eightEnd>eightStart);
+ assert.ok(eight.includes("if(current?.interactions?.playCard?.(d.cardId)){emitLocalCardGesture('commit',1,0);return}"));
+ assert.ok(eight.includes("emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d,{snap:true});return;"));
+});
