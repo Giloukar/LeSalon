@@ -1144,3 +1144,90 @@ test('a stale 3D finale cannot interrupt a rematch while fullscreen exit is pend
   assert.equal(result.mode,'3d','late cleanup does not forcibly change a newer game view');
  }finally{await browser.close()}
 });
+
+
+test('Cactus 3D quick throws report success or failure from the engine, not the missing HTML source',async()=>{
+ const t=await table();browser=t.browser;
+ try{
+  for(const good of [true,false]){
+   await setup(t.page,'cactus','solo');
+   const result=await t.page.evaluate(async(good)=>{
+    S.phase='draw';S.turn=1;
+    const card=S.players[0].hand[0],top=S.discard.at(-1);
+    top.rank=good?card.rank:(card.rank===2?3:2);
+    const before=S.players[0].hand.filter(Boolean).length;
+    let payload=null;
+    SalonTableView.register('3d',{available:()=>true,activate(){},deactivate(){},render(p){payload=p}});
+    renderGame(false);
+    await SalonTableView.setMode('3d',{persistPreference:false});
+    document.getElementById('toasts')?.replaceChildren();
+    const handled=payload.interactions.cactus('quick',0);
+    const after=S.players[0].hand.filter(Boolean).length;
+    const feedback=document.getElementById('toasts')?.textContent||'';
+    const wrongFx=!!document.querySelector('.legacy-cactus-jet-bad');
+    return{handled,good:S.lastQuick?.good,delta:after-before,feedback,wrongFx,mode:SalonTableView.getMode(),cardInDiscard:S.discard.at(-1)?.id===card.id};
+   },good);
+   assert.equal(result.handled,true);
+   assert.equal(result.good,good);
+   assert.equal(result.mode,'3d');
+   if(good){
+    assert.equal(result.delta,-1,'legal out-of-turn quick card is removed');
+    assert.equal(result.cardInDiscard,true,'authoritative discard pile holds the card');
+    assert.equal(result.feedback.includes('raté'),false,'a successful 3D throw never displays a failure toast');
+    assert.equal(result.wrongFx,false,'a successful 3D throw never displays failure visual effects');
+   }else{
+    assert.equal(result.delta,1,'a failed quick throw draws a penalty card');
+    assert.match(result.feedback,/Jet rapide raté/,'failure feedback remains visible');
+    assert.equal(result.wrongFx,true,'the failed throw keeps its negative visual feedback');
+   }
+  }
+  assert.deepEqual(t.errors,[]);
+ }finally{await browser.close()}
+});
+
+test('Eight and Cactus full solo rounds preserve engine state while toggling 2D/3D',async()=>{
+ const t=await table();browser=t.browser;
+ try{
+  for(const id of ['huit','cactus']){
+   await setup(t.page,id,'solo');
+   const outcome=await t.page.evaluate(async id=>{
+    const initial=JSON.stringify(S);
+    const seen=[],frames=[],invalid=[];
+    SalonTableView.register('3d',{available:()=>true,activate(){},deactivate(){},render(payload){
+     frames.push({id:payload.gameId,phase:payload.state?.phase,turn:payload.state?.turn,privateIndex:payload.privateIndex});
+    }});
+    let steps=0,changes=0;
+    while(S.phase!=='over'&&steps<500){
+     if(steps%4===0){
+      const before=JSON.stringify(S);
+      const entered=await SalonTableView.setMode('3d',{persistPreference:false});
+      renderGame(false);
+      const returned=await SalonTableView.setMode('2d',{persistPreference:false});
+      renderGame(false);
+      if(!entered.ok||!returned.ok||JSON.stringify(S)!==before)invalid.push({at:steps,entered:entered.reason,returned:returned.reason});
+      changes++;
+     }
+     const action=ai(S);
+     if(!action||!act(S,action)){invalid.push({at:steps,action});break}
+     seen.push(action.type);
+     steps++;
+     if(steps%7===0)renderGame(false);
+    }
+    renderGame(false);
+    return{initialId:JSON.parse(initial).id,id:S.id,steps,changes,phase:S.phase,winners:S.winners,seen,invalid,frames,screen:document.documentElement.dataset.tableView,mode:SalonTableView.getMode(),result:!!document.querySelector('.win-box'),netPackets:__test.packets.length};
+   },id);
+   assert.equal(outcome.initialId,id);
+   assert.equal(outcome.id,id);
+   assert.equal(outcome.phase,'over',id+' must reach an actual completed round');
+   assert.ok(outcome.steps>3&&outcome.steps<500,id+' ran a bounded sequence of authoritative actions');
+   assert.ok(outcome.changes>=2,id+' switched renderers several times');
+   assert.equal(outcome.screen,'2d');
+   assert.equal(outcome.mode,'2d');
+   assert.equal(outcome.result,true,id+' displays the 2D result after play');
+   assert.deepEqual(outcome.invalid,[],id+' renders cannot change the game state');
+   assert.equal(outcome.netPackets,0,id+' solo view switching sends no network action');
+   assert.ok(outcome.frames.length>1&&outcome.frames.every(f=>f.id===id));
+  }
+  assert.deepEqual(t.errors,[]);
+ }finally{await browser.close()}
+});
