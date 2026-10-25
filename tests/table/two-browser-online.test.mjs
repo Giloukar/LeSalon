@@ -32,7 +32,8 @@ async function peers(id){
   window.setInterval=(fn,ms)=>add('interval',fn,ms);
   window.requestAnimationFrame=fn=>add('frame',fn,16);
   window.clearTimeout=window.clearInterval=window.cancelAnimationFrame=id=>t.timers.delete(id);
-  localStorage.setItem('table.v3.prefs',JSON.stringify({sound:false,motion:false,immersive:false,fast:false,light:false}));
+  // addInitScript also runs on about:blank before navigation, where storage can be denied.
+  try{localStorage.setItem('table.v3.prefs',JSON.stringify({sound:false,motion:false,immersive:false,fast:false,light:false}))}catch{}
  },{epoch});
  const host=await context.newPage(),guest=await context.newPage();
  await Promise.all([host.goto('http://table.test/jeux.html'),guest.goto('http://table.test/jeux.html')]);
