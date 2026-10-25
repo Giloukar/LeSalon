@@ -1019,7 +1019,7 @@ test('free 3D tabletop manipulation stays presentation-only until an explicit va
 
 test('3D rejects stale Eight and Cactus card drops without broadcasting a false commit',async()=>{
  const source=await readFile(path.join(root,'shared/table-3d.js'),'utf8');
- const cactusStart=source.indexOf("if(d.kind==='cactus-quick'&&d.gestureStarted)");
+ const cactusStart=source.indexOf("if(d.kind==='cactus-quick'&&d.gestureStarted");
  const cactusEnd=source.indexOf("if(d.kind==='cactus-drawn')",cactusStart);
  const cactus=source.slice(cactusStart,cactusEnd);
  assert.ok(cactusStart>=0&&cactusEnd>cactusStart);
