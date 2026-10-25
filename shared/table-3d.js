@@ -2091,7 +2091,25 @@ export function createTable3DRenderer({onFatal}={}){
     const r=canvas.getBoundingClientRect();pointer.x=((e.clientX-r.left)/Math.max(1,r.width))*2-1;pointer.y=-((e.clientY-r.top)/Math.max(1,r.height))*2+1;raycaster.setFromCamera(pointer,camera);
   }
   function hit(e){
-    updatePointer(e);const raw=raycaster.intersectObjects(interactive,true)[0]?.object||null;return raw?.userData?.table3dRoot||raw;
+    updatePointer(e);
+    const direct=raycaster.intersectObjects(interactive,true)[0]?.object||null,root=direct?.userData?.table3dRoot||direct;
+    if(root||e.pointerType!=='touch'||!['huit','cactus'].includes(current?.gameId)||!canvas)return root;
+    // Touch-only tolerance: sample neighboring rays, not enlarged meshes or game rules.
+    // Exact hits always win, and the small radius avoids selecting a distant card.
+    const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
+    if(x<0||y<0||x>r.width||y>r.height)return null;
+    const offsets=[[0,-10],[10,0],[0,10],[-10,0],[9,-9],[9,9],[-9,9],[-9,-9],[0,-17],[17,0],[0,17],[-17,0]];
+    let nearby=null;
+    for(const [dx,dy] of offsets){
+      const px=x+dx,py=y+dy;
+      if(px<0||py<0||px>r.width||py>r.height)continue;
+      pointer.set(px/Math.max(1,r.width)*2-1,-(py/Math.max(1,r.height))*2+1);
+      raycaster.setFromCamera(pointer,camera);
+      const match=raycaster.intersectObjects(interactive,true).map(hit=>hit.object?.userData?.table3dRoot||hit.object).find(obj=>obj?.userData?.interactive);
+      if(match){nearby=match;break}
+    }
+    updatePointer(e);
+    return nearby;
   }
   function setHover(mesh){
     if(hovered===mesh)return;
