@@ -54,6 +54,37 @@ test('physical pieces: dice values, shared resources, exports and live game rend
  await page.waitForTimeout(100);
  }
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(100);
+ // A backgrounded mobile browser must release a camera gesture so touches work on resume.
+ for(const id of ['huit','cactus']){
+  await page.evaluate(async gameId=>{
+   await SalonTableView.setMode('2d',{persistPreference:false});
+   S=createGame(gameId,{mode:'solo',names:['Joueur','Adversaire'],timeControl:{enabled:false}});
+   view='game';gate=false;busy=false;renderGame(false);
+   const entered=await SalonTableView.setMode('3d',{persistPreference:false});
+   if(!entered.ok)throw Error('Cannot open 3D for '+gameId+': '+entered.reason);
+  },id);
+  const touch=await page.evaluate(()=>{
+   const host=document.querySelector('.table-3d-host'),canvas=host?.querySelector('canvas');
+   if(!host||!canvas)throw Error('Missing interactive 3D canvas');
+   const rect=canvas.getBoundingClientRect(),x=rect.left+8,y=rect.top+8,before=JSON.stringify(S);
+   const pointer=(type,id)=>new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:id,pointerType:'touch',isPrimary:true,button:0,buttons:type==='pointerdown'?1:0,clientX:x,clientY:y});
+   canvas.dispatchEvent(pointer('pointerdown',501));
+   const started=host.classList.contains('is-camera-dragging');
+   const original=Object.getOwnPropertyDescriptor(document,'hidden');let cleared=false,recovered=false;
+   try{
+    Object.defineProperty(document,'hidden',{configurable:true,value:true});
+    document.dispatchEvent(new Event('visibilitychange'));
+    cleared=!host.classList.contains('is-camera-dragging');
+   }finally{
+    if(original)Object.defineProperty(document,'hidden',original);else delete document.hidden;
+   }
+   canvas.dispatchEvent(pointer('pointerdown',502));
+   recovered=host.classList.contains('is-camera-dragging');
+   canvas.dispatchEvent(pointer('pointercancel',502));
+   return{started,cleared,recovered,unchanged:JSON.stringify(S)===before,stopped:!host.classList.contains('is-camera-dragging')};
+  });
+  assert.deepEqual(touch,{started:true,cleared:true,recovered:true,unchanged:true,stopped:true},'mobile 3D touch recovery for '+id);
+ }
  assert.deepEqual(errors,[]);
  }finally{await browser.close()}
 });
