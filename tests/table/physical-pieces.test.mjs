@@ -85,6 +85,21 @@ test('physical pieces: dice values, shared resources, exports and live game rend
   });
   assert.deepEqual(touch,{started:true,cleared:true,recovered:true,unchanged:true,stopped:true},'mobile 3D touch recovery for '+id);
  }
- assert.deepEqual(errors,[]);
+ // Portrait fullscreen keeps the contextual hint clear of top buttons and tall action trays.
+ for(const width of [320,390]){
+  await page.setViewportSize({width,height:width===320?640:844});
+  const layout=await page.evaluate(()=>{
+   table3dSetPresentation('full');
+   const host=document.querySelector('.table-3d-host'),help=host?.querySelector('.table-3d-help'),controls=host?.querySelector('.table-3d-window-controls'),tray=document.querySelector('#game-actions');
+   if(!host||!help||!controls||!tray)throw Error('Missing 3D portrait UI elements');
+   const display=tray.style.display,minHeight=tray.style.minHeight;
+   tray.style.display='block';tray.style.minHeight='160px';
+   const h=help.getBoundingClientRect(),c=controls.getBoundingClientRect(),a=tray.getBoundingClientRect();
+   tray.style.display=display;tray.style.minHeight=minHeight;
+   return{helpVisible:h.width>0&&h.height>0,underControls:h.top>=c.bottom+4,aboveTray:h.bottom<a.top-4,inViewport:h.top>=0&&h.bottom<=innerHeight,fullscreen:document.documentElement.dataset.table3dPresentation==='full'};
+  });
+  assert.deepEqual(layout,{helpVisible:true,underControls:true,aboveTray:true,inViewport:true,fullscreen:true},'portrait layout at '+width+'px');
+ }
+  assert.deepEqual(errors,[]);
  }finally{await browser.close()}
 });

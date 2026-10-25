@@ -44,3 +44,23 @@ html[data-table-view="3d"] .table-column{min-width:0}
 
 html[data-table-view-transition="1"] body::after{content:"";position:fixed;inset:0;z-index:2147483000;pointer-events:none;background:#0b110e;opacity:.94}
 @media(prefers-reduced-motion:reduce){html[data-table-view-transition="1"] body::after{animation:none}}
+
+/* In portrait fullscreen the contextual hint stays above, not behind, the action tray. */
+@media (max-width:700px) and (orientation:portrait){
+ html[data-table-view="3d"][data-table3d-presentation="full"] .table-3d-help{
+  top:max(58px,calc(env(safe-area-inset-top) + 54px));
+  bottom:auto;
+  max-width:min(90vw,440px);
+  white-space:normal;
+ }
+}
+@media (max-width:440px) and (orientation:portrait){
+ html[data-table-view="3d"][data-table3d-presentation="full"] .table-3d-hud{
+  top:max(53px,calc(env(safe-area-inset-top) + 49px));
+  right:max(9px,env(safe-area-inset-right));
+ }
+ html[data-table-view="3d"][data-table3d-presentation="full"] .table-3d-help{
+  top:max(89px,calc(env(safe-area-inset-top) + 85px));
+  max-width:90vw;
+ }
+}
