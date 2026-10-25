@@ -3544,7 +3544,7 @@ if(window.SalonTableView){
      sortByColor=!sortByColor;renderGame(true);return true;
     },
     nextRound(){if(!roundAdvance3D)return false;dispatch({type:'nextRound'});return true},
-    playCard(id){if(!S||S.id!=='huit'||!canPlay()||showSuit)return false;const c=player(S).hand.find(c=>c.id===id);if(!c)return false;eightPlayCardUI(c);return true},
+    playCard(id){if(!S||S.id!=='huit'||!canPlay()||showSuit)return false;const c=player(S).hand.find(c=>c.id===id);if(!c||!eightLegal(S,c))return false;eightPlayCardUI(c);return true},
     chooseSuit(suit){if(!S||S.id!=='huit'||!canPlay()||!showSuit||!SUITS.includes(suit))return false;dispatch({type:'card',id:showSuit,suit});return true},
     cancelSuit(){if(!S||S.id!=='huit'||!canPlay()||!showSuit)return false;showSuit=null;renderGame(false);return true},
     eightAction(type){if(!S||S.id!=='huit'||!canPlay()||showSuit||!['announce','counter'].includes(type))return false;dispatch({type});return true},
@@ -3580,7 +3580,7 @@ if(window.SalonTableView){
     cactus(type,value){
      if(!S||S.id!=='cactus')return false;
      if(type==='quick'){
-      const owner=privateIndex(),index=Number(value);if(!legacyCactusOwnQuickAllowed(owner)||!Number.isInteger(index))return false;
+      const owner=privateIndex(),index=Number(value);if(!legacyCactusOwnQuickAllowed(owner)||!Number.isInteger(index)||!S.players[owner]?.hand?.[index])return false;
       legacyCactusQuickUI(owner,index,null);return true;
      }
      if(!canPlay())return false;

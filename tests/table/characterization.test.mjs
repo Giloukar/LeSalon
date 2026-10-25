@@ -1032,3 +1032,57 @@ test('3D rejects stale Eight and Cactus card drops without broadcasting a false 
  assert.ok(eight.includes("if(current?.interactions?.playCard?.(d.cardId)){emitLocalCardGesture('commit',1,0);return}"));
  assert.ok(eight.includes("emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d,{snap:true});return;"));
 });
+
+test('3D Eight rejects illegal and non-drawn cards before reporting a successful drag commit',async()=>{
+ const t=await table();browser=t.browser;
+ try{
+  await setup(t.page,'huit','solo');
+  const result=await t.page.evaluate(async()=>{
+   S.turn=0;S.phase='play';S.suit='C';S.pendingDraw=0;S.attack=null;S.blockEight=false;S.discard=[{id:'top',suit:'C',rank:9}];
+   S.players[0].hand=[{id:'illegal',suit:'H',rank:5},{id:'valid',suit:'C',rank:6},{id:'wild',suit:'D',rank:8}];
+   showSuit=null;
+   let payload=null;
+   SalonTableView.register('3d',{available:()=>true,render(p){payload=p}});
+   renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});
+   const before=JSON.stringify(S),wrong=payload.interactions.playCard('illegal'),afterWrong=JSON.stringify(S);
+   const legal=payload.interactions.playCard('valid'),afterLegal={hasCard:S.players[0].hand.some(c=>c.id==='valid'),top:S.discard.at(-1).id};
+   S.phase='afterdraw';S.drawnId='wild';S.suit='C';S.turn=0;renderGame(false);
+   const beforeDrawn=JSON.stringify(S),drawnOnly=payload.interactions.playCard('illegal'),afterDrawn=JSON.stringify(S);
+   const wild=payload.interactions.playCard('wild'),pending=showSuit;
+   return{wrong,unchanged:before===afterWrong,legal,afterLegal,drawnOnly,drawnUnchanged:afterDrawn===beforeDrawn,wild,pending};
+  });
+  assert.equal(result.wrong,false);
+  assert.equal(result.unchanged,true);
+  assert.equal(result.legal,true);
+  assert.equal(result.afterLegal.hasCard,false);
+  assert.equal(result.afterLegal.top,'valid');
+  assert.equal(result.drawnOnly,false);
+  assert.equal(result.drawnUnchanged,true);
+  assert.equal(result.wild,true);
+  assert.equal(result.pending,'wild');
+ }finally{await browser.close()}
+});
+
+test('3D Cactus refuses quick throws from empty or missing slots, but accepts an occupied matching card',async()=>{
+ const t=await table();browser=t.browser;
+ try{
+  await setup(t.page,'cactus','solo');
+  const result=await t.page.evaluate(async()=>{
+   S.phase='draw';S.turn=0;S.caller=null;S.players[0].hand[1]=null;S.players[0].known[1]=null;
+   const matching=S.players[0].hand[0];
+   S.discard=[{id:'matching-discard',rank:matching.rank,suit:matching.suit}];
+   let payload=null;
+   SalonTableView.register('3d',{available:()=>true,render(p){payload=p}});
+   renderGame(false);await SalonTableView.setMode('3d',{persistPreference:false});
+   const before=JSON.stringify(S),empty=payload.interactions.cactus('quick',1),missing=payload.interactions.cactus('quick',999),unchanged=JSON.stringify(S)===before;
+   const valid=payload.interactions.cactus('quick',0);
+   return{empty,missing,unchanged,valid,removed:S.players[0].hand[0]===null,discard:S.discard.at(-1).id};
+  });
+  assert.equal(result.empty,false);
+  assert.equal(result.missing,false);
+  assert.equal(result.unchanged,true);
+  assert.equal(result.valid,true);
+  assert.equal(result.removed,true);
+  assert.equal(result.discard.length>0,true);
+ }finally{await browser.close()}
+});
