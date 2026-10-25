@@ -3780,28 +3780,39 @@ if(window.SalonTableView){
   tableViewMountControl();
  });
  const TABLE3D_BASE_CELEBRATE=celebrate;
+ let table3dFinalePending=null;
  celebrate=function(){
+  // A second end-of-game notification must not start another fullscreen exit or modal.
+  if(table3dFinalePending)return table3dFinalePending;
   if(window.SalonTableView.getMode()!=='3d')return TABLE3D_BASE_CELEBRATE();
-  const finishNow=()=>{
+  const finishedId=S?.id,finishedStart=S?.startedAt,finishedAt=S?.finishedAt;
+  const stillFinished=()=>view==='game'&&S?.phase==='over'&&S?.id===finishedId&&S?.startedAt===finishedStart&&S?.finishedAt===finishedAt;
+  const finishTransition=async()=>{
+   if(!stillFinished())return;
+   await table3dExitNativeFullscreen();
+   // Fullscreen exit is asynchronous: a replay/home navigation may have superseded the result.
+   if(!stillFinished())return;
    table3dSetPresentation(null);
-   void table3dExitNativeFullscreen();
-   void window.SalonTableView.setMode('2d',{persistPreference:false,reason:'game-over'});
-   if(view==='game')renderGame(false);
+   await window.SalonTableView.setMode('2d',{persistPreference:false,reason:'game-over'});
+   if(!stillFinished())return;
+   renderGame(false);
    return TABLE3D_BASE_CELEBRATE();
+  };
+  const finishNow=()=>{
+   const operation=finishTransition();
+   table3dFinalePending=operation;
+   const clear=()=>{if(table3dFinalePending===operation)table3dFinalePending=null};
+   operation.then(clear,clear);
+   return operation;
   };
   if(!motionOn()||typeof document.startViewTransition!=='function')return finishNow();
-  const finishTransition=async()=>{
-   table3dSetPresentation(null);
-   await table3dExitNativeFullscreen();
-   await window.SalonTableView.setMode('2d',{persistPreference:false,reason:'game-over'});
-   if(view==='game')renderGame(false);
-   return TABLE3D_BASE_CELEBRATE();
-  };
   const root=document.documentElement,cleanup=()=>root.removeAttribute('data-table-finale-transition');
   root.dataset.tableFinaleTransition='on';
   try{
    const transition=document.startViewTransition(()=>finishTransition());
-   if(transition?.finished?.then)transition.finished.then(cleanup,cleanup);else cleanup();
+   table3dFinalePending=transition;
+   const clear=()=>{cleanup();if(table3dFinalePending===transition)table3dFinalePending=null};
+   if(transition?.finished?.then)transition.finished.then(clear,clear);else clear();
    return transition;
   }catch(_){
    cleanup();

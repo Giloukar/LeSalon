@@ -63,7 +63,7 @@ test('leaving native fullscreen keeps the active 3D renderer embedded instead of
 
 test('clearing 3D presentation clears both DOM and internal window state',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','solo');const r=await t.page.evaluate(()=>{table3dSetPresentation('embedded');table3dSetPresentation(null);return{attribute:document.documentElement.hasAttribute('data-table3d-presentation'),internal:table3dPresentation};});assert.equal(r.attribute,false);assert.equal(r.internal,null);}finally{await browser.close();}});
 
-test('game over leaves fullscreen 3D before opening the finale',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','solo');const r=await t.page.evaluate(async()=>{SalonTableView.register('3d',{available:()=>true,activate(){},deactivate(){document.documentElement.dataset.test3dDeactivated='yes'},render(){}});await SalonTableView.setMode('3d',{persistPreference:false});table3dSetPresentation('full');S.phase='over';S.winners=[0];S.finishedAt=123456;renderGame(false);celebrate();const dialog=document.querySelector('#finale-dialog');const out={mode:SalonTableView.getMode(),dataset:document.documentElement.dataset.tableView,presentation:document.documentElement.hasAttribute('data-table3d-presentation'),deactivated:document.documentElement.dataset.test3dDeactivated,dialogOpen:!!dialog?.open,hasWin:!!document.querySelector('.win-box')};if(dialog?.open)dialog.close();dialog?.remove();return out;});assert.equal(r.mode,'2d');assert.equal(r.dataset,'2d');assert.equal(r.presentation,false);assert.equal(r.deactivated,'yes');assert.equal(r.dialogOpen,true);assert.equal(r.hasWin,true);}finally{await browser.close();}});
+test('game over leaves fullscreen 3D before opening the finale',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','solo');const r=await t.page.evaluate(async()=>{SalonTableView.register('3d',{available:()=>true,activate(){},deactivate(){document.documentElement.dataset.test3dDeactivated='yes'},render(){}});await SalonTableView.setMode('3d',{persistPreference:false});table3dSetPresentation('full');S.phase='over';S.winners=[0];S.finishedAt=123456;renderGame(false);await celebrate();const dialog=document.querySelector('#finale-dialog');const out={mode:SalonTableView.getMode(),dataset:document.documentElement.dataset.tableView,presentation:document.documentElement.hasAttribute('data-table3d-presentation'),deactivated:document.documentElement.dataset.test3dDeactivated,dialogOpen:!!dialog?.open,hasWin:!!document.querySelector('.win-box')};if(dialog?.open)dialog.close();dialog?.remove();return out;});assert.equal(r.mode,'2d');assert.equal(r.dataset,'2d');assert.equal(r.presentation,false);assert.equal(r.deactivated,'yes');assert.equal(r.dialogOpen,true);assert.equal(r.hasWin,true);}finally{await browser.close();}});
 
 
 test('3D game over crossfades into the finale when view transitions are available',async()=>{const t=await table();browser=t.browser;try{await setup(t.page,'huit','solo');const r=await t.page.evaluate(async()=>{SalonTableView.register('3d',{available:()=>true,render(){}});await SalonTableView.setMode('3d',{persistPreference:false});table3dSetPresentation('full');S.phase='over';S.winners=[0];S.finishedAt=123456;prefs.motion=true;let starts=0;Object.defineProperty(document,'startViewTransition',{configurable:true,value:update=>{starts++;const updateCallbackDone=Promise.resolve().then(update),finished=updateCallbackDone.then(()=>undefined);return{ready:Promise.resolve(),updateCallbackDone,finished,skipTransition(){}}}});const transition=celebrate();await transition.updateCallbackDone;await transition.finished;const dialog=document.querySelector('#finale-dialog'),out={starts,mode:SalonTableView.getMode(),dataset:document.documentElement.dataset.tableView,presentation:document.documentElement.hasAttribute('data-table3d-presentation'),dialogOpen:!!dialog?.open,transitionAttr:document.documentElement.hasAttribute('data-table-finale-transition')};if(dialog?.open)dialog.close();dialog?.remove();prefs.motion=false;return out;});assert.equal(r.starts,1);assert.equal(r.mode,'2d');assert.equal(r.dataset,'2d');assert.equal(r.presentation,false);assert.equal(r.dialogOpen,true);assert.equal(r.transitionAttr,false);}finally{await browser.close();}});
@@ -1084,5 +1084,63 @@ test('3D Cactus refuses quick throws from empty or missing slots, but accepts an
   assert.equal(result.valid,true);
   assert.equal(result.removed,true);
   assert.equal(result.discard.length>0,true);
+ }finally{await browser.close()}
+});
+
+
+test('3D Eight and Cactus finale waits for native fullscreen exit, even without View Transitions',async()=>{
+ const t=await table();browser=t.browser;
+ try{
+  for(const [id,throws] of [['huit',false],['cactus',true]]){
+   await setup(t.page,id,'solo');
+   const result=await t.page.evaluate(async({id,throws})=>{
+    SalonTableView.register('3d',{available:()=>true,activate(){},deactivate(){},render(){}});
+    await SalonTableView.setMode('3d',{persistPreference:false});
+    table3dSetPresentation('full');
+    let nativeRoot=document.documentElement,releaseExit,exits=0;
+    Object.defineProperty(document,'fullscreenElement',{configurable:true,get(){return nativeRoot}});
+    Object.defineProperty(document,'exitFullscreen',{configurable:true,value:()=>{exits++;return new Promise(resolve=>{releaseExit=()=>{nativeRoot=null;resolve()}})}});
+    prefs.motion=throws;
+    Object.defineProperty(document,'startViewTransition',{configurable:true,value:throws?()=>{throw Error('transition unavailable')}:undefined});
+    S.phase='over';S.finishedAt=__test.now+(id==='huit'?5:6);S.winners=[0];S.reason='Fin de partie';
+    renderGame(false);
+    const finishing=celebrate(),duplicate=celebrate(),samePromise=finishing===duplicate;
+    const before={mode:SalonTableView.getMode(),dialog:!!document.querySelector('#finale-dialog')?.open,exits,presentation:document.documentElement.dataset.table3dPresentation,transition:document.documentElement.hasAttribute('data-table-finale-transition')};
+    releaseExit();await finishing;
+    const dialog=document.querySelector('#finale-dialog'),after={mode:SalonTableView.getMode(),dialog:!!dialog?.open,exits,presentation:document.documentElement.hasAttribute('data-table3d-presentation'),hasResult:!!document.querySelector('.win-box'),transition:document.documentElement.hasAttribute('data-table-finale-transition')};
+    if(dialog?.open)dialog.close();dialog?.remove();prefs.motion=false;
+    return{before,after,samePromise};
+   },{id,throws});
+   assert.equal(result.samePromise,true,id+' must coalesce duplicate final events');
+   assert.deepEqual(result.before,{mode:'3d',dialog:false,exits:1,presentation:'full',transition:false},id);
+   assert.deepEqual(result.after,{mode:'2d',dialog:true,exits:1,presentation:false,hasResult:true,transition:false},id);
+  }
+ }finally{await browser.close()}
+});
+
+test('a stale 3D finale cannot interrupt a rematch while fullscreen exit is pending',async()=>{
+ const t=await table();browser=t.browser;
+ try{
+  await setup(t.page,'huit','solo');
+  const result=await t.page.evaluate(async()=>{
+   SalonTableView.register('3d',{available:()=>true,activate(){},deactivate(){},render(){}});
+   await SalonTableView.setMode('3d',{persistPreference:false});
+   table3dSetPresentation('full');
+   let nativeRoot=document.documentElement,releaseExit;
+   Object.defineProperty(document,'fullscreenElement',{configurable:true,get(){return nativeRoot}});
+   Object.defineProperty(document,'exitFullscreen',{configurable:true,value:()=>new Promise(resolve=>{releaseExit=()=>{nativeRoot=null;resolve()}})});
+   Object.defineProperty(document,'startViewTransition',{configurable:true,value:undefined});
+   S.phase='over';S.finishedAt=__test.now+9;S.winners=[0];
+   renderGame(false);
+   const finishing=celebrate();
+   S=createGame('cactus',{mode:'solo',names:['A','B','C'],timeControl:{enabled:false}});
+   renderGame(false);
+   releaseExit();await finishing;
+   return{phase:S.phase,game:S.id,modal:!!document.querySelector('#finale-dialog')?.open,mode:SalonTableView.getMode()};
+  });
+  assert.equal(result.game,'cactus');
+  assert.notEqual(result.phase,'over');
+  assert.equal(result.modal,false,'stale victory modal never covers a new game');
+  assert.equal(result.mode,'3d','late cleanup does not forcibly change a newer game view');
  }finally{await browser.close()}
 });
