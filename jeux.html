@@ -3055,9 +3055,15 @@ validateSaved=function(){
 
 function legacyCactusQuickFX(sourceRect,card,good){
  const target=document.querySelector('[data-cactus-discard="1"]');
- if(good&&sourceRect&&target&&sceneMotion()){
-  const to=target.getBoundingClientRect();sceneFlight(cardHTML(card),sourceRect,to,{spin:10,duration:520});scenePulse('[data-cactus-discard="1"]',SCENES.cactus.accent,true);sceneBadge('Bien vu !',{felt:sceneRect(document.querySelector('.felt'))},'✳');
- }else{
+ if(good){
+  // The authoritative quick throw succeeded. A 3D gesture has no source HTML rect;
+  // lack of a 2D animation must never be mistaken for a failed card action.
+  if(sourceRect&&target&&sceneMotion()){
+   const to=target.getBoundingClientRect();sceneFlight(cardHTML(card),sourceRect,to,{spin:10,duration:520});scenePulse('[data-cactus-discard="1"]',SCENES.cactus.accent,true);sceneBadge('Bien vu !',{felt:sceneRect(document.querySelector('.felt'))},'✳');
+  }
+  return;
+ }
+ {
   const own=document.querySelector('.cactus-player.own')||document.querySelector('.cactus-player');
   if(own){own.classList.add('legacy-cactus-jet-bad');setTimeout(function(){own.classList.remove('legacy-cactus-jet-bad')},650)}
   const r=sourceRect||own&&own.getBoundingClientRect();if(r)for(let i=0;i<10;i++){const sp=document.createElement('i');sp.className='legacy-cactus-spines';sp.textContent='✦';sp.style.left=(r.left+r.width/2)+'px';sp.style.top=(r.top+r.height/2)+'px';sp.style.setProperty('--sx',(Math.random()*120-60)+'px');sp.style.setProperty('--sy',(Math.random()*100-65)+'px');document.body.appendChild(sp);setTimeout(function(){sp.remove()},850)}
