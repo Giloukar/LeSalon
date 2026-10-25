@@ -76,8 +76,8 @@ async function peers(id){
  };
  await deliver();
  const state=async()=>({
-  host:await host.evaluate(()=>clonePacket(net.state)),
-  guest:await guest.evaluate(()=>clonePacket(S)),
+  host:await host.evaluate(()=>JSON.parse(JSON.stringify(net.state))),
+  guest:await guest.evaluate(()=>JSON.parse(JSON.stringify(S))),
   projected:await host.evaluate(()=>projectGame(net.state,1)),
   ack:await guest.evaluate(()=>({pending:net.pending,revision:net.revision,seq:net.seq})),
   hostRevision:await host.evaluate(()=>net.revision),
