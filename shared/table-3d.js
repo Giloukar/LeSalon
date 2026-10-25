@@ -2473,7 +2473,10 @@ export function createTable3DRenderer({onFatal}={}){
         if(startFreeToss(d))return;if(settlePersistentPlacement(d))return;returnManipulatedCard(d);return;
       }
       if(d.kind==='cactus-quick'&&d.gestureStarted){
-        if(directCardDropNear(d,'cactus')){emitLocalCardGesture('commit',1,0);current?.interactions?.cactus?.('quick',d.index);return}
+        if(directCardDropNear(d,'cactus')){
+          if(current?.interactions?.cactus?.('quick',d.index)){emitLocalCardGesture('commit',1,0);return}
+          emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d,{snap:true});return;
+        }
       }
       if(d.kind==='cactus-drawn'){
         if(Number.isInteger(d.cactusSwap?.index)&&current?.interactions?.cactus?.('swap',d.cactusSwap.index))return;
@@ -2576,7 +2579,10 @@ export function createTable3DRenderer({onFatal}={}){
       if(startFreeToss(d))return;if(settlePersistentPlacement(d))return;returnManipulatedCard(d);return;
     }
     const near=d.canPlay&&d.moved&&(d.overDrop||Math.hypot(d.mesh.position.x-1.25,d.mesh.position.z-.05)<cardDropRadius(d));
-    if(d.canPlay&&(!d.moved||near)){emitLocalCardGesture('commit',1,0);current?.interactions?.playCard?.(d.cardId);return}
+    if(d.canPlay&&(!d.moved||near)){
+      if(current?.interactions?.playCard?.(d.cardId)){emitLocalCardGesture('commit',1,0);return}
+      emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d,{snap:true});return;
+    }
     if(d.canPlay)emitLocalCardGesture('cancel',0,0);
     if(Number.isFinite(d.manualRotation))d.mesh.rotation.z=d.manualRotation;
     if(startFreeToss(d))return;
@@ -2597,7 +2603,7 @@ export function createTable3DRenderer({onFatal}={}){
   function onPointerCancel(e){if(releaseCameraPointer(e))return;if(releaseTwistPointer(e))return;cancelActiveDrag(e.pointerId)}
   function onLostPointerCapture(e){if(releaseCameraPointer(e))return;if(releaseTwistPointer(e))return;cancelActiveDrag(e.pointerId)}
   function onWindowBlur(){cancelCameraDrag();cancelActiveDrag()}
-  function onVisibilityChange(){if(document.hidden)cancelActiveDrag()}
+  function onVisibilityChange(){if(document.hidden){cancelCameraDrag();cancelActiveDrag()}}
 
   function activate(){active=true;init()}
   function deactivate(){
