@@ -77,7 +77,9 @@ test('physical pieces: dice values, shared resources, exports and live game rend
    view='game';gate=false;busy=false;renderGame(false);
    const entered=await SalonTableView.setMode('3d',{persistPreference:false});
    if(!entered.ok)throw Error('Cannot open 3D for '+gameId+': '+entered.reason);
+   table3dSetPresentation('full');
   },id);
+  await page.waitForTimeout(150);
   const touch=await page.evaluate(()=>{
    const host=document.querySelector('.table-3d-host'),canvas=host?.querySelector('canvas');
    if(!host||!canvas)throw Error('Missing interactive 3D canvas');
@@ -103,7 +105,7 @@ test('physical pieces: dice values, shared resources, exports and live game rend
   const tolerance=await page.evaluate(()=>{
    const probe=window.__salonTouchProbe,canvas=document.querySelector('.table-3d-host canvas'),r=canvas.getBoundingClientRect();
    if(!probe||!canvas)throw Error('Missing 3D hit probe');
-   const targets=probe.targets().filter(t=>t.x>r.left+24&&t.x<r.right-24&&t.y>r.top+24&&t.y<r.bottom-24);
+   const projected=probe.targets(),targets=projected.filter(t=>t.x>r.left+24&&t.x<r.right-24&&t.y>r.top+24&&t.y<r.bottom-24);
    let candidate=null;
    for(const t of targets){
     for(const radius of [12,16,20,24,28,32]){
@@ -116,7 +118,7 @@ test('physical pieces: dice values, shared resources, exports and live game rend
     }
     if(candidate)break;
    }
-   if(!candidate)return{found:false,targets:targets.length};
+   if(!candidate)return{found:false,targets:targets.length,all:projected.slice(0,8),rect:{left:r.left,top:r.top,width:r.width,height:r.height},view:document.documentElement.dataset.tableView,presentation:document.documentElement.dataset.table3dPresentation};
    const original=JSON.stringify(S),events=[];
    const pointer=(type)=>new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:622,pointerType:'touch',isPrimary:true,button:0,buttons:type==='pointerdown'?1:0,clientX:candidate.x,clientY:candidate.y});
    window.addEventListener('salon:local-card-gesture',e=>events.push(e.detail?.phase),{once:true});
