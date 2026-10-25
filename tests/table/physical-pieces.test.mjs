@@ -19,7 +19,22 @@ test('physical pieces: dice values, shared resources, exports and live game rend
  else if(u.pathname==='/fixture')return route.fulfill({contentType:'text/html',body:'<body style="margin:0;background:#182630"><div id="gallery" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;padding:18px"></div><div id="stage"></div></body>'});
  else if(u.origin==='http://cards.test')file=path.resolve(root,'.'+u.pathname);
  if(!file)return route.fulfill({contentType:'text/javascript',body:''});
- try{return route.fulfill({contentType:{'.js':'text/javascript','.html':'text/html','.css':'text/css'}[path.extname(file)]||'application/octet-stream',body:await readFile(file)})}catch{return route.fulfill({status:404,body:''})}
+ try{
+  let body=await readFile(file);
+  if(u.pathname==='/shared/table-3d.js'){
+   const source=body.toString('utf8'),marker='  function setHover(mesh){';
+   if(!source.includes(marker))throw Error('3D touch probe insertion point missing');
+   body=source.replace(marker,`  window.__salonTouchProbe={
+    targets:()=>interactive.filter(o=>o.userData?.cardId).map(o=>{
+      const center=new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()).project(camera),r=canvas.getBoundingClientRect();
+      return{id:o.userData.cardId,kind:o.userData.kind,x:r.left+(center.x+1)*r.width/2,y:r.top+(1-center.y)*r.height/2};
+    }),
+    hitAt:(x,y,pointerType)=>{const o=hit({clientX:x,clientY:y,pointerType});return o?{id:o.userData.cardId||null,kind:o.userData.kind}:null}
+   };
+`+marker);
+  }
+  return route.fulfill({contentType:{'.js':'text/javascript','.html':'text/html','.css':'text/css'}[path.extname(file)]||'application/octet-stream',body});
+ }catch{return route.fulfill({status:404,body:''})}
  });
  await page.goto('http://cards.test/fixture');
  const info=await page.evaluate(async threeURL=>{
@@ -84,7 +99,52 @@ test('physical pieces: dice values, shared resources, exports and live game rend
    return{started,cleared,recovered,unchanged:JSON.stringify(S)===before,stopped:!host.classList.contains('is-camera-dragging')};
   });
   assert.deepEqual(touch,{started:true,cleared:true,recovered:true,unchanged:true,stopped:true},'mobile 3D touch recovery for '+id);
+  // Inspect the actual Three.js raycaster; find a neighboring pixel where mouse misses but touch selects.
+  const tolerance=await page.evaluate(()=>{
+   const probe=window.__salonTouchProbe,canvas=document.querySelector('.table-3d-host canvas'),r=canvas.getBoundingClientRect();
+   if(!probe||!canvas)throw Error('Missing 3D hit probe');
+   const targets=probe.targets().filter(t=>t.x>r.left+24&&t.x<r.right-24&&t.y>r.top+24&&t.y<r.bottom-24);
+   let candidate=null;
+   for(const t of targets){
+    for(const radius of [12,16,20,24,28,32]){
+     for(const [dx,dy] of [[radius,0],[-radius,0],[0,radius],[0,-radius],[radius,radius],[-radius,-radius]]){
+      const x=t.x+dx,y=t.y+dy;
+      const mouse=probe.hitAt(x,y,'mouse'),finger=probe.hitAt(x,y,'touch');
+      if(!mouse&&finger?.id===t.id){candidate={x,y,id:t.id};break}
+     }
+     if(candidate)break;
+    }
+    if(candidate)break;
+   }
+   if(!candidate)return{found:false,targets:targets.length};
+   const original=JSON.stringify(S),events=[];
+   const pointer=(type)=>new PointerEvent(type,{bubbles:true,cancelable:true,pointerId:622,pointerType:'touch',isPrimary:true,button:0,buttons:type==='pointerdown'?1:0,clientX:candidate.x,clientY:candidate.y});
+   window.addEventListener('salon:local-card-gesture',e=>events.push(e.detail?.phase),{once:true});
+   canvas.dispatchEvent(pointer('pointerdown'));
+   const selected=document.querySelector('.table-3d-host')?.classList.contains('is-dragging')||false;
+   canvas.dispatchEvent(pointer('pointercancel'));
+   return{found:true,selected,unchanged:JSON.stringify(S)===original,id:candidate.id,events};
+  });
+  assert.equal(tolerance.found,true,'find a small near-miss touch target for '+id+' ('+JSON.stringify(tolerance)+')');
+  assert.equal(tolerance.selected,true,'touch margin activates its real 3D card for '+id);
+  assert.equal(tolerance.unchanged,true,'touch-and-cancel must not alter rules for '+id);
+  
  }
- assert.deepEqual(errors,[]);
+ // In portrait fullscreen, the hint must not overlap a tall action tray or the top controls.
+ for(const width of [320,390]){
+  await page.setViewportSize({width,height:width===320?640:844});
+  const layout=await page.evaluate(()=>{
+   if(S?.id!=='cactus')throw Error('Expected Cactus 3D during portrait layout assertion');
+   table3dSetPresentation('full');
+   const host=document.querySelector('.table-3d-host'),help=host?.querySelector('.table-3d-help'),controls=host?.querySelector('.table-3d-window-controls'),tray=document.querySelector('#game-actions');
+   if(!host||!help||!controls||!tray)throw Error('Missing 3D portrait UI elements');
+   const oldHeight=tray.style.minHeight;tray.style.minHeight='160px';
+   const h=help.getBoundingClientRect(),c=controls.getBoundingClientRect(),a=tray.getBoundingClientRect(),viewHeight=innerHeight;
+   tray.style.minHeight=oldHeight;
+   return{helpVisible:h.width>0&&h.height>0,underControls:h.top>=c.bottom+4,aboveTray:h.bottom<a.top-4,inViewport:h.top>=0&&h.bottom<=viewHeight,fullscreen:document.documentElement.dataset.table3dPresentation==='full'};
+  });
+  assert.deepEqual(layout,{helpVisible:true,underControls:true,aboveTray:true,inViewport:true,fullscreen:true},'3D portrait overlay layout at '+width+'px');
+ }
+  assert.deepEqual(errors,[]);
  }finally{await browser.close()}
 });
