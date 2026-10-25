@@ -2351,7 +2351,7 @@ export function createTable3DRenderer({onFatal}={}){
   function beginLooseCardDrag(obj,e,kind){
     const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()},gestureEnabled=!!(current?.canInteract&&LIVE_CARD_GAMES.has(current?.gameId)&&(['card-select','special-select'].includes(kind)||kind==='cactus-quick')),companions=groupedDragCompanions(obj,kind);
     stopTossForMesh(obj);companions.forEach(c=>stopTossForMesh(c.mesh));
-    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind,loose:true,mesh:obj,cardId:obj.userData.cardId,tileId:obj.userData.tileId,index:obj.userData.index,owner:obj.userData.owner,tapEnabled:!!obj.userData.tapEnabled,gestureEnabled,gestureStarted:false,gestureHome:home.position.clone(),companions,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),manualRotation:obj.rotation.z,manualFace:faceRotationX(obj.rotation.x),rotated:false,flipped:false,twist:null,stackMode:false,stackTimer:0,moved:false,home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
+    drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind,loose:true,mesh:obj,cardId:obj.userData.cardId,tileId:obj.userData.tileId,index:obj.userData.index,owner:obj.userData.owner,tapEnabled:!!obj.userData.tapEnabled,gestureEnabled,gestureStarted:false,gestureHome:home.position.clone(),companions,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),manualRotation:obj.rotation.z,manualFace:faceRotationX(obj.rotation.x),rotated:false,flipped:false,twist:null,multiTouch:false,stackMode:false,stackTimer:0,moved:false,home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
     armLocalStackDrag(drag,e);host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
   }
   function moveLooseCardDrag(e){
@@ -2438,6 +2438,8 @@ export function createTable3DRenderer({onFatal}={}){
     if(!active)return;
     try{canvas?.focus?.({preventScroll:true})}catch(_){canvas?.focus?.()}
     if(drag?.mesh&&e.pointerId!==drag.pointerId&&e.pointerType==='touch'){
+      // A second finger manipulates the card; its later primary release must never play a turn.
+      drag.multiTouch=true;
       clearStackHold(drag);
       const angle=Math.atan2(e.clientY-drag.lastY,e.clientX-drag.lastX);
       drag.twist={pointerId:e.pointerId,lastAngle:angle,startedAt:performance.now(),turned:false};capturePointer(e.pointerId);e.preventDefault();return;
@@ -2455,7 +2457,7 @@ export function createTable3DRenderer({onFatal}={}){
     }
     if(obj.userData.kind!=='card')return;
     const home=obj.userData.home||{position:obj.position.clone(),rotation:obj.rotation.clone(),scale:obj.scale.clone()},canPlay=!!obj.userData.playable;
-    stopTossForMesh(obj);drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card',mesh:obj,cardId:obj.userData.cardId,canPlay,gestureStarted:false,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),manualRotation:obj.rotation.z,manualFace:faceRotationX(obj.rotation.x),rotated:false,flipped:false,twist:null,stackMode:false,stackTimer:0,moved:false,overDrop:false,gestureHome:home.position.clone(),home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
+    stopTossForMesh(obj);drag={pointerId:e.pointerId,pointerType:e.pointerType||'mouse',kind:'card',mesh:obj,cardId:obj.userData.cardId,canPlay,gestureStarted:false,startX:e.clientX,startY:e.clientY,lastX:e.clientX,lastY:e.clientY,lastAt:performance.now(),velocityX:0,velocityY:0,worldVelocity:new THREE.Vector3(),lastWorld:obj.position.clone(),manualRotation:obj.rotation.z,manualFace:faceRotationX(obj.rotation.x),rotated:false,flipped:false,twist:null,multiTouch:false,stackMode:false,stackTimer:0,moved:false,overDrop:false,gestureHome:home.position.clone(),home:{position:home.position.clone(),rotation:home.rotation.clone(),scale:home.scale.clone()}};
     armLocalStackDrag(drag,e);if(canPlay&&!drag.stackMode){emitLocalCardGesture('start',0,0);drag.gestureStarted=true}host?.classList.add('is-dragging');capturePointer(e.pointerId);e.preventDefault();
   }
   function onPointerMove(e){
@@ -2483,6 +2485,16 @@ export function createTable3DRenderer({onFatal}={}){
     const d=drag;clearStackHold(d);drag=null;host?.classList.remove('is-dragging','is-stack-dragging');dropMarker.material.opacity=.2;
     if(d.loose&&d.kind!=='card')dropMarker.visible=false;
     if(cancelled){if(d.kind==='card'&&d.canPlay||d.loose&&d.gestureStarted)emitLocalCardGesture('cancel',0,0);if(d.loose)returnManipulatedCard(d,{snap:document.hidden});else{syncCurrent(current);draw()}return}
+    // Two-finger rotation/flip is exclusively local: even an unchanged card position is not a tap.
+    if(d.multiTouch){
+      if(d.gestureStarted)emitLocalCardGesture('cancel',0,0);
+      if(d.mesh){
+        if(Number.isFinite(d.manualRotation))d.mesh.rotation.z=d.manualRotation;
+        if(settlePersistentPlacement(d))return;
+        returnManipulatedCard(d,{snap:true});
+      }
+      return;
+    }
     const tap=!d.stackMode&&!d.rotated&&!d.flipped&&Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<8;
     if(d.loose&&!tap){
       if(d.stackMode){
@@ -2490,7 +2502,7 @@ export function createTable3DRenderer({onFatal}={}){
         if(Number.isFinite(d.manualRotation))d.mesh.rotation.z=d.manualRotation;
         if(startFreeToss(d))return;if(settlePersistentPlacement(d))return;returnManipulatedCard(d);return;
       }
-      if(d.kind==='cactus-quick'&&d.gestureStarted){
+      if(d.kind==='cactus-quick'&&d.gestureStarted&&!d.rotated&&!d.flipped){
         if(directCardDropNear(d,'cactus')){
           if(current?.interactions?.cactus?.('quick',d.index)){emitLocalCardGesture('commit',1,0);return}
           emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d,{snap:true});return;
@@ -2596,8 +2608,8 @@ export function createTable3DRenderer({onFatal}={}){
       if(Number.isFinite(d.manualRotation))d.mesh.rotation.z=d.manualRotation;
       if(startFreeToss(d))return;if(settlePersistentPlacement(d))return;returnManipulatedCard(d);return;
     }
-    const near=d.canPlay&&d.moved&&(d.overDrop||Math.hypot(d.mesh.position.x-1.25,d.mesh.position.z-.05)<cardDropRadius(d));
-    if(d.canPlay&&(!d.moved||near)){
+    const near=d.canPlay&&d.moved&&!d.rotated&&!d.flipped&&(d.overDrop||Math.hypot(d.mesh.position.x-1.25,d.mesh.position.z-.05)<cardDropRadius(d));
+    if(d.canPlay&&((tap&&!d.moved)||near)){
       if(current?.interactions?.playCard?.(d.cardId)){emitLocalCardGesture('commit',1,0);return}
       emitLocalCardGesture('cancel',0,0);returnManipulatedCard(d,{snap:true});return;
     }
