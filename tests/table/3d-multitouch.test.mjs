@@ -86,7 +86,8 @@ test('rotating or flipping a playable Eight card near the pile is not a card pla
 
 test('Cactus one-finger quick throw works, but two-finger or flipped cards do not throw',()=>{
  const normal=tableHarness({kind:'cactus-quick',loose:true,index:2,moved:true,tapEnabled:true});
- normal.handlers.finishDrag(normal.event());
+ const release=normal.event();release.clientX=145;
+ normal.handlers.finishDrag(release);
  assert.deepEqual(normal.actions,[['cactus','quick',2]]);
  assert.deepEqual(normal.events,['commit']);
  for(const overrides of [{multiTouch:true},{flipped:true},{rotated:true}]){
